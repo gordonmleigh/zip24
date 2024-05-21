@@ -1,0 +1,10 @@
+{
+  "[typescript][javascript]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "eslint.experimental.useFlatConfig": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "cSpell.words": ["decompressors"]
+}

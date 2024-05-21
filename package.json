@@ -1,0 +1,125 @@
+{
+  "name": "zip24",
+  "version": "0.1.0",
+  "description": "A zip package for the modern age",
+  "main": "lib/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    "./base/buffer": {
+      "types": "./lib/base/buffer.d.ts",
+      "default": "./lib/base/buffer.js"
+    },
+    "./base/compression": {
+      "types": "./lib/base/compression.d.ts",
+      "default": "./lib/base/compression.js"
+    },
+    "./base/reader": {
+      "types": "./lib/base/reader.d.ts",
+      "default": "./lib/base/reader.js"
+    },
+    "./base/writer": {
+      "types": "./lib/base/writer.d.ts",
+      "default": "./lib/base/writer.js"
+    },
+    "./node/buffer": {
+      "types": "./lib/node/buffer.d.ts",
+      "default": "./lib/node/buffer.js"
+    },
+    "./node/compression": {
+      "types": "./lib/node/compression.d.ts",
+      "default": "./lib/node/compression.js"
+    },
+    "./node/reader": {
+      "types": "./lib/node/reader.d.ts",
+      "default": "./lib/node/reader.js"
+    },
+    "./node/writer": {
+      "types": "./lib/node/writer.d.ts",
+      "default": "./lib/node/writer.js"
+    },
+    "./buffer": {
+      "node": {
+        "types": "./lib/node/buffer.d.ts",
+        "default": "./lib/node/buffer.js"
+      },
+      "default": {
+        "types": "./lib/base/buffer.d.ts",
+        "default": "./lib/base/buffer.js"
+      }
+    },
+    "./compression": {
+      "node": {
+        "types": "./lib/node/compression.d.ts",
+        "default": "./lib/node/compression.js"
+      },
+      "default": {
+        "types": "./lib/base/compression.d.ts",
+        "default": "./lib/base/compression.js"
+      }
+    },
+    "./reader": {
+      "node": {
+        "types": "./lib/node/reader.d.ts",
+        "default": "./lib/node/reader.js"
+      },
+      "default": {
+        "types": "./lib/base/reader.d.ts",
+        "default": "./lib/base/reader.js"
+      }
+    },
+    "./writer": {
+      "node": {
+        "types": "./lib/node/writer.d.ts",
+        "default": "./lib/node/writer.js"
+      },
+      "default": {
+        "types": "./lib/base/writer.d.ts",
+        "default": "./lib/base/writer.js"
+      }
+    },
+    "./common": {
+      "types": "./lib/common.d.ts",
+      "default": "./lib/common.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf lib/",
+    "compile": "tsc",
+    "lint": "eslint src",
+    "test": "node --import @swc-node/register/esm-register --enable-source-maps --test 'src/**/*.test.*'",
+    "watch:compile": "tsc -w",
+    "watch:test": "node --import @swc-node/register/esm-register --enable-source-maps --watch --test 'src/**/*.test.*'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/gordonmleigh/zip24.git"
+  },
+  "keywords": [
+    "zip"
+  ],
+  "author": "Gordon Leigh",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gordonmleigh/zip24/issues"
+  },
+  "homepage": "https://github.com/gordonmleigh/zip24#readme",
+  "devDependencies": {
+    "@awboost/eslint-config": "^0.1.2",
+    "@swc-node/register": "^1.9.1",
+    "@types/node": "^20.12.11",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5"
+  },
+  "files": [
+    "src/",
+    "lib/"
+  ],
+  "packageManager": "npm@10.7.0+sha256.f443ed4364ea11ac5cf7cae7fb4731278c64dd6839093f8a46eabde0430e0fcd",
+  "dependencies": {
+    "crc-32": "^1.2.2"
+  }
+}

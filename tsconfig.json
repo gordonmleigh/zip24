@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    // correctness
+    "allowJs": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "strict": true,
+    // modules
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    // language
+    "target": "ES2022",
+    // output
+    "declaration": true,
+    "declarationMap": true,
+    "isolatedModules": true,
+    "outDir": "lib/",
+    "rootDir": "src/",
+    "sourceMap": true,
+    "verbatimModuleSyntax": true,
+    // other
+    "noErrorTruncation": true,
+    "pretty": true
+  },
+  "include": ["src/"],
+  "exclude": ["dist/", "lib/", "node_modules/"]
+}
