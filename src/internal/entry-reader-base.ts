@@ -1,6 +1,10 @@
 import { defaultDecompressors } from "../base/compression.js";
 import {
   CompressionMethod,
+  DosFileAttributes,
+  UnixFileAttributes,
+  ZipPlatform,
+  ZipVersion,
   type CompressionAlgorithms,
   type ZipEntryReaderLike,
 } from "../common.js";
@@ -19,18 +23,38 @@ export type ZipEntryReaderOptions = {
 export abstract class EntryReaderBase implements ZipEntryReaderLike {
   private readonly decompressors: CompressionAlgorithms;
 
+  public readonly attributes: number;
   public readonly comment: string;
   public readonly compressionMethod: CompressionMethod;
   public readonly compressedSize: number;
   public readonly crc32: number;
   public readonly lastModified: Date;
   public readonly path: string;
+  public readonly platformMadeBy: ZipPlatform;
   public readonly uncompressedSize: number;
+  public readonly versionMadeBy: ZipVersion;
+  public readonly versionNeeded: ZipVersion;
+
+  public readonly dosFileAttributes?: DosFileAttributes;
+  public readonly unixFileAttributes?: UnixFileAttributes;
+
+  public get isDirectory(): boolean {
+    return (
+      this.path.endsWith("/") ||
+      !!this.dosFileAttributes?.isDirectory ||
+      !!this.unixFileAttributes?.isDirectory
+    );
+  }
+
+  public get isSymbolicLink(): boolean {
+    return !!this.unixFileAttributes?.isSymbolicLink;
+  }
 
   public constructor(
     reader: ZipDirectoryReader,
     options: ZipEntryReaderOptions = {},
   ) {
+    this.attributes = reader.externalFileAttributes;
     this.decompressors = options.decompressors ?? defaultDecompressors;
     this.comment = reader.fileComment;
     this.compressionMethod = reader.compressionMethod;
@@ -38,7 +62,17 @@ export abstract class EntryReaderBase implements ZipEntryReaderLike {
     this.crc32 = reader.crc32;
     this.lastModified = reader.lastModified;
     this.path = reader.fileName;
+    this.platformMadeBy = reader.platformMadeBy;
     this.uncompressedSize = reader.uncompressedSize;
+    this.versionMadeBy = reader.versionMadeBy;
+    this.versionNeeded = reader.versionNeeded;
+
+    if (this.platformMadeBy === ZipPlatform.DOS) {
+      this.dosFileAttributes = new DosFileAttributes(this.attributes & 0xff);
+    }
+    if (this.platformMadeBy === ZipPlatform.UNIX) {
+      this.unixFileAttributes = new UnixFileAttributes(this.attributes >>> 16);
+    }
   }
 
   public async *getData(): AsyncGenerator<Uint8Array> {
@@ -78,6 +112,18 @@ export abstract class EntryReaderBase implements ZipEntryReaderLike {
 
   public async getBuffer(): Promise<Uint8Array> {
     return await bufferFromIterable(this.getData());
+  }
+
+  public async getText(encoding?: string): Promise<string> {
+    const decoder = new TextDecoder(encoding);
+    let output = "";
+
+    for await (const chunk of this.getData()) {
+      output += decoder.decode(chunk, { stream: true });
+    }
+
+    output += decoder.decode();
+    return output;
   }
 
   public [Symbol.asyncIterator](): AsyncIterator<Uint8Array> {

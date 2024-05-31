@@ -2,7 +2,7 @@ import {
   CompressionMethod,
   DosDate,
   GeneralPurposeFlags,
-  MadeByPlatform,
+  ZipPlatform,
   ZipVersion,
   type CompressionAlgorithms,
 } from "../common.js";
@@ -34,7 +34,7 @@ type EntryInfoBase = {
   compressionMethod: CompressionMethod;
   crc32: number;
   externalFileAttributes: number;
-  platformMadeBy: MadeByPlatform;
+  platformMadeBy: ZipPlatform;
   uncompressedSize: number;
   versionMadeBy: ZipVersion;
   zip64: boolean;
@@ -157,7 +157,7 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
         : new DosDate(),
       localHeaderOffset: this.startingOffset + this.buffer.writtenBytes,
       path: encoder.encode(file.path),
-      platformMadeBy: file.platformMadeBy ?? MadeByPlatform.DOS,
+      platformMadeBy: file.platformMadeBy ?? ZipPlatform.DOS,
       uncompressedSize: file.uncompressedSize ?? 0,
       versionMadeBy: file.versionMadeBy ?? ZipVersion.Deflate,
       zip64:

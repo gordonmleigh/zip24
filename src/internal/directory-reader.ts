@@ -2,7 +2,7 @@ import {
   CompressionMethod,
   DosDate,
   GeneralPurposeFlags,
-  MadeByPlatform,
+  ZipPlatform,
   ZipVersion,
 } from "../common.js";
 import { assert, assertSignature } from "./assert.js";
@@ -16,7 +16,7 @@ import { CentralHeaderSignature } from "./signatures.js";
 export class ZipDirectoryReader implements OverridableFileInfo {
   public static readonly fixedFieldsLength = 46;
 
-  public platformMadeBy = MadeByPlatform.DOS;
+  public platformMadeBy = ZipPlatform.DOS;
   public versionMadeBy = ZipVersion.Zip64;
   public versionNeeded = ZipVersion.Zip64;
   public readonly flags = new GeneralPurposeFlags();

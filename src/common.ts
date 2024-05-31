@@ -1,7 +1,7 @@
 import { assert } from "./internal/assert.js";
 import { BitField } from "./internal/binary.js";
 
-export enum MadeByPlatform {
+export enum ZipPlatform {
   // 4.4.2.2 The current mappings are:
   //   0 - MS-DOS and OS/2 (FAT / VFAT / FAT32 file systems)
   //   1 - Amiga                     2 - OpenVMS
@@ -26,9 +26,85 @@ export enum ZipVersion {
   Zip64 = 45,
 }
 
+export class DosFileAttributes extends BitField {
+  // https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+  public constructor(value = 0) {
+    super(value, 8);
+  }
+
+  public get isReadOnly(): boolean {
+    return this.getBit(0);
+  }
+  public set isReadOnly(value: boolean) {
+    this.setBit(0, value);
+  }
+
+  public get isHidden(): boolean {
+    return this.getBit(1);
+  }
+  public set isHidden(value: boolean) {
+    this.setBit(1, value);
+  }
+
+  public get isSystem(): boolean {
+    return this.getBit(2);
+  }
+  public set isSystem(value: boolean) {
+    this.setBit(2, value);
+  }
+
+  public get isDirectory(): boolean {
+    return this.getBit(4);
+  }
+  public set isDirectory(value: boolean) {
+    this.setBit(4, value);
+  }
+}
+
+export class UnixFileAttributes extends BitField {
+  // https://man7.org/linux/man-pages/man7/inode.7.html
+  public constructor(value = 0) {
+    super(value, 16);
+  }
+
+  public get isDirectory(): boolean {
+    return this.type === 0o40000;
+  }
+  public set isDirectory(value: boolean) {
+    this.type = value ? 0o40000 : 0o100000;
+  }
+
+  public get isSymbolicLink(): boolean {
+    return this.type === 0o120000;
+  }
+  public set isSymbolicLink(value: boolean) {
+    this.type = value ? 0o120000 : 0o100000;
+  }
+
+  public get mode(): number {
+    return this.value & 0o7777;
+  }
+  public set mode(value: number) {
+    this.value = (this.value & 0o170000) | (value & 0o7777);
+  }
+
+  public get permissions(): number {
+    return this.value & 0o777;
+  }
+  public set permissions(value: number) {
+    this.value = (this.value & 0o177000) | (value & 0o777);
+  }
+
+  public get type(): number {
+    return this.value & 0o170000;
+  }
+  public set type(value: number) {
+    this.value = (this.value & 0o7777) | (value & 0o170000);
+  }
+}
+
 export class GeneralPurposeFlags extends BitField {
   public constructor(value = 0) {
-    // default is to enable utf-8
     super(value, 16);
   }
 
@@ -140,8 +216,8 @@ export class DosDate extends Date {
     );
 
     this.setDate(value & 0x1f); // 1-31
-    this.setMonth(((value >> 5) & 0xf) - 1); // 1-12
-    this.setFullYear(((value >> 9) & 0x7f) + 1980); // 0-128, 1980-2108
+    this.setMonth(((value >>> 5) & 0xf) - 1); // 1-12
+    this.setFullYear(((value >>> 9) & 0x7f) + 1980); // 0-128, 1980-2108
 
     return this.getTime();
   }
@@ -166,8 +242,8 @@ export class DosDate extends Date {
     );
 
     this.setSeconds((value & 0x1f) * 2); // 0-29, 0-58 (even numbers)
-    this.setMinutes((value >> 5) & 0x3f); // 0-59
-    this.setHours((value >> 11) & 0x1f); // 0-23
+    this.setMinutes((value >>> 5) & 0x3f); // 0-59
+    this.setHours((value >>> 11) & 0x1f); // 0-23
 
     return this.getTime();
   }
@@ -187,11 +263,18 @@ export type ZipReaderLike = {
  * Represents an object which can read a zip file entry.
  */
 export type ZipEntryReaderLike = {
+  readonly attributes: number;
   readonly comment: string;
   readonly compressedSize: number;
   readonly crc32: number;
   readonly path: string;
+  readonly platformMadeBy: ZipPlatform;
   readonly uncompressedSize: number;
+  readonly versionMadeBy: ZipVersion;
+  readonly versionNeeded: ZipVersion;
+
+  readonly isDirectory: boolean;
+  readonly isSymbolicLink: boolean;
 
   readonly getBuffer: () => PromiseLike<Uint8Array>;
   readonly getData: () => AsyncIterable<Uint8Array>;

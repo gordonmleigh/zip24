@@ -1,4 +1,10 @@
-import { CompressionMethod } from "../common.js";
+import {
+  CompressionMethod,
+  DosFileAttributes,
+  UnixFileAttributes,
+  ZipPlatform,
+} from "../common.js";
+import { assert } from "../internal/assert.js";
 import { readableStreamFromIterable } from "../internal/streams.js";
 import {
   ZipWriterBase,
@@ -15,9 +21,11 @@ export type ZipEntryInfo = {
   compressionMethod?: CompressionMethod;
   compressedSize?: number;
   crc32?: number;
+  dosFileAttributes?: DosFileAttributes;
   modifiedTime?: Date;
   path: string;
   uncompressedSize?: number;
+  unixFileAttributes?: UnixFileAttributes;
   zip64?: boolean;
 };
 
@@ -51,7 +59,32 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     entry: ZipEntryInfo,
     content?: ZipEntryData,
   ): Promise<void> {
-    await this.writer.writeFileEntry(entry, content);
+    const { dosFileAttributes, unixFileAttributes, ...rest } = entry;
+
+    let externalFileAttributes: number | undefined;
+    let platformMadeBy: ZipPlatform | undefined;
+
+    if (dosFileAttributes) {
+      assert(
+        !unixFileAttributes,
+        `specify either dosFileAttributes or unixFileAttributes`,
+      );
+
+      externalFileAttributes = dosFileAttributes.value;
+      platformMadeBy = ZipPlatform.DOS;
+    } else if (unixFileAttributes) {
+      externalFileAttributes = (unixFileAttributes.value & 0xffff) << 16;
+      platformMadeBy = ZipPlatform.UNIX;
+    }
+
+    await this.writer.writeFileEntry(
+      {
+        ...rest,
+        externalFileAttributes,
+        platformMadeBy,
+      },
+      content,
+    );
   }
 
   /**
