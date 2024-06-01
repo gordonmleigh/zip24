@@ -88,9 +88,11 @@
   "scripts": {
     "clean": "rm -rf lib/",
     "compile": "tsc",
+    "coverage": "c8 --src src/ --all -r text -r lcovonly node --import=@swc-node/register/esm-register --test-reporter=dot --test 'src/**/*.test.ts'",
     "lint": "eslint src",
     "test": "node --import @swc-node/register/esm-register --enable-source-maps --test 'src/**/*.test.*'",
     "watch:compile": "tsc -w",
+    "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
     "watch:test": "node --import @swc-node/register/esm-register --enable-source-maps --watch --test 'src/**/*.test.*'"
   },
   "repository": {
@@ -110,7 +112,9 @@
     "@awboost/eslint-config": "^0.1.2",
     "@swc-node/register": "^1.9.1",
     "@types/node": "^20.12.11",
+    "c8": "^9.1.0",
     "eslint": "^8.57.0",
+    "nodemon": "^3.1.2",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5"
   },
@@ -121,5 +125,6 @@
   "packageManager": "npm@10.7.0+sha256.f443ed4364ea11ac5cf7cae7fb4731278c64dd6839093f8a46eabde0430e0fcd",
   "dependencies": {
     "crc-32": "^1.2.2"
-  }
+  },
+  "nodemonConfig": {}
 }

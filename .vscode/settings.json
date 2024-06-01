@@ -6,5 +6,6 @@
   },
   "eslint.experimental.useFlatConfig": true,
   "typescript.tsdk": "node_modules/typescript/lib",
-  "cSpell.words": ["decompressors"]
+  "cSpell.words": ["decompressors"],
+  "code-coverage-lcov.path.searchPath": "coverage/lcov.info"
 }

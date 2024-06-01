@@ -29,7 +29,7 @@ export enum ZipVersion {
 export class DosFileAttributes extends BitField {
   // https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
   public constructor(value = 0) {
-    super(value, 8);
+    super(8, value);
   }
 
   public get isReadOnly(): boolean {
@@ -64,7 +64,7 @@ export class DosFileAttributes extends BitField {
 export class UnixFileAttributes extends BitField {
   // https://man7.org/linux/man-pages/man7/inode.7.html
   public constructor(value = 0) {
-    super(value, 16);
+    super(16, value);
   }
 
   public get isDirectory(): boolean {
@@ -105,7 +105,7 @@ export class UnixFileAttributes extends BitField {
 
 export class GeneralPurposeFlags extends BitField {
   public constructor(value = 0) {
-    super(value, 16);
+    super(16, value);
   }
 
   public get hasEncryption(): boolean {

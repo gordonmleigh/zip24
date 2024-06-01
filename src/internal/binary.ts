@@ -1,7 +1,6 @@
-import { assert } from "./assert.js";
 import { CodePage437Decoder } from "./cp437.js";
 
-function getUpperBound(bytes: number): number {
+function getUintUpperBound(bytes: number): number {
   switch (bytes) {
     case 1:
       return 0xff;
@@ -10,69 +9,69 @@ function getUpperBound(bytes: number): number {
       return 0xffff;
 
     case 4:
-      return 0xffffffff;
+      return 0xffff_ffff;
 
     case 8:
       return Number.MAX_SAFE_INTEGER;
 
+    /* c8 ignore next 2 */
     default:
       throw new TypeError(`expected bytes to be 1, 2, 4 or 8`);
   }
 }
 
-function assertBounds(value: number, bytes: number): void {
-  assert(
-    Number.isInteger(value) && value >= 0 && value <= getUpperBound(bytes),
-    `${value} is outside the range for ${bytes} byte unsigned integer`,
+function outOfBounds(value: number, bytes: number): boolean {
+  return (
+    !Number.isInteger(value) || value < 0 || value > getUintUpperBound(bytes)
   );
+}
+
+class UintBoundsError extends RangeError {
+  // eslint-disable-next-line unicorn/custom-error-definition -- RangeError is fine
+  public constructor(value: number, bytes: number) {
+    super(`${value} is outside the range for ${bytes} byte unsigned integer`);
+  }
 }
 
 export type BufferLike = ArrayBuffer | ArrayBufferView;
 
+function normalizeBuffer(
+  source: BufferLike,
+  byteOffset = 0,
+  byteLength = source.byteLength - byteOffset,
+): [ArrayBuffer, number, number] {
+  if (ArrayBuffer.isView(source)) {
+    if (byteOffset + byteLength > source.byteLength) {
+      throw new RangeError(
+        `offset + length must be less than the source buffer length`,
+      );
+    }
+    return [source.buffer, source.byteOffset + byteOffset, byteLength];
+  }
+  return [source, byteOffset, byteLength];
+}
+
+/**
+ * Extension of {@link DataView} with API like Node's {@link Buffer}.
+ */
 export class BufferView extends DataView {
   public static alloc(byteLength: number): BufferView {
     return new BufferView(new ArrayBuffer(byteLength));
   }
 
-  public constructor(
-    buffer: BufferLike,
-    byteOffset?: number,
-    byteLength?: number,
-  ) {
-    if (ArrayBuffer.isView(buffer)) {
-      super(buffer.buffer, buffer.byteOffset + (byteOffset ?? 0), byteLength);
-    } else {
-      super(buffer, byteOffset, byteLength);
-    }
+  public constructor(buffer: BufferLike, byteOffset = 0, byteLength?: number) {
+    super(...normalizeBuffer(buffer, byteOffset, byteLength));
   }
 
+  /**
+   * Get a Uint8Array that points to the ArrayBuffer that backs this instance.
+   */
   public getOriginalBytes(byteOffset = 0, byteLength?: number): Uint8Array {
-    return new Uint8Array(
-      this.buffer,
-      this.byteOffset + byteOffset,
-      byteLength,
-    );
-  }
-
-  public copyBytes(
-    sourceOffset = 0,
-    byteLength = this.byteLength - sourceOffset,
-    destination = new Uint8Array(byteLength),
-    destinationOffset = 0,
-  ): Uint8Array {
-    destination.set(
-      this.getOriginalBytes(sourceOffset, byteLength),
-      destinationOffset,
-    );
-    return destination;
+    return new Uint8Array(...normalizeBuffer(this, byteOffset, byteLength));
   }
 
   public setBytes(byteOffset: number, value: Uint8Array): void {
     this.getOriginalBytes(byteOffset, value.byteLength).set(value);
-  }
-
-  public subView(byteOffset: number, byteLength?: number): BufferView {
-    return new BufferView(this, byteOffset, byteLength);
   }
 
   public getUint64(byteOffset: number, littleEndian?: boolean): number {
@@ -85,7 +84,9 @@ export class BufferView extends DataView {
       ? left + 2 ** 32 * right
       : 2 ** 32 * left + right;
 
-    assertBounds(combined, 8);
+    if (outOfBounds(combined, 8)) {
+      throw new UintBoundsError(combined, 8);
+    }
     return combined;
   }
 
@@ -94,7 +95,9 @@ export class BufferView extends DataView {
     value: number,
     littleEndian?: boolean,
   ): void {
-    assertBounds(value, 8);
+    if (outOfBounds(value, 8)) {
+      throw new UintBoundsError(value, 8);
+    }
 
     // bit shift won't work here because it's restricted to 32 bits
     const upper = Math.floor(value / 0x1_0000_0000);
@@ -135,49 +138,89 @@ export class BufferView extends DataView {
   }
 
   public writeUint8(value: number, byteOffset = 0): void {
-    assertBounds(value, 1);
+    if (outOfBounds(value, 1)) {
+      throw new UintBoundsError(value, 1);
+    }
     this.setUint8(byteOffset, value);
   }
   public writeUint16LE(value: number, byteOffset = 0): void {
-    assertBounds(value, 2);
+    if (outOfBounds(value, 2)) {
+      throw new UintBoundsError(value, 2);
+    }
     this.setUint16(byteOffset, value, true);
   }
   public writeUint32LE(value: number, byteOffset = 0): void {
-    assertBounds(value, 4);
+    if (outOfBounds(value, 4)) {
+      throw new UintBoundsError(value, 4);
+    }
     this.setUint32(byteOffset, value, true);
   }
   public writeUint64LE(value: number, byteOffset = 0): void {
-    assertBounds(value, 8);
+    if (outOfBounds(value, 8)) {
+      throw new UintBoundsError(value, 8);
+    }
     this.setUint64(byteOffset, value, true);
   }
 }
 
 export class BitField {
+  private valueInternal: number;
+
+  public get value(): number {
+    return this.valueInternal;
+  }
+  public set value(value: number) {
+    if (!Number.isInteger(value)) {
+      throw new TypeError(`value must be an integer`);
+    }
+    if (value < 0 || value >= 2 ** this.width) {
+      throw new RangeError(`value must be within width`);
+    }
+    this.valueInternal = value;
+  }
+
   public constructor(
-    public value = 0,
-    public width = 16,
+    public readonly width = 16,
+    value = 0,
   ) {
-    assert(width <= 32, `BitFields must be 32 bits or less`);
+    this.valueInternal = value;
+    if (!Number.isInteger(width)) {
+      throw new TypeError(`width must be an integer`);
+    }
+    if (width < 0 || width > 32) {
+      throw new RangeError(`BitFields must be 32 bits or less`);
+    }
+    if (!Number.isInteger(value)) {
+      throw new TypeError(`value must be an integer`);
+    }
+    if (value < 0 || value >= 2 ** width) {
+      throw new RangeError(`value must be within width`);
+    }
   }
 
   public getBit(bit: number): boolean {
-    assert(
-      Number.isInteger(bit) && bit >= 0 && bit < this.width,
-      `can't get bit ${bit} of ${this.width} bit field`,
-    );
+    if (!Number.isInteger(bit)) {
+      throw new TypeError(`bit must be an integer`);
+    }
+    if (bit < 0 || bit >= this.width) {
+      throw new RangeError(`can't get bit ${bit} of ${this.width} bit field`);
+    }
     return (this.value & (1 << bit)) !== 0;
   }
 
   public setBit(bit: number, value: boolean): void {
-    assert(
-      Number.isInteger(bit) && bit >= 0 && bit < this.width,
-      `can't set bit ${bit} of ${this.width} bit field`,
-    );
+    if (!Number.isInteger(bit)) {
+      throw new TypeError(`bit must be an integer`);
+    }
+    if (bit < 0 || bit >= this.width) {
+      throw new RangeError(`can't get bit ${bit} of ${this.width} bit field`);
+    }
+
     const bitMask = 1 << bit;
     if (value) {
       this.value |= bitMask;
     } else {
-      this.value = (this.value | bit) ^ bit;
+      this.value = (this.value | bitMask) ^ bitMask;
     }
   }
 }
