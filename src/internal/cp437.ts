@@ -59,7 +59,7 @@ export class CodePage437Encoder implements TextEncoder {
 
     for (const char of input) {
       const codePoint = reverseCp437[char];
-      if (!codePoint) {
+      if (codePoint === undefined) {
         throw new Error(
           `character "${char}" is not encodable in Code Page 437`,
         );
