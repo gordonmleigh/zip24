@@ -1,13 +1,9 @@
-import { assert } from "./assert.js";
+import { Deferred } from "./deferred.js";
+import { Semaphore } from "./semaphore.js";
 
-type BufferedValue<T> = {
+type MeasuredItem<T> = {
   size: number;
   value: T;
-};
-
-type WaitingValue<T> = {
-  size: number;
-  release: () => T;
 };
 
 export type DoubleEndedBufferOptions<T> = {
@@ -25,38 +21,36 @@ export class ByteLengthStrategy<T extends ArrayBuffer | ArrayBufferView>
   }
 }
 export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
-  private readonly buffer: BufferedValue<T>[] = [];
-  private readonly capacity: number;
+  private readonly abortController = new AbortController();
+  private readonly buffer: MeasuredItem<T>[] = [];
+  private readonly endedInternal = new Deferred<void>();
   private readonly getSize: (value: T) => number;
-  private readonly waitingReaders: ((data?: T) => void)[] = [];
-  private readonly waitingWriters: WaitingValue<T>[] = [];
+  private readonly highWaterMark: number;
+  private readonly readableItems: Semaphore;
+  private readonly writableCapacity: Semaphore;
 
-  private bufferSize = 0;
   private consumerCountInternal = 0;
-  private endedInternal = false;
-  private errorInternal?: Error;
-  private rejectEverything!: (error: Error) => void;
-  private signalEnded!: () => void;
+  private isEndedInternal = false;
   private writtenBytesInternal = 0;
 
-  private readonly endedPromise = new Promise<void>((resolve) => {
-    this.signalEnded = resolve;
-  });
-
-  private readonly errorPromise = new Promise<undefined>((_, reject) => {
-    this.rejectEverything = reject;
-  });
-
-  public get ended(): boolean {
-    return this.endedInternal;
+  public get ended(): PromiseLike<void> {
+    return this.endedInternal.promise;
   }
 
   public get error(): Error | undefined {
-    return this.errorInternal;
+    return this.signal.reason as Error;
+  }
+
+  public get isEnded(): boolean {
+    return this.isEndedInternal;
   }
 
   public get hasConsumers(): boolean {
     return this.consumerCountInternal > 0;
+  }
+
+  public get signal(): AbortSignal {
+    return this.abortController.signal;
   }
 
   public get writtenBytes(): number {
@@ -65,8 +59,16 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
 
   public constructor(options: DoubleEndedBufferOptions<T> = {}) {
     const { highWaterMark = 10, size = () => 1 } = options;
-    this.capacity = highWaterMark;
+
+    // this semaphore signals available items in the buffer for readers
+    this.readableItems = new Semaphore(0, { signal: this.signal });
+    // this semaphore signals available capacity in the buffer for writers
+    this.writableCapacity = new Semaphore(highWaterMark, {
+      signal: this.signal,
+    });
+
     this.getSize = size;
+    this.highWaterMark = highWaterMark;
   }
 
   public async *[Symbol.asyncIterator](): AsyncIterator<T> {
@@ -85,136 +87,52 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
     }
   }
 
-  public abort(error = new Error(`aborted`)): void {
-    this.errorInternal = error;
-    this.rejectEverything(error);
+  public abort(error?: Error): void {
+    this.abortController.abort(error);
   }
 
   public end(): void {
-    this.endedInternal = true;
+    this.isEndedInternal = true;
 
-    const readers = this.waitingReaders.slice(0, this.waitingReaders.length);
-    for (const reader of readers) {
-      reader();
+    if (this.buffer.length === 0) {
+      // signal phantom buffer item to let readers drain
+      this.readableItems.release();
+      this.endedInternal.resolve();
     }
-
-    if (this.buffer.length === 0 && this.waitingWriters.length === 0) {
-      // there's nothing waiting to be read, so we're done here
-      this.signalEnded();
-    }
-  }
-
-  public async endAndWait(): Promise<void> {
-    if (!this.endedInternal) {
-      this.end();
-    }
-    await this.waitForEnd();
   }
 
   public async read(): Promise<T | undefined> {
-    if (this.errorInternal) {
-      throw this.errorInternal;
-    }
-    if (this.buffer.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const chunk = this.buffer.shift()!;
-      this.bufferSize -= chunk.size;
-
-      // move chunks from the queue to the buffer to fill it up again
-      while (this.waitingWriters.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const waiter = this.waitingWriters[0]!;
-        if (this.bufferSize + waiter.size < this.capacity) {
-          this.waitingWriters.shift();
-          const value = waiter.release();
-          this.buffer.push({ value, size: waiter.size });
-          this.bufferSize += waiter.size;
-        } else {
-          break;
-        }
-      }
-
-      return chunk.value;
-    }
-
-    // we'll get here if the waiting chunk is bigger than the capacity
-    if (this.waitingWriters.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const waiter = this.waitingWriters[0]!;
-      return waiter.release();
-    }
-
-    if (this.ended) {
-      // there is nothing left to be read, so we're done here
-      this.signalEnded();
+    if (this.isEndedInternal && this.buffer.length === 0) {
+      // short circuit if buffer is empty and stream is empty
       return;
     }
+    await this.readableItems.acquire();
+    const item = this.buffer.shift();
 
-    // nothing to read for now, so wait for a chunk
-    return await Promise.race([
-      this.errorPromise,
-      new Promise<T | undefined>((resolve) => {
-        this.waitingReaders.push(resolve);
-      }),
-    ]);
-  }
+    if (item) {
+      this.writableCapacity.release(Math.min(this.highWaterMark, item.size));
+      return item.value;
+    }
 
-  public async waitForEnd(): Promise<void> {
-    await this.endedPromise;
+    if (this.isEndedInternal) {
+      // we didn't read anything here so we can signal that we're done
+      this.endedInternal.resolve();
+      // release the next reader so that reader list can drain
+      this.readableItems.release();
+    }
   }
 
   public async write(value: T): Promise<void> {
-    if (this.errorInternal) {
-      throw this.errorInternal;
+    if (this.isEndedInternal) {
+      throw new Error(`can't add data to an ended buffer`);
     }
-    assert(!this.endedInternal, `can't add data to an ended buffer`);
 
     const size = this.getSize(value);
     this.writtenBytesInternal += size;
 
-    if (this.waitingReaders.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const reader = this.waitingReaders.shift()!;
-      reader(value);
-      return;
-    }
-
-    if (this.bufferSize + size <= this.capacity) {
-      this.buffer.push({ size, value });
-      this.bufferSize += size;
-      return;
-    }
-
-    await Promise.race([
-      this.errorPromise,
-      new Promise<void>((resolve) => {
-        this.waitingWriters.push({
-          release: () => {
-            resolve();
-            return value;
-          },
-          size,
-        });
-      }),
-    ]);
-  }
-}
-
-export type Task = () => void | PromiseLike<void>;
-
-export class TaskQueue extends DoubleEndedBuffer<Task> {
-  public constructor(capacity: number) {
-    super({ highWaterMark: capacity });
-  }
-
-  public async run(): Promise<void> {
-    try {
-      for await (const task of this) {
-        await task();
-      }
-    } catch (error) {
-      this.abort(error as Error);
-      throw error;
-    }
+    // only try to acquire up to the total capacity to avoid blocking forever
+    await this.writableCapacity.acquire(Math.min(this.highWaterMark, size));
+    this.buffer.push({ size, value });
+    this.readableItems.release();
   }
 }

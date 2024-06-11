@@ -13,8 +13,8 @@ import { computeCrc32 } from "./crc32.js";
 import {
   ByteLengthStrategy,
   DoubleEndedBuffer,
-  TaskQueue,
 } from "./double-ended-buffer.js";
+import { Semaphore } from "./semaphore.js";
 import {
   CentralHeaderSignature,
   DataDescriptorSignature,
@@ -81,10 +81,10 @@ export type ZipWriterBaseOptions = {
 };
 
 export class ZipWriterBase implements AsyncIterable<Uint8Array> {
+  private readonly buffer: DoubleEndedBuffer<Uint8Array>;
+  private readonly bufferSemaphore = new Semaphore(1);
   private readonly compressors: CompressionAlgorithms;
   private readonly directory: FullEntryInfo[] = [];
-  private readonly buffer: DoubleEndedBuffer<Uint8Array>;
-  private readonly queue: TaskQueue;
   private readonly startingOffset: number;
 
   public constructor(options: ZipWriterBaseOptions) {
@@ -92,38 +92,28 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
 
     // the buffer stores outgoing data chunks
     this.buffer = new DoubleEndedBuffer(new ByteLengthStrategy(highWaterMark));
-    // the queue synchronizes access to the buffer
-    this.queue = new TaskQueue(1);
-
     this.compressors = compressors;
     this.startingOffset = startingOffset;
-
-    // process items added to the queue
-    this.queue.run().then(undefined, (error) => {
-      // something bad happened, abort the buffer to let downstream know
-      this.buffer.abort(error as Error);
-    });
   }
 
   public async *[Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
     yield* this.buffer;
   }
 
-  public async writeFileEntry(
-    file: ZipEntryInfo,
-    content?: ZipEntryData,
-  ): Promise<void> {
-    await this.queue.write(() => this.writeFileEntryInternal(file, content));
-  }
+  public readonly addFileEntry = this.bufferSemaphore.synchronize(
+    (file: ZipEntryInfo, content?: ZipEntryData) =>
+      this.writeFileEntry(file, content),
+  );
 
-  public async writeCentralDirectory(fileComment?: string): Promise<void> {
-    await this.queue.write(() =>
-      this.writeCentralDirectoryInternal(fileComment),
-    );
-    await this.queue.endAndWait();
-  }
+  public readonly finalize = this.bufferSemaphore.synchronize(
+    async (fileComment?: string) => {
+      await this.writeCentralDirectory(fileComment);
+      this.buffer.end();
+      await this.buffer.ended;
+    },
+  );
 
-  private async writeFileEntryInternal(
+  private async writeFileEntry(
     file: ZipEntryInfo,
     content?: ZipEntryData,
   ): Promise<void> {
@@ -186,9 +176,7 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     this.directory.push(entry);
   }
 
-  private async writeCentralDirectoryInternal(
-    fileComment?: string,
-  ): Promise<void> {
+  private async writeCentralDirectory(fileComment?: string): Promise<void> {
     const offset = this.startingOffset + this.buffer.writtenBytes;
     let zip64 = false;
 
@@ -206,7 +194,6 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     }
 
     await this.writeEndOfCentralDirectory(offset, size, zip64, fileComment);
-    await this.buffer.endAndWait();
   }
 
   private async writeLocalHeader(entry: FullEntryInfo): Promise<void> {

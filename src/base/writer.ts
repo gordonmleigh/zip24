@@ -77,7 +77,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
       platformMadeBy = ZipPlatform.UNIX;
     }
 
-    await this.writer.writeFileEntry(
+    await this.writer.addFileEntry(
       {
         ...rest,
         externalFileAttributes,
@@ -98,7 +98,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   /**
    * Signal that all files have been added and the output should be finalized.
    */
-  public async finish(): Promise<void> {
-    await this.writer.writeCentralDirectory();
+  public async finalize(): Promise<void> {
+    await this.writer.finalize();
   }
 }
