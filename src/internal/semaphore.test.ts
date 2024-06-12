@@ -11,6 +11,14 @@ describe("Semaphore", () => {
       await semaphore.acquire(5);
     });
 
+    it("throws if the signal is already aborted", async () => {
+      const controller = new AbortController();
+      const semaphore = new Semaphore(10, { signal: controller.signal });
+
+      controller.abort();
+      await assert.rejects(() => semaphore.acquire(5));
+    });
+
     it("waits if the count is higher than the value", async () => {
       // this feels hard to test, because we can't inspect the current state of
       // a promise – so lets just prove that it runs to the max concurrency
@@ -43,6 +51,15 @@ describe("Semaphore", () => {
 
       await Promise.all(workers);
       assert.strictEqual(maxSimultaneous, 7);
+    });
+
+    it("throws if the signal is aborted while waiting", async () => {
+      const controller = new AbortController();
+      const semaphore = new Semaphore(0, { signal: controller.signal });
+
+      const result = semaphore.acquire();
+      controller.abort();
+      await assert.rejects(() => result);
     });
   });
 

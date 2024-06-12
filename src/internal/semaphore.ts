@@ -54,6 +54,8 @@ export class Semaphore {
         this.waiters.push({
           count,
           release: () => {
+            // can't test this
+            /* c8 ignore next */
             cancelAbort?.();
             resolve();
           },
