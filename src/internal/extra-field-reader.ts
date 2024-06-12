@@ -1,4 +1,3 @@
-import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { CodePage437Encoder } from "./cp437.js";
 import { computeCrc32 } from "./crc32.js";
@@ -67,7 +66,7 @@ export class ExtraFieldReader {
 
     // | offset | field                   | size |
     // | ------ | ----------------------- | ---- |
-    // | 0      | tag (0x6375)            | 2    |
+    // | 0      | tag (0x6375 or 0x7075)  | 2    |
     // | 2      | size                    | 2    |
     // | 4      | version (0x01)          | 1    |
     // | 5      | crc32 of _header_ value | 4    |
@@ -76,12 +75,11 @@ export class ExtraFieldReader {
     const view = new BufferView(buffer, bufferOffset, byteLength);
     const version = view.readUint8(4);
 
-    assert(
-      version === 1,
-      `expected version 1 of unicode field, got ${version}`,
-    );
+    if (version !== 1) {
+      throw new Error(`expected version 1 of unicode field, got ${version}`);
+    }
 
-    const checkCrc32 = view.readUint16LE(5);
+    const checkCrc32 = view.readUint32LE(5);
 
     const originalCrc32 = computeCrc32(
       new CodePage437Encoder().encode(this.header[field]),
