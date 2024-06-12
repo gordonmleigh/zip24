@@ -163,6 +163,70 @@ describe("ExtraFieldReader", () => {
         },
       );
     });
+
+    it("can read three fields together", () => {
+      const fields: OverridableFileInfo = {
+        fileComment: "hello",
+        fileName: "world",
+        compressedSize: 0xffffffff,
+        uncompressedSize: 0xffffffff,
+        localHeaderOffset: 0xffffffff,
+      };
+
+      const buffer = data(
+        "7563", // tag: Info-ZIP Unicode Comment Extra Field
+        "0800", // size: 8 bytes
+        "01", // version
+        "86a61036", // crc of "hello"
+        "414243", // data: ABC
+
+        "7570", // tag: Info-ZIP Unicode Path Extra Field
+        "0900", // size: 8 bytes
+        "01", // version
+        "4311773a", // crc of "world"
+        "f09fa5ba", // data: 🥺
+
+        "0100", // tag: Zip64 extended information extra field
+        "1800", // size: 24 bytes
+        "0102030405060000", // uncompressed size
+        "0605040302010000", // compressed size
+        "0302010302010000", // local header offset
+      );
+
+      const reader = new ExtraFieldReader(fields);
+      reader.read(buffer);
+
+      assert.strictEqual(fields.fileComment, "ABC");
+      assert.strictEqual(fields.fileName, "🥺");
+      assert.strictEqual(fields.uncompressedSize, 0x060504030201);
+      assert.strictEqual(fields.compressedSize, 0x010203040506);
+      assert.strictEqual(fields.localHeaderOffset, 0x010203010203);
+    });
+
+    it("can skip over unknown fields", () => {
+      const fields: OverridableFileInfo = {
+        fileName: "",
+        compressedSize: 0xffffffff,
+        uncompressedSize: 0xffffffff,
+      };
+
+      const buffer = data(
+        "ff99", // nonsense
+        "0a00", // ten more bytes of nonsense to come
+        "0102030405060708090a", // nonsense
+
+        "0100", // tag: Zip64 extended information extra field
+        "1000", // size: 16 bytes
+        "0102030405060000", // uncompressed size
+        "0605040302010000", // compressed size
+      );
+
+      const reader = new ExtraFieldReader(fields);
+      reader.read(buffer);
+
+      assert.strictEqual(fields.uncompressedSize, 0x060504030201);
+      assert.strictEqual(fields.compressedSize, 0x010203040506);
+    });
   });
 });
 
