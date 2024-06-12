@@ -17,6 +17,10 @@ export class Semaphore {
   private readonly signal?: AbortSignal;
   private valueInternal: number;
 
+  public get value(): number {
+    return this.valueInternal;
+  }
+
   public constructor(initialVale = 0, options?: SemaphoreOptions) {
     this.signal = options?.signal;
     this.valueInternal = initialVale;
