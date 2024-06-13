@@ -152,8 +152,8 @@ export class DosDate extends Date {
    * Create a new instance from the given date and time values. Each value
    * should be a 16-bit integer.
    */
-  public static fromDateTime(dateValue: number, timeValue: number): DosDate {
-    const date = new DosDate();
+  public static fromDosDateTime(dateValue: number, timeValue: number): DosDate {
+    const date = new DosDate(0);
     date.setDosDate(dateValue);
     date.setDosTime(timeValue);
     return date;
@@ -163,8 +163,8 @@ export class DosDate extends Date {
    * Create a new instance from the given date/time value. The value is a 32-bit
    * integer with the time in the lower 16 bits and date in the upper 16 bits.
    */
-  public static fromDosDateTime(dateTime: number): DosDate {
-    const date = new DosDate();
+  public static fromDosUint32(dateTime: number): DosDate {
+    const date = new DosDate(0);
     date.setDosDateTime(dateTime);
     return date;
   }
@@ -186,10 +186,10 @@ export class DosDate extends Date {
       Number.isInteger(value) && value >= 0 && value <= 0xffff_ffff,
       `invalid value for dos date/time ${value}`,
     );
-    // little-endian, so first word is low-order word
-    this.setDosTime(value & 0xffff);
     // no need to mask because >>> is only defined for 32 bit
     this.setDosDate(value >>> 16);
+    // little-endian, so first word is low-order word
+    this.setDosTime(value & 0xffff);
 
     return this.getTime();
   }
@@ -238,7 +238,7 @@ export class DosDate extends Date {
   public setDosTime(value: number): number {
     assert(
       Number.isInteger(value) && value >= 0 && value <= 0xffff,
-      `invalid value for dos value ${value}`,
+      `invalid value for dos time ${value}`,
     );
 
     this.setSeconds((value & 0x1f) * 2); // 0-29, 0-58 (even numbers)

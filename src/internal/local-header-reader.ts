@@ -76,7 +76,7 @@ export class LocalHeaderReader implements OverridableFileInfo {
     this.versionNeeded = view.readUint16LE(4);
     this.flags.value = view.readUint16LE(6);
     this.compressionMethod = view.readUint16LE(8);
-    this.lastModified = DosDate.fromDosDateTime(view.readUint32LE(10));
+    this.lastModified = DosDate.fromDosUint32(view.readUint32LE(10));
     this.crc32 = view.readUint32LE(14);
     this.compressedSize = view.readUint32LE(18);
     this.uncompressedSize = view.readUint32LE(22);

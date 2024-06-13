@@ -97,7 +97,7 @@ export class ZipDirectoryReader implements OverridableFileInfo {
     this.versionNeeded = view.readUint16LE(6);
     this.flags.value = view.readUint16LE(8);
     this.compressionMethod = view.readUint16LE(10);
-    this.lastModified = DosDate.fromDosDateTime(view.readUint32LE(12));
+    this.lastModified = DosDate.fromDosUint32(view.readUint32LE(12));
     this.crc32 = view.readUint32LE(16);
     this.compressedSize = view.readUint32LE(20);
     this.uncompressedSize = view.readUint32LE(24);
