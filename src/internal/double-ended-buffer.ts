@@ -29,9 +29,8 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
   private readonly readableItems: Semaphore;
   private readonly writableCapacity: Semaphore;
 
-  private consumerCountInternal = 0;
   private isEndedInternal = false;
-  private writtenBytesInternal = 0;
+  private writtenInternal = 0;
 
   public get ended(): PromiseLike<void> {
     return this.endedInternal.promise;
@@ -45,16 +44,12 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
     return this.isEndedInternal;
   }
 
-  public get hasConsumers(): boolean {
-    return this.consumerCountInternal > 0;
-  }
-
   public get signal(): AbortSignal {
     return this.abortController.signal;
   }
 
-  public get writtenBytes(): number {
-    return this.writtenBytesInternal;
+  public get written(): number {
+    return this.writtenInternal;
   }
 
   public constructor(options: DoubleEndedBufferOptions<T> = {}) {
@@ -72,18 +67,12 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
   }
 
   public async *[Symbol.asyncIterator](): AsyncIterator<T> {
-    try {
-      ++this.consumerCountInternal;
-
-      for (;;) {
-        const chunk = await this.read();
-        if (chunk === undefined) {
-          break;
-        }
-        yield chunk;
+    for (;;) {
+      const chunk = await this.read();
+      if (chunk === undefined) {
+        break;
       }
-    } finally {
-      --this.consumerCountInternal;
+      yield chunk;
     }
   }
 
@@ -106,19 +95,20 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
       // short circuit if buffer is empty and stream is empty
       return;
     }
+
     await this.readableItems.acquire();
     const item = this.buffer.shift();
+
+    if (this.buffer.length === 0 && this.isEndedInternal) {
+      // nothing left to read
+      this.endedInternal.resolve();
+      // release the next reader so that reader list can drain
+      this.readableItems.release();
+    }
 
     if (item) {
       this.writableCapacity.release(Math.min(this.highWaterMark, item.size));
       return item.value;
-    }
-
-    if (this.isEndedInternal) {
-      // we didn't read anything here so we can signal that we're done
-      this.endedInternal.resolve();
-      // release the next reader so that reader list can drain
-      this.readableItems.release();
     }
   }
 
@@ -128,11 +118,12 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
     }
 
     const size = this.getSize(value);
-    this.writtenBytesInternal += size;
+    this.writtenInternal += size;
 
-    // only try to acquire up to the total capacity to avoid blocking forever
-    await this.writableCapacity.acquire(Math.min(this.highWaterMark, size));
+    // push the chunk before acquiring so that we can always read even if the
+    // chunk is bigger than the highWaterMark
     this.buffer.push({ size, value });
+    await this.writableCapacity.acquire(size);
     this.readableItems.release();
   }
 }

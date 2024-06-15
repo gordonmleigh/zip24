@@ -145,7 +145,7 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
       lastModified: file.lastModified
         ? new DosDate(file.lastModified)
         : new DosDate(),
-      localHeaderOffset: this.startingOffset + this.buffer.writtenBytes,
+      localHeaderOffset: this.startingOffset + this.buffer.written,
       path: encoder.encode(file.path),
       platformMadeBy: file.platformMadeBy ?? ZipPlatform.DOS,
       uncompressedSize: file.uncompressedSize ?? 0,
@@ -177,7 +177,7 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
   }
 
   private async writeCentralDirectory(fileComment?: string): Promise<void> {
-    const offset = this.startingOffset + this.buffer.writtenBytes;
+    const offset = this.startingOffset + this.buffer.written;
     let zip64 = false;
 
     for (const entry of this.directory) {
@@ -185,8 +185,8 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
       zip64 ||= entry.zip64;
     }
 
-    const size = this.startingOffset + this.buffer.writtenBytes - offset;
-    zip64 ||= this.buffer.writtenBytes >= 0xffff_ffff;
+    const size = this.startingOffset + this.buffer.written - offset;
+    zip64 ||= this.buffer.written >= 0xffff_ffff;
 
     if (zip64) {
       await this.writeZip64EndOfCentralDirectory(offset, size);
