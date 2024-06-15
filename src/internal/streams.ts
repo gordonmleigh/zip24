@@ -3,22 +3,22 @@ import { assert } from "./assert.js";
 
 const DefaultChunkSize = 1024 ** 2; // 1 MB
 
-export type RandomAccessReadOptions<T extends ArrayBufferView> = {
-  buffer: T;
+export type RandomAccessReadOptions = {
+  buffer: Uint8Array;
   offset?: number;
   length?: number;
   position: number;
 };
 
-export type RandomAccessReadResult<T extends ArrayBufferView> = {
+export type RandomAccessReadResult = {
   bytesRead: number;
-  buffer: T;
+  buffer: Uint8Array;
 };
 
 export type RandomAccessReader = {
-  read: <T extends ArrayBufferView>(
-    options: RandomAccessReadOptions<T>,
-  ) => PromiseLike<RandomAccessReadResult<T>>;
+  read: (
+    options: RandomAccessReadOptions,
+  ) => PromiseLike<RandomAccessReadResult>;
 };
 
 type RandomAccessReaderSourceOptions = {
@@ -32,6 +32,7 @@ export async function* iterableFromReadableStream(
 ): AsyncGenerator<Uint8Array, undefined, undefined> {
   if (Symbol.asyncIterator in stream) {
     yield* stream as AsyncIterable<Uint8Array>;
+    return;
   }
 
   const reader = stream.getReader();
@@ -40,7 +41,7 @@ export async function* iterableFromReadableStream(
     for (;;) {
       const result = await reader.read();
 
-      if (result.value) {
+      if (result.value !== undefined) {
         assert(result.value instanceof Uint8Array, `expected byte array`);
         yield result.value;
       }
@@ -80,7 +81,7 @@ export async function* iterableFromRandomAccessReader(
       length: bufferSize,
     });
 
-    if (result.bytesRead) {
+    if (result.bytesRead > 0) {
       yield buffer.subarray(0, result.bytesRead);
       position += result.bytesRead;
       bytesRead += result.bytesRead;
@@ -99,7 +100,7 @@ export function readableStreamFromIterable(
   return new ReadableStream({
     pull: async (controller) => {
       const result = await inputIterator.next();
-      if (result.value) {
+      if (result.value !== undefined) {
         controller.enqueue(result.value as Uint8Array);
       }
       if (result.done) {
@@ -107,8 +108,8 @@ export function readableStreamFromIterable(
       }
     },
 
-    cancel: async () => {
-      await inputIterator.return?.();
+    cancel: async (reason) => {
+      await inputIterator.return?.(reason);
     },
   });
 }
