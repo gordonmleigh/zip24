@@ -120,7 +120,9 @@
   },
   "files": [
     "src/",
-    "lib/"
+    "lib/",
+    "!*.test.*",
+    "!**/test-utils/"
   ],
   "packageManager": "npm@10.7.0+sha256.f443ed4364ea11ac5cf7cae7fb4731278c64dd6839093f8a46eabde0430e0fcd",
   "dependencies": {

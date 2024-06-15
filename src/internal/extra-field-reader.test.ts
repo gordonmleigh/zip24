@@ -4,6 +4,7 @@ import {
   ExtraFieldReader,
   type OverridableFileInfo,
 } from "./extra-field-reader.js";
+import { data } from "./test-utils/data.js";
 
 describe("ExtraFieldReader", () => {
   describe("read()", () => {
@@ -181,7 +182,7 @@ describe("ExtraFieldReader", () => {
         "414243", // data: ABC
 
         "7570", // tag: Info-ZIP Unicode Path Extra Field
-        "0900", // size: 8 bytes
+        "0900", // size: 9 bytes
         "01", // version
         "4311773a", // crc of "world"
         "f09fa5ba", // data: 🥺
@@ -227,9 +228,30 @@ describe("ExtraFieldReader", () => {
       assert.strictEqual(fields.uncompressedSize, 0x060504030201);
       assert.strictEqual(fields.compressedSize, 0x010203040506);
     });
+
+    it("can read from the middle of a buffer", () => {
+      const fields: OverridableFileInfo = {
+        fileName: "",
+        compressedSize: 0xffffffff,
+        uncompressedSize: 0xffffffff,
+      };
+
+      const buffer = data(
+        "0102030405060708090a", // nonsense
+
+        "0100", // tag: Zip64 extended information extra field
+        "1000", // size: 16 bytes
+        "0102030405060000", // uncompressed size
+        "0605040302010000", // compressed size
+
+        "abcdef", // nonsense
+      );
+
+      const reader = new ExtraFieldReader(fields);
+      reader.read(buffer, 10, 20);
+
+      assert.strictEqual(fields.uncompressedSize, 0x060504030201);
+      assert.strictEqual(fields.compressedSize, 0x010203040506);
+    });
   });
 });
-
-function data(...hex: string[]): Uint8Array {
-  return Buffer.concat(hex.map((x) => Buffer.from(x, "hex")));
-}

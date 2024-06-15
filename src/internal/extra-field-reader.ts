@@ -38,15 +38,15 @@ export class ExtraFieldReader {
 
       switch (tag) {
         case ExtendedDataTag.UnicodeCommentField:
-          this.readUnicodeField("fileComment", buffer, offset, size);
+          this.readUnicodeField("fileComment", view, offset, size);
           break;
 
         case ExtendedDataTag.UnicodePathField:
-          this.readUnicodeField("fileName", buffer, offset, size);
+          this.readUnicodeField("fileName", view, offset, size);
           break;
 
         case ExtendedDataTag.Zip64ExtendedInfo:
-          this.readZip64Field(buffer, offset, size);
+          this.readZip64Field(view, offset, size);
           break;
       }
 

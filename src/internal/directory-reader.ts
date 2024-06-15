@@ -115,7 +115,7 @@ export class ZipDirectoryReader implements OverridableFileInfo {
 
     this.internalFileAttributes = view.readUint16LE(36);
     this.externalFileAttributes = view.readUint32LE(38);
-    this.localHeaderOffset = view.readUint16LE(42);
+    this.localHeaderOffset = view.readUint32LE(42);
 
     return this.fixedFieldsLength;
   }
