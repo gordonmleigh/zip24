@@ -3,6 +3,9 @@ import { assert } from "./assert.js";
 
 const DefaultChunkSize = 1024 ** 2; // 1 MB
 
+export type AnyIterable<T> = AsyncIterable<T> | Iterable<T>;
+export type ByteStream = AnyIterable<Uint8Array>;
+
 export type RandomAccessReadOptions = {
   buffer: Uint8Array;
   offset?: number;
@@ -92,7 +95,7 @@ export async function* iterableFromRandomAccessReader(
 }
 
 export function readableStreamFromIterable(
-  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
+  input: ByteStream,
 ): ReadableStream<Uint8Array> {
   const inputIterator = getAsyncIterator(input);
 
@@ -115,7 +118,7 @@ export function readableStreamFromIterable(
 }
 
 export async function bufferFromIterable(
-  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
+  input: ByteStream,
 ): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   for await (const chunk of input) {
@@ -135,7 +138,7 @@ export async function bufferFromIterable(
 }
 
 export async function* mapIterable<Input, Output>(
-  input: AsyncIterable<Input> | Iterable<Input>,
+  input: AnyIterable<Input>,
   map: (input: Input) => Output | PromiseLike<Output>,
 ): AsyncGenerator<Output> {
   for await (const element of input) {
@@ -144,7 +147,7 @@ export async function* mapIterable<Input, Output>(
 }
 
 export async function* identityStream<Input>(
-  input: AsyncIterable<Input> | Iterable<Input>,
+  input: AnyIterable<Input>,
 ): AsyncGenerator<Input> {
   for await (const element of input) {
     yield element;
@@ -152,7 +155,7 @@ export async function* identityStream<Input>(
 }
 
 function getAsyncIterator<T>(
-  iterable: AsyncIterable<T> | Iterable<T>,
+  iterable: AnyIterable<T>,
 ): AsyncIterator<T> | Iterator<T> {
   const input = iterable as Partial<AsyncIterable<Uint8Array>> &
     Partial<Iterable<Uint8Array>>;
