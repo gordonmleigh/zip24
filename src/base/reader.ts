@@ -155,7 +155,7 @@ export class ZipReader {
       offset: 0,
       size: 0,
     };
-    const result = readEocdr(this.directory, buffer, 0, position);
+    const result = readEocdr(this.directory, buffer, position);
 
     if (!result.ok) {
       // we didn't manage to read the zip64 eocdr within the original buffer

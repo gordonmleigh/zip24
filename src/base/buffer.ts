@@ -51,7 +51,7 @@ export class ZipBufferReader {
       offset: 0,
       size: 0,
     };
-    const { ok } = readEocdr(this.directory, buffer, 0, 0);
+    const { ok } = readEocdr(this.directory, buffer, 0);
     assert(ok, `expected to find EOCDR in buffer`);
   }
 

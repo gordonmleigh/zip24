@@ -1,8 +1,10 @@
-import { assert } from "./assert.js";
+import { MultiDiskError, ZipFormatError } from "../common.js";
+import { assert, assertSignature } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import {
   EndOfCentralDirectorySignature,
   Zip64EocdlSignature,
+  Zip64EocdrSignature,
 } from "./signatures.js";
 
 export type CentralDirectory = {
@@ -24,21 +26,20 @@ export type CentralDirectoryResult =
 
 export function readEocdr(
   directory: CentralDirectory,
-  buffer: BufferLike,
-  bufferOffset = 0,
+  inputBuffer: BufferLike,
   fileOffset = 0,
 ): CentralDirectoryResult {
-  const view = new BufferView(buffer, bufferOffset);
+  const view = new BufferView(inputBuffer);
   const minLength = 22;
   // max comment length is 0xffff
-  const maxLength = Math.min(buffer.byteLength, minLength + 0xffff);
+  const maxLength = Math.min(view.byteLength, minLength + 0xffff);
 
   let eocdrOffset: number | undefined;
 
   // look backwards from end of buffer for EOCDR signature
   for (
-    let offset = buffer.byteLength - minLength;
-    offset >= buffer.byteLength - maxLength;
+    let offset = view.byteLength - minLength;
+    offset >= view.byteLength - maxLength;
     --offset
   ) {
     if (view.readUint32LE(offset) === EndOfCentralDirectorySignature) {
@@ -47,10 +48,9 @@ export function readEocdr(
     }
   }
 
-  assert(
-    eocdrOffset !== undefined,
-    `unable to find end of central directory record`,
-  );
+  if (eocdrOffset === undefined) {
+    throw new ZipFormatError(`unable to find end of central directory record`);
+  }
 
   // | offset | field                         | size |
   // | ------ | ----------------------------- | ---- |
@@ -71,6 +71,10 @@ export function readEocdr(
 
   // EOCDL starts 20 bytes before EOCDR
   const eocdlOffset = eocdrOffset - 20;
+  assert(
+    eocdlOffset >= 0,
+    `buffer must be at least as big as the EOCDR and possible EOCDL`,
+  );
 
   if (view.readUint32LE(eocdlOffset) === Zip64EocdlSignature) {
     // Zip64 End of Central Directory Locator (4.3.15)
@@ -85,19 +89,18 @@ export function readEocdr(
     const startDisk = view.readUint32LE(eocdlOffset + 4);
     const totalDisks = view.readUint32LE(eocdlOffset + 16);
 
-    assert(
-      startDisk === 0 && totalDisks === 1,
-      `multi-disk zips not supported`,
-    );
+    if (startDisk > 0 || totalDisks > 1) {
+      throw new MultiDiskError();
+    }
 
     const eocdr64Offset = view.readUint32LE(eocdlOffset + 8);
-    if (eocdrOffset < fileOffset) {
+    if (eocdr64Offset < fileOffset) {
       // zip64 eocdr is 56 bytes long
       return { ok: false, eocdr64Offset, byteLength: 56 };
     }
 
     // get the buffer-relative rather than file-relative offset
-    readZip64Eocdr(directory, buffer, eocdr64Offset - fileOffset);
+    readZip64Eocdr(directory, view, eocdr64Offset - fileOffset);
     return { ok: true };
   }
 
@@ -121,10 +124,9 @@ export function readEocdr(
   const diskNumber = view.readUint16LE(eocdrOffset + 4);
   const totalEntriesThisDisk = view.readUint16LE(eocdrOffset + 8);
 
-  assert(
-    diskNumber === 0 && totalEntriesThisDisk === directory.count,
-    `multi-file zips are not supported`,
-  );
+  if (diskNumber > 0 || totalEntriesThisDisk !== directory.count) {
+    throw new MultiDiskError();
+  }
   return { ok: true };
 }
 
@@ -133,7 +135,6 @@ export function readZip64Eocdr(
   buffer: BufferLike,
   bufferOffset: number,
 ): void {
-  const view = new BufferView(buffer, bufferOffset);
   // Zip64 End of Central Directory Record (4.3.14)
   //
   // | offset | field                         | size |
@@ -149,15 +150,16 @@ export function readZip64Eocdr(
   // | 40     | size of the central directory | 8    |
   // | 48     | central directory offset      | 8    |
   // | 56     | (end)                         |      |
+
+  const view = new BufferView(buffer, bufferOffset);
+
+  assertSignature(
+    view.readUint32LE(0),
+    Zip64EocdrSignature,
+    `Zip64EndOfCentralDirectoryRecord`,
+  );
+
   directory.count = view.readUint64LE(32);
   directory.size = view.readUint64LE(40);
   directory.offset = view.readUint64LE(48);
-
-  const diskNumber = view.readUint32LE(16);
-  const totalEntriesThisDisk = view.readUint64LE(24);
-
-  assert(
-    diskNumber === 0 && totalEntriesThisDisk === directory.count,
-    `multi-file zips are not supported`,
-  );
 }
