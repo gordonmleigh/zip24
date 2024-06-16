@@ -1,8 +1,19 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { ZipEntryReader } from "../base/entry-reader.js";
-import { CompressionMethod, ZipPlatform, ZipVersion } from "../common.js";
-import { readDirectoryEntry, readExtraFields } from "./file-entry.js";
+import {
+  CompressionMethod,
+  DosFileAttributes,
+  GeneralPurposeFlags,
+  UnixFileAttributes,
+  ZipPlatform,
+  ZipVersion,
+} from "../common.js";
+import {
+  readDirectoryEntry,
+  readExtraFields,
+  type ZipEntry,
+} from "./file-entry.js";
+import { CentralHeaderLength } from "./signatures.js";
 import { cp437, data, utf8 } from "./test-utils/data.js";
 
 describe("readDirectoryEntry()", () => {
@@ -30,7 +41,7 @@ describe("readDirectoryEntry()", () => {
       /* 54 +11 */ "010203040506", // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.versionMadeBy, ZipVersion.Deflate64);
@@ -89,7 +100,7 @@ describe("readDirectoryEntry()", () => {
       /* 54 +11 */ "010203040506", // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.UNIX);
@@ -120,7 +131,7 @@ describe("readDirectoryEntry()", () => {
       /* 54 +11 */ "010203040506", // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.DOS);
@@ -151,7 +162,7 @@ describe("readDirectoryEntry()", () => {
       /* 54 +11 */ "010203040506", // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
 
     assert.throws(() => {
       readDirectoryEntry(entry, buffer);
@@ -182,7 +193,7 @@ describe("readDirectoryEntry()", () => {
       /* 54 +11 */ "f09f9883", // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.fileName, "≡ƒÑ║");
@@ -213,7 +224,7 @@ describe("readDirectoryEntry()", () => {
       /* 54 +11 */ "f09f9883", // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.fileName, "🥺");
@@ -262,7 +273,7 @@ describe("readDirectoryEntry()", () => {
       cp437`hello`, // the comment
     );
 
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.fileComment, "ABC");
@@ -275,7 +286,7 @@ describe("readDirectoryEntry()", () => {
 
 describe("readExtraFields()", () => {
   it("can read a unicode comment field", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.fileComment = "hello world";
 
     const buffer = data(
@@ -292,7 +303,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read a unicode path field", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.fileName = "hello world";
 
     const buffer = data(
@@ -309,7 +320,7 @@ describe("readExtraFields()", () => {
   });
 
   it("ignores unicode path field if the CRC32 does not match", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.fileName = "hello world";
 
     const buffer = data(
@@ -326,7 +337,7 @@ describe("readExtraFields()", () => {
   });
 
   it("ignores unicode comment field if the header comment is not set", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
 
     const buffer = data(
       "7563", // tag: Info-ZIP Unicode Comment Extra Field
@@ -342,7 +353,7 @@ describe("readExtraFields()", () => {
   });
 
   it("throws if the unicode path field version is not 1", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.fileName = "hello world";
 
     const buffer = data(
@@ -359,7 +370,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read sizes from a Zip64 extended info field", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.compressedSize = 0xffffffff;
     entry.uncompressedSize = 0xffffffff;
 
@@ -377,7 +388,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read sizes and offset from a Zip64 extended info field", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.compressedSize = 0xffffffff;
     entry.uncompressedSize = 0xffffffff;
     entry.localHeaderOffset = 0xffffffff;
@@ -398,7 +409,7 @@ describe("readExtraFields()", () => {
   });
 
   it("throws if value in Zip64 extended info field is too large for Number", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.compressedSize = 0xffffffff;
 
     const buffer = data(
@@ -419,7 +430,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read three fields together", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.fileComment = "hello";
     entry.fileName = "world";
     entry.compressedSize = 0xffffffff;
@@ -456,7 +467,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can skip over unknown fields", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.compressedSize = 0xffffffff;
     entry.uncompressedSize = 0xffffffff;
 
@@ -478,7 +489,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read from the middle of a buffer", () => {
-    const entry = new ZipEntryReader();
+    const entry = new TestZipEntry();
     entry.compressedSize = 0xffffffff;
     entry.uncompressedSize = 0xffffffff;
 
@@ -499,3 +510,32 @@ describe("readExtraFields()", () => {
     assert.strictEqual(entry.compressedSize, 0x010203040506);
   });
 });
+
+class TestZipEntry implements ZipEntry {
+  public platformMadeBy = ZipPlatform.DOS;
+  public versionMadeBy = ZipVersion.Zip64;
+  public versionNeeded = ZipVersion.Zip64;
+  public readonly flags = new GeneralPurposeFlags();
+  public compressionMethod = CompressionMethod.Deflate;
+  public lastModified = new Date();
+  public crc32 = 0;
+  public compressedSize = 0;
+  public uncompressedSize = 0;
+  public fileNameLength = 0;
+  public extraFieldLength = 0;
+  public fileCommentLength = 0;
+  public internalFileAttributes = 0;
+  public externalFileAttributes?: DosFileAttributes | UnixFileAttributes;
+  public localHeaderOffset = 0;
+  public fileName = "";
+  public fileComment = "";
+
+  public get totalRecordLength(): number {
+    return (
+      CentralHeaderLength +
+      this.fileNameLength +
+      this.extraFieldLength +
+      this.fileCommentLength
+    );
+  }
+}
