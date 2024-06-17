@@ -42,11 +42,9 @@ export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
     return this.path.endsWith("/") || !!this.attributes?.isDirectory;
   }
 
-  public get isSymbolicLink(): boolean {
-    return (
-      this.attributes instanceof UnixFileAttributes &&
-      this.attributes.isSymbolicLink
-    );
+  public get isFile(): boolean {
+    // is indeterminate if we can't understand the attributes
+    return !this.path.endsWith("/") && !!this.attributes?.isFile;
   }
 
   public get totalRecordLength(): number {

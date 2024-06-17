@@ -27,7 +27,13 @@ export enum ZipVersion {
   Zip64 = 45,
 }
 
-export class DosFileAttributes extends BitField {
+export type CommonAttributes = {
+  isReadOnly: boolean;
+  isDirectory: boolean;
+  isFile: boolean;
+};
+
+export class DosFileAttributes extends BitField implements CommonAttributes {
   // https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
   public constructor(value = 0) {
     super(8, value);
@@ -60,33 +66,73 @@ export class DosFileAttributes extends BitField {
   public set isDirectory(value: boolean) {
     this.setBit(4, value);
   }
+
+  public get isFile(): boolean {
+    return !this.isDirectory;
+  }
+  public set isFile(value: boolean) {
+    if (value) {
+      this.isDirectory = false;
+    } else {
+      throw new RangeError(
+        `unable to set isFile to false (set another type flag to true instead)`,
+      );
+    }
+  }
 }
 
-export class UnixFileAttributes extends BitField {
+export class UnixFileAttributes extends BitField implements CommonAttributes {
   // https://man7.org/linux/man-pages/man7/inode.7.html
   public constructor(value = 0) {
     super(16, value);
   }
 
   public get isDirectory(): boolean {
-    return this.type === 0o40000;
+    return this.type === 0o4_0000;
   }
   public set isDirectory(value: boolean) {
-    this.type = value ? 0o40000 : 0o100000;
+    this.type = value ? 0o4_0000 : 0o10_0000;
+  }
+
+  public get isFile(): boolean {
+    return this.type === 0o10_0000;
+  }
+  public set isFile(value: boolean) {
+    if (value) {
+      this.type = 0o10_0000;
+    } else {
+      throw new RangeError(
+        `unable to set isFile to false (set another type flag to true instead)`,
+      );
+    }
+  }
+
+  public get isReadOnly(): boolean {
+    // no-one has write permission set
+    return (this.permissions & 0b010_010_010) === 0;
+  }
+  public set isReadOnly(value: boolean) {
+    if (value) {
+      // clear write permission for everyone
+      this.permissions = this.permissions & 0b101_101_101;
+    } else {
+      // set write permission for everyone
+      this.permissions = this.permissions | 0b010_010_010;
+    }
   }
 
   public get isSymbolicLink(): boolean {
-    return this.type === 0o120000;
+    return this.type === 0o12_0000;
   }
   public set isSymbolicLink(value: boolean) {
-    this.type = value ? 0o120000 : 0o100000;
+    this.type = value ? 0o12_0000 : 0o10_0000;
   }
 
   public get mode(): number {
     return this.value & 0o7777;
   }
   public set mode(value: number) {
-    this.value = (this.value & 0o170000) | (value & 0o7777);
+    this.value = (this.value & 0o17_0000) | (value & 0o7777);
   }
 
   public get permissions(): number {
@@ -100,7 +146,7 @@ export class UnixFileAttributes extends BitField {
     return this.value & 0o170000;
   }
   public set type(value: number) {
-    this.value = (this.value & 0o7777) | (value & 0o170000);
+    this.value = (this.value & 0o7777) | (value & 0o17_0000);
   }
 }
 
@@ -175,7 +221,7 @@ export class DosDate extends Date {
    * integer with the time in the lower 16 bits and date in the upper 16 bits.
    */
   public getDosDateTime(): number {
-    return ((this.getDosDate() << 16) >>> 0) | this.getDosTime();
+    return ((this.getDosDate() << 16) | this.getDosTime()) >>> 0;
   }
 
   /**
@@ -204,7 +250,7 @@ export class DosDate extends Date {
     // clamp at 1980 which is the earliest representable date
     // (1970 for regular Date class)
     const year = Math.max(0, this.getFullYear() - 1980);
-    return day | (month << 5) | (year << 9);
+    return (day | (month << 5) | (year << 9)) >>> 0;
   }
 
   /**
@@ -230,7 +276,7 @@ export class DosDate extends Date {
     const second = Math.round(this.getSeconds() / 2);
     const minute = this.getMinutes();
     const hour = this.getHours();
-    return second | (minute << 5) | (hour << 11);
+    return (second | (minute << 5) | (hour << 11)) >>> 0;
   }
 
   /**
@@ -254,7 +300,7 @@ export class DosDate extends Date {
  * Represents an object which can read a zip file.
  */
 export type ZipReaderLike = {
-  readonly fileCount: number;
+  readonly entryCount: number;
   readonly comment: string;
 
   readonly files: () => AsyncIterable<ZipEntryLike>;
@@ -267,7 +313,10 @@ export type ZipEntryLike = {
   readonly attributes?: DosFileAttributes | UnixFileAttributes;
   readonly comment: string;
   readonly compressedSize: number;
+  readonly compressionMethod: CompressionMethod;
   readonly crc32: number;
+  readonly flags: GeneralPurposeFlags;
+  readonly lastModified: Date;
   readonly path: string;
   readonly platformMadeBy: ZipPlatform;
   readonly uncompressedSize: number;
@@ -275,7 +324,7 @@ export type ZipEntryLike = {
   readonly versionNeeded: ZipVersion;
 
   readonly isDirectory: boolean;
-  readonly isSymbolicLink: boolean;
+  readonly isFile: boolean;
 
   readonly uncompressedData: ByteStream;
 

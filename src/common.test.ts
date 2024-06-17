@@ -87,6 +87,37 @@ describe("DosFileAttributes", () => {
       assert.strictEqual(value2.value, 0xef);
     });
   });
+
+  describe("isFile", () => {
+    it("returns the correct value", () => {
+      const value1 = new DosFileAttributes();
+      assert.strictEqual(value1.isFile, true);
+
+      // directory
+      const value2 = new DosFileAttributes(0b10000);
+      assert.strictEqual(value2.isFile, false);
+    });
+
+    it("sets the correct bit", () => {
+      // hidden, read-only directory
+      const value1 = new DosFileAttributes(0b10011);
+      value1.isFile = true;
+      assert.strictEqual(value1.value, 0b00011);
+
+      // system directory
+      const value2 = new DosFileAttributes(0b10100);
+      value2.isFile = true;
+      assert.strictEqual(value2.value, 0b00100);
+    });
+
+    it("throws if isFile is set to false", () => {
+      const value1 = new DosFileAttributes(0);
+      assert.throws(
+        () => (value1.isFile = false),
+        (error) => error instanceof RangeError,
+      );
+    });
+  });
 });
 
 describe("UnixFileAttributes", () => {
@@ -99,7 +130,7 @@ describe("UnixFileAttributes", () => {
       assert.strictEqual(value2.isDirectory, true);
     });
 
-    it("sets the correct bit", () => {
+    it("sets the correct bits", () => {
       const value1 = new UnixFileAttributes();
       value1.isDirectory = true;
       assert.strictEqual(value1.value, 0o4_0000);
@@ -108,6 +139,60 @@ describe("UnixFileAttributes", () => {
       value2.isDirectory = false;
       // changes type to file
       assert.strictEqual(value2.value, 0o10_7777);
+    });
+  });
+
+  describe("isFile", () => {
+    it("returns the correct value", () => {
+      const value1 = new UnixFileAttributes();
+      assert.strictEqual(value1.isFile, false);
+
+      const value2 = new UnixFileAttributes(0o10_0000);
+      assert.strictEqual(value2.isFile, true);
+
+      const value3 = new UnixFileAttributes(0o4_0000);
+      assert.strictEqual(value3.isFile, false);
+    });
+
+    it("sets the correct bits", () => {
+      const value1 = new UnixFileAttributes();
+      value1.isFile = true;
+      assert.strictEqual(value1.value, 0o10_0000);
+
+      const value2 = new UnixFileAttributes(0o4_7777);
+      value2.isFile = true;
+      assert.strictEqual(value2.value, 0o10_7777);
+    });
+
+    it("throws if isFile is set to false", () => {
+      const value1 = new UnixFileAttributes(0o10_0000);
+      assert.throws(
+        () => (value1.isFile = false),
+        (error) => error instanceof RangeError,
+      );
+    });
+  });
+
+  describe("isReadOnly", () => {
+    it("returns the correct value", () => {
+      const value1 = new UnixFileAttributes(0o777);
+      assert.strictEqual(value1.isReadOnly, false);
+
+      const value2 = new UnixFileAttributes(0o444);
+      assert.strictEqual(value2.isReadOnly, true);
+
+      const value3 = new UnixFileAttributes(0o644);
+      assert.strictEqual(value3.isReadOnly, false);
+    });
+
+    it("sets the correct bits", () => {
+      const value1 = new UnixFileAttributes(0o777);
+      value1.isReadOnly = true;
+      assert.strictEqual(value1.permissions, 0o555);
+
+      const value2 = new UnixFileAttributes(0o444);
+      value2.isReadOnly = false;
+      assert.strictEqual(value2.value, 0o666);
     });
   });
 
