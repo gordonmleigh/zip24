@@ -33,8 +33,10 @@ type RandomAccessReaderSourceOptions = {
 export async function* iterableFromReadableStream(
   stream: ReadableStream,
 ): AsyncGenerator<Uint8Array, undefined, undefined> {
-  if (Symbol.asyncIterator in stream) {
-    yield* stream as AsyncIterable<Uint8Array>;
+  // prevent narrowing to `never` after this block (using `as any`)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (Symbol.asyncIterator in (stream as any)) {
+    yield* stream;
     return;
   }
 
