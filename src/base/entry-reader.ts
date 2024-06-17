@@ -14,6 +14,7 @@ import { CentralHeaderLength } from "../internal/signatures.js";
 import {
   bufferFromIterable,
   readableStreamFromIterable,
+  textFromIterable,
   type ByteStream,
 } from "../internal/streams.js";
 
@@ -76,15 +77,7 @@ export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
   }
 
   public async toText(encoding?: string): Promise<string> {
-    const decoder = new TextDecoder(encoding);
-    let output = "";
-
-    for await (const chunk of this.uncompressedData) {
-      output += decoder.decode(chunk, { stream: true });
-    }
-
-    output += decoder.decode();
-    return output;
+    return await textFromIterable(this.uncompressedData, encoding);
   }
 
   public async *[Symbol.asyncIterator](): AsyncIterator<Uint8Array> {

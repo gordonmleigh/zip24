@@ -6,7 +6,9 @@ import {
   iterableFromRandomAccessReader,
   iterableFromReadableStream,
   mapIterable,
+  maxChunkSize,
   readableStreamFromIterable,
+  textFromIterable,
   type RandomAccessReadOptions,
   type RandomAccessReadResult,
 } from "./streams.js";
@@ -219,6 +221,18 @@ describe("bufferFromIterable", () => {
     );
 
     assert.strictEqual(Buffer.from(buffer).toString(), "uno.dos.tres.");
+  });
+});
+
+describe("textFromIterable", () => {
+  it("decodes all of the chunks", async () => {
+    const data = ["one", "1️⃣", "2️⃣", "3️⃣"].map((x) => Buffer.from(x));
+    // chunk it up weird so that we can prove the utf-8 decoding works properly
+    // (the glyphs are 7 bytes)
+    const chunks = maxChunkSize(data, 3);
+    const text = await textFromIterable(chunks);
+
+    assert.strictEqual(text, "one1️⃣2️⃣3️⃣");
   });
 });
 

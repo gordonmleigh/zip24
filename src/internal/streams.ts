@@ -139,12 +139,45 @@ export async function bufferFromIterable(
   return output;
 }
 
+export async function textFromIterable(
+  input: ByteStream,
+  encoding?: string,
+): Promise<string> {
+  const decoder = new TextDecoder(encoding);
+  let output = "";
+
+  for await (const chunk of input) {
+    output += decoder.decode(chunk, { stream: true });
+  }
+
+  output += decoder.decode();
+  return output;
+}
+
 export async function* mapIterable<Input, Output>(
   input: AnyIterable<Input>,
   map: (input: Input) => Output | PromiseLike<Output>,
 ): AsyncGenerator<Output> {
   for await (const element of input) {
     yield await map(element);
+  }
+}
+
+export async function* maxChunkSize(
+  input: ByteStream,
+  chunkSize: number,
+): ByteStream {
+  for await (const originalChunk of input) {
+    for (
+      let offset = 0;
+      offset < originalChunk.byteLength;
+      offset += chunkSize
+    ) {
+      yield originalChunk.subarray(
+        offset,
+        offset + Math.min(originalChunk.byteLength - offset, chunkSize),
+      );
+    }
   }
 }
 
