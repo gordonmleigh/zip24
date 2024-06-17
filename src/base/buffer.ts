@@ -5,10 +5,8 @@ import {
   readEocdr,
   type CentralDirectory,
 } from "../internal/central-directory.js";
-import {
-  readDirectoryEntry,
-  readLocalHeaderSize,
-} from "../internal/file-entry.js";
+import { readDirectoryEntry } from "../internal/directory-entry.js";
+import { readLocalHeaderSize } from "../internal/local-entry.js";
 import { defaultCompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
 

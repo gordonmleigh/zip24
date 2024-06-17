@@ -8,7 +8,7 @@ import {
   type CompressionAlgorithms,
 } from "../common.js";
 import { computeCrc32 } from "../internal/crc32.js";
-import type { ZipEntry } from "../internal/file-entry.js";
+import type { ZipEntry } from "../internal/directory-entry.js";
 import { CentralHeaderLength } from "../internal/signatures.js";
 import {
   bufferFromIterable,

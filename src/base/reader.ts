@@ -8,9 +8,9 @@ import {
 import {
   readDirectoryEntry,
   readDirectoryVariableFields,
-  readLocalHeaderSize,
-} from "../internal/file-entry.js";
+} from "../internal/directory-entry.js";
 import { lazy } from "../internal/lazy.js";
+import { readLocalHeaderSize } from "../internal/local-entry.js";
 import {
   CentralHeaderLength,
   LocalHeaderLength,

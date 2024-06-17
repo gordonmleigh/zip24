@@ -14,7 +14,7 @@ import {
   readDirectoryVariableFields,
   readExtraFields,
   type ZipEntry,
-} from "./file-entry.js";
+} from "./directory-entry.js";
 import { CentralHeaderLength } from "./signatures.js";
 import { cp437, data, utf8 } from "./test-utils/data.js";
 
