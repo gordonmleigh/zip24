@@ -6,9 +6,10 @@ import {
   ZipPlatform,
   ZipVersion,
   type CompressionAlgorithms,
+  type ZipEntryLike,
 } from "../common.js";
 import { computeCrc32 } from "../internal/crc32.js";
-import type { ZipEntry } from "../internal/directory-entry.js";
+import type { ZipEntry as ZipEntryInternal } from "../internal/directory-entry.js";
 import { CentralHeaderLength } from "../internal/signatures.js";
 import {
   bufferFromIterable,
@@ -16,7 +17,7 @@ import {
   type ByteStream,
 } from "../internal/streams.js";
 
-export class ZipEntryReader implements ZipEntry {
+export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
   private uncompressedDataInternal?: ByteStream;
 
   public platformMadeBy = ZipPlatform.DOS;
@@ -28,34 +29,32 @@ export class ZipEntryReader implements ZipEntry {
   public crc32 = 0;
   public compressedSize = 0;
   public uncompressedSize = 0;
-  public fileNameLength = 0;
+  public pathLength = 0;
   public extraFieldLength = 0;
-  public fileCommentLength = 0;
-  public internalFileAttributes = 0;
-  public externalFileAttributes?: DosFileAttributes | UnixFileAttributes;
+  public commentLength = 0;
+  public internalAttributes = 0;
+  public attributes?: DosFileAttributes | UnixFileAttributes;
   public localHeaderOffset = 0;
-  public fileName = "";
-  public fileComment = "";
+  public path = "";
+  public comment = "";
 
   public get isDirectory(): boolean {
-    return (
-      this.fileName.endsWith("/") || !!this.externalFileAttributes?.isDirectory
-    );
+    return this.path.endsWith("/") || !!this.attributes?.isDirectory;
   }
 
   public get isSymbolicLink(): boolean {
     return (
-      this.externalFileAttributes instanceof UnixFileAttributes &&
-      this.externalFileAttributes.isSymbolicLink
+      this.attributes instanceof UnixFileAttributes &&
+      this.attributes.isSymbolicLink
     );
   }
 
   public get totalRecordLength(): number {
     return (
       CentralHeaderLength +
-      this.fileNameLength +
+      this.pathLength +
       this.extraFieldLength +
-      this.fileCommentLength
+      this.commentLength
     );
   }
 
@@ -74,11 +73,11 @@ export class ZipEntryReader implements ZipEntry {
     return readableStreamFromIterable(this.uncompressedData);
   }
 
-  public async getBuffer(): Promise<Uint8Array> {
+  public async toBuffer(): Promise<Uint8Array> {
     return await bufferFromIterable(this.uncompressedData);
   }
 
-  public async getText(encoding?: string): Promise<string> {
+  public async toText(encoding?: string): Promise<string> {
     const decoder = new TextDecoder(encoding);
     let output = "";
 
@@ -96,7 +95,7 @@ export class ZipEntryReader implements ZipEntry {
 }
 
 export async function* decompress(
-  entry: ZipEntry,
+  entry: ZipEntryInternal,
   input: ByteStream,
   decompressors: CompressionAlgorithms,
 ): AsyncGenerator<Uint8Array> {

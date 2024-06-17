@@ -16,19 +16,19 @@ import { computeCrc32 } from "./crc32.js";
 import { CentralHeaderLength, CentralHeaderSignature } from "./signatures.js";
 
 export type ZipEntry = {
+  attributes?: DosFileAttributes | UnixFileAttributes;
+  comment: string;
+  commentLength: number;
   compressedSize: number;
   compressionMethod: CompressionMethod;
   crc32: number;
-  externalFileAttributes?: DosFileAttributes | UnixFileAttributes;
   extraFieldLength: number;
-  fileComment: string;
-  fileCommentLength: number;
-  fileName: string;
-  fileNameLength: number;
   flags: GeneralPurposeFlags;
-  internalFileAttributes: number;
+  internalAttributes: number;
   lastModified: Date;
   localHeaderOffset: number;
+  path: string;
+  pathLength: number;
   platformMadeBy: ZipPlatform;
   uncompressedSize: number;
   versionMadeBy: ZipVersion;
@@ -90,9 +90,9 @@ export function readDirectoryHeader(
   entry.compressedSize = view.readUint32LE(20);
   entry.uncompressedSize = view.readUint32LE(24);
 
-  entry.fileNameLength = view.readUint16LE(28);
+  entry.pathLength = view.readUint16LE(28);
   entry.extraFieldLength = view.readUint16LE(30);
-  entry.fileCommentLength = view.readUint16LE(32);
+  entry.commentLength = view.readUint16LE(32);
 
   const diskNumberStart = view.readUint16LE(34);
   assert(
@@ -101,15 +101,13 @@ export function readDirectoryHeader(
     `multi-disk zips not supported`,
   );
 
-  entry.internalFileAttributes = view.readUint16LE(36);
+  entry.internalAttributes = view.readUint16LE(36);
 
   const externalFileAttributes = view.readUint32LE(38);
   if (entry.platformMadeBy === ZipPlatform.DOS) {
-    entry.externalFileAttributes = new DosFileAttributes(
-      externalFileAttributes & 0xff,
-    );
+    entry.attributes = new DosFileAttributes(externalFileAttributes & 0xff);
   } else if (entry.platformMadeBy === ZipPlatform.UNIX) {
-    entry.externalFileAttributes = new UnixFileAttributes(
+    entry.attributes = new UnixFileAttributes(
       (externalFileAttributes >>> 16) & 0xffff,
     );
   }
@@ -131,22 +129,18 @@ export function readDirectoryVariableFields(
 
   const encoding = entry.flags.hasUtf8Strings ? "utf8" : "cp437";
 
-  entry.fileName = view.readString(
-    encoding,
-    CentralHeaderLength,
-    entry.fileNameLength,
-  );
+  entry.path = view.readString(encoding, CentralHeaderLength, entry.pathLength);
 
-  entry.fileComment = view.readString(
+  entry.comment = view.readString(
     encoding,
-    CentralHeaderLength + entry.fileNameLength + entry.extraFieldLength,
-    entry.fileCommentLength,
+    CentralHeaderLength + entry.pathLength + entry.extraFieldLength,
+    entry.commentLength,
   );
 
   readExtraFields(
     entry,
     view,
-    CentralHeaderLength + entry.fileNameLength,
+    CentralHeaderLength + entry.pathLength,
     entry.extraFieldLength,
   );
 }
@@ -170,11 +164,11 @@ export function readExtraFields(
 
     switch (tag) {
       case ExtendedDataTag.UnicodeCommentField:
-        readUnicodeField(entry, "fileComment", view, offset, size);
+        readUnicodeField(entry, "comment", view, offset, size);
         break;
 
       case ExtendedDataTag.UnicodePathField:
-        readUnicodeField(entry, "fileName", view, offset, size);
+        readUnicodeField(entry, "path", view, offset, size);
         break;
 
       case ExtendedDataTag.Zip64ExtendedInfo:
@@ -188,7 +182,7 @@ export function readExtraFields(
 
 function readUnicodeField(
   entry: ZipEntry,
-  field: "fileName" | "fileComment",
+  field: "path" | "comment",
   buffer: BufferLike,
   bufferOffset: number,
   byteLength: number,

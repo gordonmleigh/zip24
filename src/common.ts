@@ -1,5 +1,6 @@
 import { assert } from "./internal/assert.js";
 import { BitField } from "./internal/binary.js";
+import type { ByteStream } from "./internal/streams.js";
 
 export enum ZipPlatform {
   // 4.4.2.2 The current mappings are:
@@ -256,14 +257,14 @@ export type ZipReaderLike = {
   readonly fileCount: number;
   readonly comment: string;
 
-  readonly files: () => AsyncIterable<ZipEntryReaderLike>;
-} & AsyncIterable<ZipEntryReaderLike>;
+  readonly files: () => AsyncIterable<ZipEntryLike>;
+} & AsyncIterable<ZipEntryLike>;
 
 /**
  * Represents an object which can read a zip file entry.
  */
-export type ZipEntryReaderLike = {
-  readonly attributes: number;
+export type ZipEntryLike = {
+  readonly attributes?: DosFileAttributes | UnixFileAttributes;
   readonly comment: string;
   readonly compressedSize: number;
   readonly crc32: number;
@@ -276,8 +277,10 @@ export type ZipEntryReaderLike = {
   readonly isDirectory: boolean;
   readonly isSymbolicLink: boolean;
 
-  readonly getBuffer: () => PromiseLike<Uint8Array>;
-  readonly getData: () => AsyncIterable<Uint8Array>;
+  readonly uncompressedData: ByteStream;
+
+  readonly toBuffer: () => PromiseLike<Uint8Array>;
+  readonly toText: (encoding?: string) => PromiseLike<string>;
 } & AsyncIterable<Uint8Array>;
 
 /**

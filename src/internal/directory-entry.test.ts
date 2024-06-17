@@ -98,17 +98,17 @@ describe("readDirectoryEntry()", () => {
     assert.strictEqual(entry.compressedSize, 0x21436587);
     assert.strictEqual(entry.uncompressedSize, 0x65873412);
 
-    assert.strictEqual(entry.fileNameLength, 8);
+    assert.strictEqual(entry.pathLength, 8);
     assert.strictEqual(entry.extraFieldLength, 0);
-    assert.strictEqual(entry.fileCommentLength, 6);
+    assert.strictEqual(entry.commentLength, 6);
 
     assert.strictEqual(entry.localHeaderOffset, 0x12efcdab);
-    assert.strictEqual(entry.externalFileAttributes?.value, 0x81a4);
+    assert.strictEqual(entry.attributes?.value, 0x81a4);
 
     assert.strictEqual(entry.totalRecordLength, 46 + 8 + 0 + 6);
 
-    assert.strictEqual(entry.fileName, "ôöò/path");
-    assert.strictEqual(entry.fileComment, "☺☻♥♦♣♠");
+    assert.strictEqual(entry.path, "ôöò/path");
+    assert.strictEqual(entry.comment, "☺☻♥♦♣♠");
   });
 
   it("sets unixFileAttributes if the platform is unix", () => {
@@ -139,7 +139,7 @@ describe("readDirectoryEntry()", () => {
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.UNIX);
-    assert.strictEqual(entry.externalFileAttributes?.value, 0x81a4);
+    assert.strictEqual(entry.attributes?.value, 0x81a4);
   });
 
   it("sets dosFileAttributes if the platform is DOS", () => {
@@ -170,7 +170,7 @@ describe("readDirectoryEntry()", () => {
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.DOS);
-    assert.strictEqual(entry.externalFileAttributes?.value, 0x11);
+    assert.strictEqual(entry.attributes?.value, 0x11);
   });
 
   it("throws when disk number start is non-zero", () => {
@@ -231,8 +231,8 @@ describe("readDirectoryEntry()", () => {
     const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
-    assert.strictEqual(entry.fileName, "≡ƒÑ║");
-    assert.strictEqual(entry.fileComment, "≡ƒÿâ");
+    assert.strictEqual(entry.path, "≡ƒÑ║");
+    assert.strictEqual(entry.comment, "≡ƒÿâ");
   });
 
   it("decodes file name and comment as utf-8 if the unicode flag is set", () => {
@@ -262,8 +262,8 @@ describe("readDirectoryEntry()", () => {
     const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
-    assert.strictEqual(entry.fileName, "🥺");
-    assert.strictEqual(entry.fileComment, "😃");
+    assert.strictEqual(entry.path, "🥺");
+    assert.strictEqual(entry.comment, "😃");
   });
 
   it("decodes extra fields", () => {
@@ -311,8 +311,8 @@ describe("readDirectoryEntry()", () => {
     const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
-    assert.strictEqual(entry.fileComment, "ABC");
-    assert.strictEqual(entry.fileName, "🥺");
+    assert.strictEqual(entry.comment, "ABC");
+    assert.strictEqual(entry.path, "🥺");
     assert.strictEqual(entry.uncompressedSize, 0x060504030201);
     assert.strictEqual(entry.compressedSize, 0x010203040506);
     assert.strictEqual(entry.localHeaderOffset, 0x010203010203);
@@ -357,7 +357,7 @@ describe("readDirectoryVariableFields", () => {
 describe("readExtraFields()", () => {
   it("can read a unicode comment field", () => {
     const entry = new TestZipEntry();
-    entry.fileComment = "hello world";
+    entry.comment = "hello world";
 
     const buffer = data(
       "7563", // tag: Info-ZIP Unicode Comment Extra Field
@@ -369,12 +369,12 @@ describe("readExtraFields()", () => {
 
     readExtraFields(entry, buffer);
 
-    assert.strictEqual(entry.fileComment, "ABC");
+    assert.strictEqual(entry.comment, "ABC");
   });
 
   it("can read a unicode path field", () => {
     const entry = new TestZipEntry();
-    entry.fileName = "hello world";
+    entry.path = "hello world";
 
     const buffer = data(
       "7570", // tag: Info-ZIP Unicode Path Extra Field
@@ -386,12 +386,12 @@ describe("readExtraFields()", () => {
 
     readExtraFields(entry, buffer);
 
-    assert.strictEqual(entry.fileName, "ABC");
+    assert.strictEqual(entry.path, "ABC");
   });
 
   it("ignores unicode path field if the CRC32 does not match", () => {
     const entry = new TestZipEntry();
-    entry.fileName = "hello world";
+    entry.path = "hello world";
 
     const buffer = data(
       "7570", // tag: Info-ZIP Unicode Path Extra Field
@@ -403,7 +403,7 @@ describe("readExtraFields()", () => {
 
     readExtraFields(entry, buffer);
 
-    assert.strictEqual(entry.fileName, "hello world");
+    assert.strictEqual(entry.path, "hello world");
   });
 
   it("ignores unicode comment field if the header comment is not set", () => {
@@ -419,12 +419,12 @@ describe("readExtraFields()", () => {
 
     readExtraFields(entry, buffer);
 
-    assert.strictEqual(entry.fileComment, "");
+    assert.strictEqual(entry.comment, "");
   });
 
   it("throws if the unicode path field version is not 1", () => {
     const entry = new TestZipEntry();
-    entry.fileName = "hello world";
+    entry.path = "hello world";
 
     const buffer = data(
       "7570", // tag: Info-ZIP Unicode Path Extra Field
@@ -501,8 +501,8 @@ describe("readExtraFields()", () => {
 
   it("can read three fields together", () => {
     const entry = new TestZipEntry();
-    entry.fileComment = "hello";
-    entry.fileName = "world";
+    entry.comment = "hello";
+    entry.path = "world";
     entry.compressedSize = 0xffffffff;
     entry.uncompressedSize = 0xffffffff;
     entry.localHeaderOffset = 0xffffffff;
@@ -529,8 +529,8 @@ describe("readExtraFields()", () => {
 
     readExtraFields(entry, buffer);
 
-    assert.strictEqual(entry.fileComment, "ABC");
-    assert.strictEqual(entry.fileName, "🥺");
+    assert.strictEqual(entry.comment, "ABC");
+    assert.strictEqual(entry.path, "🥺");
     assert.strictEqual(entry.uncompressedSize, 0x060504030201);
     assert.strictEqual(entry.compressedSize, 0x010203040506);
     assert.strictEqual(entry.localHeaderOffset, 0x010203010203);
@@ -591,21 +591,21 @@ class TestZipEntry implements ZipEntry {
   public crc32 = 0;
   public compressedSize = 0;
   public uncompressedSize = 0;
-  public fileNameLength = 0;
+  public pathLength = 0;
   public extraFieldLength = 0;
-  public fileCommentLength = 0;
-  public internalFileAttributes = 0;
-  public externalFileAttributes?: DosFileAttributes | UnixFileAttributes;
+  public commentLength = 0;
+  public internalAttributes = 0;
+  public attributes?: DosFileAttributes | UnixFileAttributes;
   public localHeaderOffset = 0;
-  public fileName = "";
-  public fileComment = "";
+  public path = "";
+  public comment = "";
 
   public get totalRecordLength(): number {
     return (
       CentralHeaderLength +
-      this.fileNameLength +
+      this.pathLength +
       this.extraFieldLength +
-      this.fileCommentLength
+      this.commentLength
     );
   }
 }
