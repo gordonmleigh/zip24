@@ -5,14 +5,12 @@ import {
   ZipFormatError,
   ZipSignatureError,
 } from "../common.js";
+import { cp437, data } from "../testing/data.js";
 import { readEocdr, type CentralDirectory } from "./central-directory.js";
-import { cp437, data } from "./test-utils/data.js";
 
 describe("readEocdr", () => {
   it("can read an EOCDR", () => {
     const buffer = data(
-      "89273498892734988927349889273498",
-      "89273498892734988927349889273498", // nonsense (32 bytes)
       "504b0506", // signature (0x06054b50)
       "0000", // number of this disk
       "0000", // central directory start disk

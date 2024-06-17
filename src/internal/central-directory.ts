@@ -74,13 +74,20 @@ export function readEocdr(
   );
 
   // EOCDL starts 20 bytes before EOCDR
-  const eocdlOffset = eocdrOffset - 20;
+  const eocdlBufferOffset = eocdrOffset - 20;
+  const eocdlFileOffset = eocdlBufferOffset + fileOffset;
+
+  // we need to either have the EOCDL in the buffer, or the case where the EOCDL
+  // wouldn't fit in the file
   assert(
-    eocdlOffset >= 0,
+    eocdlBufferOffset >= 0 || eocdlFileOffset < 0,
     `buffer must be at least as big as the EOCDR and possible EOCDL`,
   );
 
-  if (view.readUint32LE(eocdlOffset) === Zip64EocdlSignature) {
+  if (
+    eocdlBufferOffset >= 0 &&
+    view.readUint32LE(eocdlBufferOffset) === Zip64EocdlSignature
+  ) {
     // Zip64 End of Central Directory Locator (4.3.15)
     //
     // | offset | field                        | size |
@@ -90,14 +97,14 @@ export function readEocdr(
     // | 8      | central directory offset     | 8    |
     // | 16     | total number of disks        | 4    |
     // | 20     | (end)                        |      |
-    const startDisk = view.readUint32LE(eocdlOffset + 4);
-    const totalDisks = view.readUint32LE(eocdlOffset + 16);
+    const startDisk = view.readUint32LE(eocdlBufferOffset + 4);
+    const totalDisks = view.readUint32LE(eocdlBufferOffset + 16);
 
     if (startDisk > 0 || totalDisks > 1) {
       throw new MultiDiskError();
     }
 
-    const eocdr64Offset = view.readUint32LE(eocdlOffset + 8);
+    const eocdr64Offset = view.readUint32LE(eocdlBufferOffset + 8);
     if (eocdr64Offset < fileOffset) {
       // zip64 eocdr is 56 bytes long
       return { ok: false, eocdr64Offset, byteLength: 56 };
