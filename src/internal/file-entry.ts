@@ -6,9 +6,10 @@ import {
   GeneralPurposeFlags,
   UnixFileAttributes,
   ZipPlatform,
+  ZipSignatureError,
   ZipVersion,
 } from "../common.js";
-import { assert, assertSignature } from "./assert.js";
+import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { CodePage437Encoder } from "./cp437.js";
 import { computeCrc32 } from "./crc32.js";
@@ -77,12 +78,11 @@ export function readDirectoryHeader(
   // |        | extra field (variable size)     |      |
   // |        | file comment (variable size)    |      |
   const view = new BufferView(buffer, bufferOffset);
+  const signature = view.readUint32LE(0);
 
-  assertSignature(
-    view.readUint32LE(0),
-    CentralHeaderSignature,
-    "CentralDirectoryHeader",
-  );
+  if (signature !== CentralHeaderSignature) {
+    throw new ZipSignatureError("central directory header", signature);
+  }
 
   entry.versionMadeBy = view.readUint8(4);
   entry.platformMadeBy = view.readUint8(5);
@@ -127,11 +127,11 @@ export function readDirectoryVariableFields(
   bufferOffset = 0,
 ): void {
   const view = new BufferView(buffer, bufferOffset);
-  assertSignature(
-    view.readUint32LE(0),
-    CentralHeaderSignature,
-    "CentralDirectoryHeader",
-  );
+  const signature = view.readUint32LE(0);
+
+  if (signature !== CentralHeaderSignature) {
+    throw new ZipSignatureError("central directory header", signature);
+  }
 
   const encoding = entry.flags.hasUtf8Strings ? "utf8" : "cp437";
 
@@ -177,12 +177,11 @@ export function readLocalHeaderSize(
   // | 30     | file name                 | ...  |
   // | ...    | extra field               | ...  |
   const view = new BufferView(buffer, bufferOffset);
+  const signature = view.readUint32LE(0);
 
-  assertSignature(
-    view.readUint32LE(0),
-    LocalHeaderSignature,
-    "LocalFileHeader",
-  );
+  if (signature !== LocalHeaderSignature) {
+    throw new ZipSignatureError("local header", signature);
+  }
 
   const fileNameLength = view.readUint16LE(26);
   const extraFieldLength = view.readUint16LE(28);

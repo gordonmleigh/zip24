@@ -11,6 +11,7 @@ export function addAbortListener(
   if (abortSignal.aborted) {
     // run on next tick
     void Promise.resolve().then(onAbort);
+    /* c8 ignore next */
     return () => {};
   }
 

@@ -1,5 +1,9 @@
-import { MultiDiskError, ZipFormatError } from "../common.js";
-import { assert, assertSignature } from "./assert.js";
+import {
+  MultiDiskError,
+  ZipFormatError,
+  ZipSignatureError,
+} from "../common.js";
+import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import {
   EndOfCentralDirectorySignature,
@@ -152,12 +156,11 @@ export function readZip64Eocdr(
   // | 56     | (end)                         |      |
 
   const view = new BufferView(buffer, bufferOffset);
+  const signature = view.readUint32LE(0);
 
-  assertSignature(
-    view.readUint32LE(0),
-    Zip64EocdrSignature,
-    `Zip64EndOfCentralDirectoryRecord`,
-  );
+  if (signature !== Zip64EocdrSignature) {
+    throw new ZipSignatureError("Zip64 EOCDR", signature);
+  }
 
   directory.count = view.readUint64LE(32);
   directory.size = view.readUint64LE(40);

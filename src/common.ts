@@ -317,3 +317,10 @@ export class ZipFormatError extends ZipError {
     this.name = "ZipFormatError";
   }
 }
+
+export class ZipSignatureError extends ZipFormatError {
+  public constructor(recordName: string, actual: number) {
+    super(`invalid signature for ${recordName} (${actual.toString(16)})`);
+    this.name = "ZipSignatureError";
+  }
+}

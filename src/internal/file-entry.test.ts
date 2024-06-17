@@ -6,10 +6,12 @@ import {
   GeneralPurposeFlags,
   UnixFileAttributes,
   ZipPlatform,
+  ZipSignatureError,
   ZipVersion,
 } from "../common.js";
 import {
   readDirectoryEntry,
+  readDirectoryVariableFields,
   readExtraFields,
   type ZipEntry,
 } from "./file-entry.js";
@@ -17,6 +19,39 @@ import { CentralHeaderLength } from "./signatures.js";
 import { cp437, data, utf8 } from "./test-utils/data.js";
 
 describe("readDirectoryEntry()", () => {
+  it("throws if the signature is invalid", () => {
+    const buffer = data(
+      /* 00 +04 */ "ffffffff", // signature  (0x02014b50)
+      /* 04 +02 */ "1503", // version made by (21 = 2.1), platform (3 = Unix)
+      /* 06 +02 */ "1500", // version needed (21 = 2.1)
+      /* 08 +02 */ "4100", // flags
+      /* 10 +02 */ "0800", // compression method (8 = DEFLATE)
+      /* 12 +02 */ "6a51", // last mod file time (10:11:20)
+      /* 14 +02 */ "a656", // last mod file date, (2023-05-06)
+      /* 16 +04 */ "12345678", // crc-32
+      /* 20 +04 */ "87654321", // compressed size
+      /* 24 +04 */ "12348765", // uncompressed size
+      /* 28 +02 */ "0800", // file name length
+      /* 30 +02 */ "0000", // extra field length
+      /* 32 +02 */ "0600", // file comment length
+      /* 34 +02 */ "0000", // disk number start
+      /* 36 +02 */ "0000", // internal file attributes
+      /* 38 +04 */ "0000a481", // external file attributes
+      /* 42 +04 */ "abcdef12", // relative offset of local header
+      /* 46 +08 */ cp437`ôöò/path`, // file name
+      /* 54 +00 */ "", // extra field
+      /* 54 +11 */ "010203040506", // the comment
+    );
+
+    const entry = new TestZipEntry();
+    assert.throws(
+      () => {
+        readDirectoryEntry(entry, buffer);
+      },
+      (error) => error instanceof ZipSignatureError,
+    );
+  });
+
   it("can read a header", () => {
     const buffer = data(
       /* 00 +04 */ "504b0102", // signature  (0x02014b50)
@@ -281,6 +316,41 @@ describe("readDirectoryEntry()", () => {
     assert.strictEqual(entry.uncompressedSize, 0x060504030201);
     assert.strictEqual(entry.compressedSize, 0x010203040506);
     assert.strictEqual(entry.localHeaderOffset, 0x010203010203);
+  });
+});
+
+describe("readDirectoryVariableFields", () => {
+  it("throws if the signature is invalid", () => {
+    const buffer = data(
+      /* 00 +04 */ "ffffffff", // signature  (0x02014b50)
+      /* 04 +02 */ "1503", // version made by (21 = 2.1), platform (3 = Unix)
+      /* 06 +02 */ "1500", // version needed (21 = 2.1)
+      /* 08 +02 */ "4100", // flags
+      /* 10 +02 */ "0800", // compression method (8 = DEFLATE)
+      /* 12 +02 */ "6a51", // last mod file time (10:11:20)
+      /* 14 +02 */ "a656", // last mod file date, (2023-05-06)
+      /* 16 +04 */ "12345678", // crc-32
+      /* 20 +04 */ "87654321", // compressed size
+      /* 24 +04 */ "12348765", // uncompressed size
+      /* 28 +02 */ "0800", // file name length
+      /* 30 +02 */ "0000", // extra field length
+      /* 32 +02 */ "0600", // file comment length
+      /* 34 +02 */ "0000", // disk number start
+      /* 36 +02 */ "0000", // internal file attributes
+      /* 38 +04 */ "0000a481", // external file attributes
+      /* 42 +04 */ "abcdef12", // relative offset of local header
+      /* 46 +08 */ cp437`ôöò/path`, // file name
+      /* 54 +00 */ "", // extra field
+      /* 54 +11 */ "010203040506", // the comment
+    );
+
+    const entry = new TestZipEntry();
+    assert.throws(
+      () => {
+        readDirectoryVariableFields(entry, buffer);
+      },
+      (error) => error instanceof ZipSignatureError,
+    );
   });
 });
 
