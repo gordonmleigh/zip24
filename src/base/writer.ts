@@ -3,8 +3,7 @@ import {
   DosFileAttributes,
   UnixFileAttributes,
   ZipPlatform,
-} from "../common.js";
-import { assert } from "../internal/assert.js";
+} from "../internal/field-types.js";
 import { readableStreamFromIterable } from "../internal/streams.js";
 import {
   ZipWriterBase,
@@ -21,11 +20,10 @@ export type ZipEntryInfo = {
   compressionMethod?: CompressionMethod;
   compressedSize?: number;
   crc32?: number;
-  dosFileAttributes?: DosFileAttributes;
+  attributes?: DosFileAttributes | UnixFileAttributes;
   modifiedTime?: Date;
   path: string;
   uncompressedSize?: number;
-  unixFileAttributes?: UnixFileAttributes;
   zip64?: boolean;
 };
 
@@ -59,22 +57,19 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     entry: ZipEntryInfo,
     content?: ZipEntryData,
   ): Promise<void> {
-    const { dosFileAttributes, unixFileAttributes, ...rest } = entry;
+    const { attributes, ...rest } = entry;
 
-    let externalFileAttributes: number | undefined;
+    let externalFileAttributes = 0;
     let platformMadeBy: ZipPlatform | undefined;
 
-    if (dosFileAttributes) {
-      assert(
-        !unixFileAttributes,
-        `specify either dosFileAttributes or unixFileAttributes`,
-      );
-
-      externalFileAttributes = dosFileAttributes.value;
+    if (attributes instanceof DosFileAttributes) {
+      externalFileAttributes = attributes.value;
       platformMadeBy = ZipPlatform.DOS;
-    } else if (unixFileAttributes) {
-      externalFileAttributes = (unixFileAttributes.value & 0xffff) << 16;
+    } else if (attributes instanceof UnixFileAttributes) {
+      externalFileAttributes = ((attributes.value & 0xffff) << 16) >>> 0;
       platformMadeBy = ZipPlatform.UNIX;
+    } else if (attributes !== undefined) {
+      throw new Error(`invalid value for attributes`);
     }
 
     await this.writer.addFileEntry(

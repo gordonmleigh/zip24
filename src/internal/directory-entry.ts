@@ -1,20 +1,26 @@
-import {
-  CompressionMethod,
-  DosDate,
-  DosFileAttributes,
-  ExtendedDataTag,
-  GeneralPurposeFlags,
-  UnixFileAttributes,
-  ZipFormatError,
-  ZipPlatform,
-  ZipSignatureError,
-  ZipVersion,
-} from "../common.js";
 import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { CodePage437Encoder } from "./cp437.js";
 import { computeCrc32 } from "./crc32.js";
+import { ZipFormatError, ZipSignatureError } from "./errors.js";
+import {
+  CompressionMethod,
+  DosDate,
+  DosFileAttributes,
+  GeneralPurposeFlags,
+  UnixFileAttributes,
+  ZipPlatform,
+  ZipVersion,
+} from "./field-types.js";
 import { CentralHeaderLength, CentralHeaderSignature } from "./signatures.js";
+
+enum ExtendedDataTag {
+  Unset = 0,
+  Zip64ExtendedInfo = 0x01,
+  UnicodeCommentField = 0x6375,
+  UnicodePathField = 0x7075,
+  Unix = 0x0d,
+}
 
 export type ZipEntryDataDescriptor = {
   compressedSize: number;

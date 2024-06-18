@@ -1,11 +1,3 @@
-import {
-  CompressionMethod,
-  DosDate,
-  GeneralPurposeFlags,
-  ZipPlatform,
-  ZipVersion,
-  type CompressionAlgorithms,
-} from "../common.js";
 import { assert } from "./assert.js";
 import { BufferView } from "./binary.js";
 import { CodePage437Encoder } from "./cp437.js";
@@ -14,6 +6,14 @@ import {
   ByteLengthStrategy,
   DoubleEndedBuffer,
 } from "./double-ended-buffer.js";
+import {
+  CompressionMethod,
+  DosDate,
+  GeneralPurposeFlags,
+  ZipPlatform,
+  ZipVersion,
+  type CompressionAlgorithms,
+} from "./field-types.js";
 import { Semaphore } from "./semaphore.js";
 import {
   CentralHeaderSignature,

@@ -1,15 +1,5 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import {
-  CompressionMethod,
-  DosDate,
-  DosFileAttributes,
-  GeneralPurposeFlags,
-  ZipFormatError,
-  ZipPlatform,
-  ZipSignatureError,
-  ZipVersion,
-} from "../common.js";
 import { cp437, data, utf8 } from "../testing/data.js";
 import {
   getDirectoryHeaderLength,
@@ -19,6 +9,15 @@ import {
   type ZipEntryHeader,
   type ZipEntryMeasurementFields,
 } from "./directory-entry.js";
+import { ZipFormatError, ZipSignatureError } from "./errors.js";
+import {
+  CompressionMethod,
+  DosDate,
+  DosFileAttributes,
+  GeneralPurposeFlags,
+  ZipPlatform,
+  ZipVersion,
+} from "./field-types.js";
 
 describe("readDirectoryEntry()", () => {
   it("throws if the signature is invalid", () => {

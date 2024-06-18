@@ -1,10 +1,6 @@
-import {
-  MultiDiskError,
-  ZipFormatError,
-  ZipSignatureError,
-} from "../common.js";
 import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
+import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   EndOfCentralDirectorySignature,
   Zip64EocdlSignature,

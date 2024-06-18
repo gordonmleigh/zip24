@@ -1,12 +1,8 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import {
-  MultiDiskError,
-  ZipFormatError,
-  ZipSignatureError,
-} from "../common.js";
 import { cp437, data } from "../testing/data.js";
 import { readEocdr, type CentralDirectory } from "./central-directory.js";
+import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
 
 describe("readEocdr", () => {
   it("can read an EOCDR", () => {

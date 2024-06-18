@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { deflateRawSync } from "node:zlib";
-import { DosDate } from "../common.js";
 import { CodePage437Encoder } from "../internal/cp437.js";
 import { computeCrc32 } from "../internal/crc32.js";
+import { DosDate } from "../internal/field-types.js";
 
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function* asyncIterable(

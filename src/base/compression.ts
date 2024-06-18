@@ -1,4 +1,7 @@
-import { CompressionMethod, type CompressionAlgorithms } from "../common.js";
+import {
+  CompressionMethod,
+  type CompressionAlgorithms,
+} from "../internal/field-types.js";
 import {
   iterableFromReadableStream,
   readableStreamFromIterable,

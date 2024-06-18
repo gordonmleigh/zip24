@@ -1,13 +1,13 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
+import type { ZipEntryCompressionInfo } from "../internal/directory-entry.js";
+import { ZipFormatError } from "../internal/errors.js";
 import {
   CompressionMethod,
   DosFileAttributes,
   UnixFileAttributes,
-  ZipFormatError,
-} from "../common.js";
-import type { ZipEntryCompressionInfo } from "../internal/directory-entry.js";
+} from "../internal/field-types.js";
 import type { ByteStream } from "../internal/streams.js";
 import { asyncIterable } from "../testing/data.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";

@@ -1,5 +1,5 @@
-import { ZipSignatureError } from "../common.js";
 import { BufferView, type BufferLike } from "./binary.js";
+import { ZipSignatureError } from "./errors.js";
 import { LocalHeaderSignature } from "./signatures.js";
 
 export function readLocalHeaderSize(

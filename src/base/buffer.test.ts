@@ -5,7 +5,7 @@ import {
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
-} from "../common.js";
+} from "../internal/field-types.js";
 import { EmptyZip32, Zip32WithThreeEntries } from "../testing/fixtures.js";
 import { ZipBufferReader } from "./buffer.js";
 import { ZipEntryReader } from "./entry-reader.js";

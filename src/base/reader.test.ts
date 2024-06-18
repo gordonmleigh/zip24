@@ -6,7 +6,7 @@ import {
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
-} from "../common.js";
+} from "../internal/field-types.js";
 import { randomAccessReaderFromBuffer } from "../internal/streams.js";
 import {
   EmptyZip32,

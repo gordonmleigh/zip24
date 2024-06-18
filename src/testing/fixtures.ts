@@ -1,5 +1,5 @@
-import { CompressionMethod, ZipVersion } from "../common.js";
 import { computeCrc32 } from "../internal/crc32.js";
+import { CompressionMethod, ZipVersion } from "../internal/field-types.js";
 import {
   bigUint,
   cp437,

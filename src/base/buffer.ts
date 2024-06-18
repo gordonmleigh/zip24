@@ -1,4 +1,3 @@
-import type { CompressionAlgorithms } from "../common.js";
 import { assert } from "../internal/assert.js";
 import { BufferView, type BufferLike } from "../internal/binary.js";
 import {
@@ -9,6 +8,7 @@ import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
 } from "../internal/directory-entry.js";
+import type { CompressionAlgorithms } from "../internal/field-types.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";

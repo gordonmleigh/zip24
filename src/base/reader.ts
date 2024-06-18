@@ -1,4 +1,3 @@
-import type { CompressionAlgorithms } from "../common.js";
 import { assert } from "../internal/assert.js";
 import {
   readEocdr,
@@ -10,6 +9,7 @@ import {
   readDirectoryHeader,
   readDirectoryVariableFields,
 } from "../internal/directory-entry.js";
+import type { CompressionAlgorithms } from "../internal/field-types.js";
 import { lazy } from "../internal/lazy.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import {

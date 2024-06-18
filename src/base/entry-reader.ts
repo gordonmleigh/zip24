@@ -1,18 +1,18 @@
-import {
-  CompressionMethod,
-  DosFileAttributes,
-  GeneralPurposeFlags,
-  UnixFileAttributes,
-  ZipFormatError,
-  ZipPlatform,
-  ZipVersion,
-  type CompressionAlgorithms,
-} from "../common.js";
 import { computeCrc32 } from "../internal/crc32.js";
 import type {
   ZipEntryCompressionInfo,
   ZipEntryHeader,
 } from "../internal/directory-entry.js";
+import { ZipFormatError } from "../internal/errors.js";
+import {
+  CompressionMethod,
+  DosFileAttributes,
+  GeneralPurposeFlags,
+  UnixFileAttributes,
+  ZipPlatform,
+  ZipVersion,
+  type CompressionAlgorithms,
+} from "../internal/field-types.js";
 import {
   bufferFromIterable,
   readableStreamFromIterable,

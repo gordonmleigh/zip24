@@ -1,6 +1,9 @@
 import { Readable } from "node:stream";
 import { createDeflateRaw, createInflateRaw } from "node:zlib";
-import { CompressionMethod, type CompressionAlgorithms } from "../common.js";
+import {
+  CompressionMethod,
+  type CompressionAlgorithms,
+} from "../internal/field-types.js";
 
 /**
  * Default Node.js (zlib) compression methods.
