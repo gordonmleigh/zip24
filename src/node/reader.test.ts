@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { ZipEntryReader } from "../base/entry-reader.js";
@@ -117,6 +118,44 @@ describe("node/reader", () => {
       }
 
       assert.strictEqual(fileIndex, 5);
+    });
+
+    describe("ZipReader.open()", () => {
+      it("can read a zip file from disk", async () => {
+        const data = generateZip({
+          fileCount: 100,
+          fileSize: 100 * 1024,
+          // pad out the central dir to force multiple chunks to be read
+          fileCommentLength: 30 * 1024,
+        });
+
+        // make sure we're in the workspace root
+        await stat("package.json");
+        await mkdir(".local/", { recursive: true });
+
+        const filePath = ".local/test-ZipReader-open.zip";
+        await writeFile(filePath, data);
+
+        const reader = await ZipReader.open(filePath);
+
+        let fileIndex = 0;
+        for await (const file of reader) {
+          assert.strictEqual(file.path, `path ${fileIndex}`);
+
+          const expectedComment = `comment ${fileIndex}`;
+          const commentRegexp = new RegExp(`^(${expectedComment})+$`);
+          assert(commentRegexp.test(file.comment));
+
+          const expectedData = `file${fileIndex.toString().padStart(6, "0")}`;
+          const dataRegexp = new RegExp(`^(${expectedData})+$`);
+          const text = await file.toText();
+          assert(dataRegexp.test(text));
+
+          ++fileIndex;
+        }
+
+        assert.strictEqual(fileIndex, 100);
+      });
     });
 
     describe("comment", () => {
