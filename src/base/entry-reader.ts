@@ -7,7 +7,6 @@ import {
   ZipPlatform,
   ZipVersion,
   type CompressionAlgorithms,
-  type ZipEntryLike,
 } from "../common.js";
 import { computeCrc32 } from "../internal/crc32.js";
 import type {
@@ -21,7 +20,7 @@ import {
   type ByteStream,
 } from "../internal/streams.js";
 
-export class ZipEntryReader implements ZipEntryHeader, ZipEntryLike {
+export class ZipEntryReader implements ZipEntryHeader {
   private uncompressedDataInternal?: ByteStream;
 
   public platformMadeBy = ZipPlatform.DOS;

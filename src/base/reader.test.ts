@@ -6,7 +6,6 @@ import {
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
-  type ZipEntryLike,
 } from "../common.js";
 import { randomAccessReaderFromBuffer } from "../internal/streams.js";
 import {
@@ -141,7 +140,7 @@ describe("base/reader", () => {
           Zip32WithThreeEntries.byteLength,
         );
 
-        const files: ZipEntryLike[] = [];
+        const files: ZipEntryReader[] = [];
         for await (const file of reader.files()) {
           files.push(file);
         }
@@ -251,17 +250,13 @@ describe("base/reader", () => {
           randomAccessReaderFromBuffer(Zip32WithThreeEntries),
           Zip32WithThreeEntries.byteLength,
         );
-
-        const files: ZipEntryLike[] = [
-          new ZipEntryReader(),
-          new ZipEntryReader(),
-        ];
+        const files = [new ZipEntryReader(), new ZipEntryReader()];
 
         const filesMock = mock.method(
           reader,
           "files",
           // eslint-disable-next-line @typescript-eslint/require-await
-          async function* (): AsyncGenerator<ZipEntryLike> {
+          async function* (): AsyncGenerator<ZipEntryReader> {
             for (const file of files) {
               yield file;
             }

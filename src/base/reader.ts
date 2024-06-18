@@ -1,8 +1,4 @@
-import type {
-  CompressionAlgorithms,
-  ZipEntryLike,
-  ZipReaderLike,
-} from "../common.js";
+import type { CompressionAlgorithms } from "../common.js";
 import { assert } from "../internal/assert.js";
 import {
   readEocdr,
@@ -40,7 +36,7 @@ export type ZipReaderOptions = {
 /**
  * An object which can read a zip file from a {@link RandomAccessReader}.
  */
-export class ZipReader implements ZipReaderLike {
+export class ZipReader {
   /**
    * Create a new instance and call open().
    */
@@ -91,14 +87,14 @@ export class ZipReader implements ZipReaderLike {
   /**
    * Get an iterator which iterates over the file entries in the zip.
    */
-  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryLike> {
+  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader> {
     return this.files();
   }
 
   /**
    * Get an iterator which iterates over the file entries in the zip.
    */
-  public async *files(): AsyncGenerator<ZipEntryLike> {
+  public async *files(): AsyncGenerator<ZipEntryReader> {
     await this.open();
     assert(this.directory, `expected this.directory to have a value`);
 

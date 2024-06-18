@@ -1,6 +1,5 @@
 import { assert } from "./internal/assert.js";
 import { BitField } from "./internal/binary.js";
-import type { ByteStream } from "./internal/streams.js";
 
 export enum ZipPlatform {
   // 4.4.2.2 The current mappings are:
@@ -293,42 +292,6 @@ export class DosDate extends Date {
     return this.getTime();
   }
 }
-
-/**
- * Represents an object which can read a zip file.
- */
-export type ZipReaderLike = {
-  readonly entryCount: number;
-  readonly comment: string;
-
-  readonly files: () => AsyncIterable<ZipEntryLike>;
-} & AsyncIterable<ZipEntryLike>;
-
-/**
- * Represents an object which can read a zip file entry.
- */
-export type ZipEntryLike = {
-  readonly attributes: DosFileAttributes | UnixFileAttributes;
-  readonly comment: string;
-  readonly compressedSize: number;
-  readonly compressionMethod: CompressionMethod;
-  readonly crc32: number;
-  readonly flags: GeneralPurposeFlags;
-  readonly lastModified: Date;
-  readonly path: string;
-  readonly platformMadeBy: ZipPlatform;
-  readonly uncompressedSize: number;
-  readonly versionMadeBy: ZipVersion;
-  readonly versionNeeded: ZipVersion;
-
-  readonly isDirectory: boolean;
-  readonly isFile: boolean;
-
-  readonly uncompressedData: ByteStream;
-
-  readonly toBuffer: () => PromiseLike<Uint8Array>;
-  readonly toText: (encoding?: string) => PromiseLike<string>;
-} & AsyncIterable<Uint8Array>;
 
 /**
  * A function which can transform data from an async iterable.

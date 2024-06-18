@@ -5,7 +5,6 @@ import {
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
-  type ZipEntryLike,
 } from "../common.js";
 import { EmptyZip32, Zip32WithThreeEntries } from "../testing/fixtures.js";
 import { ZipBufferReader } from "./buffer.js";
@@ -31,7 +30,7 @@ describe("base/buffer", () => {
       it("iterates all the files", async () => {
         const reader = new ZipBufferReader(Zip32WithThreeEntries);
 
-        const files: ZipEntryLike[] = [];
+        const files: ZipEntryReader[] = [];
         for (const file of reader.filesSync()) {
           files.push(file);
         }
@@ -138,16 +137,12 @@ describe("base/buffer", () => {
     describe("files()", () => {
       it("passes through to filesSync()", async () => {
         const reader = new ZipBufferReader(Zip32WithThreeEntries);
-
-        const files: ZipEntryLike[] = [
-          new ZipEntryReader(),
-          new ZipEntryReader(),
-        ];
+        const files = [new ZipEntryReader(), new ZipEntryReader()];
 
         const filesMock = mock.method(
           reader,
           "filesSync",
-          function* (): Generator<ZipEntryLike> {
+          function* (): Generator<ZipEntryReader> {
             for (const file of files) {
               yield file;
             }
@@ -170,16 +165,12 @@ describe("base/buffer", () => {
     describe("[Symbol.iterator]()", () => {
       it("passes through to filesSync()", () => {
         const reader = new ZipBufferReader(Zip32WithThreeEntries);
-
-        const files: ZipEntryLike[] = [
-          new ZipEntryReader(),
-          new ZipEntryReader(),
-        ];
+        const files = [new ZipEntryReader(), new ZipEntryReader()];
 
         const filesMock = mock.method(
           reader,
           "filesSync",
-          function* (): Generator<ZipEntryLike> {
+          function* (): Generator<ZipEntryReader> {
             for (const file of files) {
               yield file;
             }
@@ -202,16 +193,12 @@ describe("base/buffer", () => {
     describe("[Symbol.asyncIterator]()", () => {
       it("passes through to filesSync()", async () => {
         const reader = new ZipBufferReader(Zip32WithThreeEntries);
-
-        const files: ZipEntryLike[] = [
-          new ZipEntryReader(),
-          new ZipEntryReader(),
-        ];
+        const files = [new ZipEntryReader(), new ZipEntryReader()];
 
         const filesMock = mock.method(
           reader,
           "filesSync",
-          function* (): Generator<ZipEntryLike> {
+          function* (): Generator<ZipEntryReader> {
             for (const file of files) {
               yield file;
             }

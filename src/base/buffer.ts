@@ -1,8 +1,4 @@
-import type {
-  CompressionAlgorithms,
-  ZipEntryLike,
-  ZipReaderLike,
-} from "../common.js";
+import type { CompressionAlgorithms } from "../common.js";
 import { assert } from "../internal/assert.js";
 import { BufferView, type BufferLike } from "../internal/binary.js";
 import {
@@ -27,7 +23,7 @@ export type ZipBufferReaderOptions = {
 /**
  * An object which can read zip data from a buffer.
  */
-export class ZipBufferReader implements ZipReaderLike {
+export class ZipBufferReader {
   private readonly buffer: BufferView;
   private readonly decompressors: CompressionAlgorithms;
   private readonly directory: CentralDirectory;
@@ -63,7 +59,7 @@ export class ZipBufferReader implements ZipReaderLike {
   /**
    * Iterate through the files in the zip synchronously.
    */
-  public *filesSync(): Generator<ZipEntryLike> {
+  public *filesSync(): Generator<ZipEntryReader> {
     let offset = this.directory.offset;
 
     for (let index = 0; index < this.entryCount; ++index) {
@@ -95,15 +91,15 @@ export class ZipBufferReader implements ZipReaderLike {
    * Iterate through the files in the zip.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- interface
-  public async *files(): AsyncGenerator<ZipEntryLike> {
+  public async *files(): AsyncGenerator<ZipEntryReader> {
     yield* this.filesSync();
   }
 
-  public [Symbol.iterator](): Iterator<ZipEntryLike> {
+  public [Symbol.iterator](): Iterator<ZipEntryReader> {
     return this.filesSync();
   }
 
-  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryLike> {
+  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader> {
     return this.files();
   }
 }
