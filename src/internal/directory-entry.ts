@@ -16,40 +16,55 @@ import { CodePage437Encoder } from "./cp437.js";
 import { computeCrc32 } from "./crc32.js";
 import { CentralHeaderLength, CentralHeaderSignature } from "./signatures.js";
 
-export type ZipEntry = {
-  attributes: DosFileAttributes | UnixFileAttributes;
-  comment: string;
-  commentLength: number;
+export type ZipEntryDataDescriptor = {
   compressedSize: number;
-  compressionMethod: CompressionMethod;
   crc32: number;
-  extraFieldLength: number;
-  flags: GeneralPurposeFlags;
-  internalAttributes: number;
-  lastModified: Date;
-  localHeaderOffset: number;
-  path: string;
-  pathLength: number;
-  platformMadeBy: ZipPlatform;
   uncompressedSize: number;
-  versionMadeBy: ZipVersion;
-  versionNeeded: ZipVersion;
 };
 
+export type ZipEntryCompressionInfo = ZipEntryDataDescriptor & {
+  compressionMethod: CompressionMethod;
+};
+
+export type ZipEntryMeasurementFields = {
+  commentLength: number;
+  extraFieldLength: number;
+  pathLength: number;
+};
+
+export type ZipEntryFixedFields = ZipEntryCompressionInfo &
+  ZipEntryMeasurementFields & {
+    attributes: DosFileAttributes | UnixFileAttributes;
+    flags: GeneralPurposeFlags;
+    internalAttributes: number;
+    lastModified: Date;
+    localHeaderOffset: number;
+    platformMadeBy: ZipPlatform;
+    versionMadeBy: ZipVersion;
+    versionNeeded: ZipVersion;
+  };
+
+export type ZipEntryVariableFields = {
+  comment: string;
+  path: string;
+};
+
+export type ZipEntryHeader = ZipEntryFixedFields & ZipEntryVariableFields;
+
 export function readDirectoryEntry(
-  entry: ZipEntry,
+  entry: Partial<ZipEntryHeader>,
   buffer: BufferLike,
   bufferOffset = 0,
-): void {
+): asserts entry is ZipEntryHeader {
   readDirectoryHeader(entry, buffer, bufferOffset);
   readDirectoryVariableFields(entry, buffer, bufferOffset);
 }
 
 export function readDirectoryHeader(
-  entry: ZipEntry,
+  entry: Partial<ZipEntryHeader>,
   buffer: BufferLike,
   bufferOffset = 0,
-): void {
+): asserts entry is ZipEntryFixedFields {
   // Central Directory Header (4.3.12)
   //
   // | offset | field                           | size |
@@ -84,6 +99,14 @@ export function readDirectoryHeader(
   entry.versionMadeBy = view.readUint8(4);
   entry.platformMadeBy = view.readUint8(5);
   entry.versionNeeded = view.readUint16LE(6);
+
+  const flags = view.readUint16LE(8);
+  if (entry.flags === undefined) {
+    entry.flags = new GeneralPurposeFlags(flags);
+  } else {
+    entry.flags.value = flags;
+  }
+
   entry.flags.value = view.readUint16LE(8);
   entry.compressionMethod = view.readUint16LE(10);
   entry.lastModified = DosDate.fromDosUint32(view.readUint32LE(12));
@@ -112,17 +135,29 @@ export function readDirectoryHeader(
       (externalFileAttributes >>> 16) & 0xffff,
     );
   } else {
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     throw new ZipFormatError(`unknown platform ${entry.platformMadeBy}`);
   }
 
   entry.localHeaderOffset = view.readUint32LE(42);
 }
 
+export function getDirectoryHeaderLength(
+  entry: ZipEntryMeasurementFields,
+): number {
+  return (
+    CentralHeaderLength +
+    entry.pathLength +
+    entry.extraFieldLength +
+    entry.commentLength
+  );
+}
+
 export function readDirectoryVariableFields(
-  entry: ZipEntry,
+  entry: ZipEntryFixedFields & Partial<ZipEntryVariableFields>,
   buffer: BufferLike,
   bufferOffset = 0,
-): void {
+): asserts entry is ZipEntryHeader {
   const view = new BufferView(buffer, bufferOffset);
   const signature = view.readUint32LE(0);
 
@@ -130,7 +165,7 @@ export function readDirectoryVariableFields(
     throw new ZipSignatureError("central directory header", signature);
   }
 
-  const encoding = entry.flags.hasUtf8Strings ? "utf8" : "cp437";
+  const encoding = entry.flags?.hasUtf8Strings ? "utf8" : "cp437";
 
   entry.path = view.readString(encoding, CentralHeaderLength, entry.pathLength);
 
@@ -149,7 +184,7 @@ export function readDirectoryVariableFields(
 }
 
 export function readExtraFields(
-  entry: ZipEntry,
+  entry: Partial<ZipEntryHeader>,
   buffer: BufferLike,
   bufferOffset = 0,
   byteLength?: number,
@@ -184,7 +219,7 @@ export function readExtraFields(
 }
 
 function readUnicodeField(
-  entry: ZipEntry,
+  entry: Partial<ZipEntryHeader>,
   field: "path" | "comment",
   buffer: BufferLike,
   bufferOffset: number,
@@ -221,7 +256,7 @@ function readUnicodeField(
 }
 
 function readZip64Field(
-  entry: ZipEntry,
+  entry: Partial<ZipEntryHeader>,
   buffer: BufferLike,
   bufferOffset: number,
   byteLength: number,

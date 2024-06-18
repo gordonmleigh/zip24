@@ -10,8 +10,10 @@ import {
   type ZipEntryLike,
 } from "../common.js";
 import { computeCrc32 } from "../internal/crc32.js";
-import type { ZipEntry as ZipEntryInternal } from "../internal/directory-entry.js";
-import { CentralHeaderLength } from "../internal/signatures.js";
+import type {
+  ZipEntryCompressionInfo,
+  ZipEntryHeader,
+} from "../internal/directory-entry.js";
 import {
   bufferFromIterable,
   readableStreamFromIterable,
@@ -19,7 +21,7 @@ import {
   type ByteStream,
 } from "../internal/streams.js";
 
-export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
+export class ZipEntryReader implements ZipEntryHeader, ZipEntryLike {
   private uncompressedDataInternal?: ByteStream;
 
   public platformMadeBy = ZipPlatform.DOS;
@@ -48,15 +50,6 @@ export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
   public get isFile(): boolean {
     // is indeterminate if we can't understand the attributes
     return !this.path.endsWith("/") && !!this.attributes.isFile;
-  }
-
-  public get totalRecordLength(): number {
-    return (
-      CentralHeaderLength +
-      this.pathLength +
-      this.extraFieldLength +
-      this.commentLength
-    );
   }
 
   public get uncompressedData(): ByteStream {
@@ -88,7 +81,7 @@ export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
 }
 
 export async function* decompress(
-  entry: ZipEntryInternal,
+  entry: ZipEntryCompressionInfo,
   input: ByteStream,
   decompressors: CompressionAlgorithms,
 ): AsyncGenerator<Uint8Array> {

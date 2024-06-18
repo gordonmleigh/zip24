@@ -7,7 +7,7 @@ import {
   UnixFileAttributes,
   ZipFormatError,
 } from "../common.js";
-import type { ZipEntry } from "../internal/directory-entry.js";
+import type { ZipEntryCompressionInfo } from "../internal/directory-entry.js";
 import type { ByteStream } from "../internal/streams.js";
 import { asyncIterable } from "../testing/data.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
@@ -96,17 +96,6 @@ describe("base/entry-reader", () => {
       });
     });
 
-    describe("totalRecordLength", () => {
-      it("returns the sum of the variable field lengths plus 46", () => {
-        const entry = new ZipEntryReader();
-        entry.commentLength = 22;
-        entry.extraFieldLength = 111;
-        entry.pathLength = 34;
-
-        assert.strictEqual(entry.totalRecordLength, 46 + 22 + 111 + 34);
-      });
-    });
-
     describe("uncompressedData", () => {
       it("throws if accessed before initialization", () => {
         const entry = new ZipEntryReader();
@@ -190,12 +179,12 @@ describe("base/entry-reader", () => {
 
   describe("decompress", () => {
     it("falls back to passing through the input for CompressionMethod.Stored", async () => {
-      const entry = {
+      const entry: ZipEntryCompressionInfo = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
         uncompressedSize: 11,
-      } satisfies Partial<ZipEntry> as unknown as ZipEntry;
+      };
 
       const input = asyncIterable`hello world`;
 
@@ -204,12 +193,12 @@ describe("base/entry-reader", () => {
     });
 
     it("uses the correct algorithm", async () => {
-      const entry = {
+      const entry: ZipEntryCompressionInfo = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Deflate,
         compressedSize: 11,
         uncompressedSize: 11,
-      } satisfies Partial<ZipEntry> as unknown as ZipEntry;
+      };
 
       // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
       const algorithm = mock.fn(async function* (input: ByteStream) {
@@ -227,12 +216,12 @@ describe("base/entry-reader", () => {
     });
 
     it("uses the passed algorithm if provided and compression method is Stored", async () => {
-      const entry = {
+      const entry: ZipEntryCompressionInfo = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
         uncompressedSize: 11,
-      } satisfies Partial<ZipEntry> as unknown as ZipEntry;
+      };
 
       // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
       const algorithm = mock.fn(async function* (input: ByteStream) {
@@ -250,12 +239,12 @@ describe("base/entry-reader", () => {
     });
 
     it("throws if compressionMethod is unknown", () => {
-      const entry = {
+      const entry: ZipEntryCompressionInfo = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Deflate,
         compressedSize: 11,
         uncompressedSize: 11,
-      } satisfies Partial<ZipEntry> as unknown as ZipEntry;
+      };
 
       // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
       const algorithm = mock.fn(async function* (input: ByteStream) {
@@ -273,12 +262,12 @@ describe("base/entry-reader", () => {
     });
 
     it("throws if uncompressedSize is wrong", () => {
-      const entry = {
+      const entry: ZipEntryCompressionInfo = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
         uncompressedSize: 22,
-      } satisfies Partial<ZipEntry> as unknown as ZipEntry;
+      };
 
       const input = asyncIterable`hello world`;
 
@@ -291,12 +280,12 @@ describe("base/entry-reader", () => {
     });
 
     it("throws if crc32 is wrong", () => {
-      const entry = {
+      const entry: ZipEntryCompressionInfo = {
         crc32: 1,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
         uncompressedSize: 11,
-      } satisfies Partial<ZipEntry> as unknown as ZipEntry;
+      };
 
       const input = asyncIterable`hello world`;
 

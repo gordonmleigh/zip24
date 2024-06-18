@@ -9,7 +9,10 @@ import {
   readEocdr,
   type CentralDirectory,
 } from "../internal/central-directory.js";
-import { readDirectoryEntry } from "../internal/directory-entry.js";
+import {
+  getDirectoryHeaderLength,
+  readDirectoryEntry,
+} from "../internal/directory-entry.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
@@ -66,7 +69,7 @@ export class ZipBufferReader implements ZipReaderLike {
     for (let index = 0; index < this.entryCount; ++index) {
       const entry = new ZipEntryReader();
       readDirectoryEntry(entry, this.buffer, offset);
-      offset += entry.totalRecordLength;
+      offset += getDirectoryHeaderLength(entry);
 
       const localHeaderSize = readLocalHeaderSize(
         this.buffer,

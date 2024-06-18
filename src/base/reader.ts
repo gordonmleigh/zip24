@@ -10,6 +10,7 @@ import {
   type CentralDirectory,
 } from "../internal/central-directory.js";
 import {
+  getDirectoryHeaderLength,
   readDirectoryHeader,
   readDirectoryVariableFields,
 } from "../internal/directory-entry.js";
@@ -115,7 +116,9 @@ export class ZipReader implements ZipReaderLike {
       const entry = new ZipEntryReader();
       readDirectoryHeader(entry, buffer, offset);
 
-      if (offset + entry.totalRecordLength > buffer.byteLength) {
+      const headerLength = getDirectoryHeaderLength(entry);
+
+      if (offset + headerLength > buffer.byteLength) {
         // there isn't enough buffer left to read all of the variable fields,
         // read a new chunk starting from the start of the header
         position -= bufferLength - offset;
@@ -128,7 +131,7 @@ export class ZipReader implements ZipReaderLike {
       readDirectoryVariableFields(entry, buffer, offset);
       entry.uncompressedData = getData(entry, this.reader, this.decompressors);
 
-      offset += entry.totalRecordLength;
+      offset += headerLength;
       yield entry;
     }
   }
