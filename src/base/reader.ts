@@ -67,7 +67,7 @@ export class ZipReader implements ZipReaderLike {
   /**
    * Get the total number of entries in the zip.
    */
-  public get fileCount(): number {
+  public get entryCount(): number {
     assert(this.directory, `call open() first`);
     return this.directory.count;
   }
@@ -103,7 +103,7 @@ export class ZipReader implements ZipReaderLike {
     let bufferLength = 0;
 
     // read the central directory a chunk at a time
-    for (let index = 0; index < this.fileCount; ++index) {
+    for (let index = 0; index < this.entryCount; ++index) {
       if (offset + CentralHeaderLength >= bufferLength) {
         // we ran out of buffer, read a new chunk
         const result = await this.reader.read({ buffer, position });

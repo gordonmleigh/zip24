@@ -11,7 +11,7 @@ import {
 } from "../internal/central-directory.js";
 import { readDirectoryEntry } from "../internal/directory-entry.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
-import { defaultCompressors } from "./compression.js";
+import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
 
 /**
@@ -39,13 +39,13 @@ export class ZipBufferReader implements ZipReaderLike {
   /**
    * The number of file entries in the zip.
    */
-  public get fileCount(): number {
+  public get entryCount(): number {
     return this.directory.count;
   }
 
   public constructor(buffer: BufferLike, options: ZipBufferReaderOptions = {}) {
     this.buffer = new BufferView(buffer);
-    this.decompressors = options.decompressors ?? defaultCompressors;
+    this.decompressors = options.decompressors ?? defaultDecompressors;
 
     this.directory = {
       comment: "",
@@ -63,7 +63,7 @@ export class ZipBufferReader implements ZipReaderLike {
   public *filesSync(): Generator<ZipEntryLike> {
     let offset = this.directory.offset;
 
-    for (let index = 0; index < this.fileCount; ++index) {
+    for (let index = 0; index < this.entryCount; ++index) {
       const entry = new ZipEntryReader();
       readDirectoryEntry(entry, this.buffer, offset);
       offset += entry.totalRecordLength;

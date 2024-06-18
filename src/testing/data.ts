@@ -1,4 +1,8 @@
+import assert from "node:assert";
+import { deflateRawSync } from "node:zlib";
+import { DosDate } from "../common.js";
 import { CodePage437Encoder } from "../internal/cp437.js";
+import { computeCrc32 } from "../internal/crc32.js";
 
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function* asyncIterable(
@@ -38,10 +42,62 @@ export function cp437(
   return new CodePage437Encoder().encode(baseTemplate(literals, ...values));
 }
 
+export function cp437length(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return shortUint(cp437(literals, ...values).byteLength);
+}
+
+export function crc32(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return longUint(computeCrc32(utf8(literals, ...values)));
+}
+
 export function data(...hex: (string | Uint8Array)[]): Uint8Array {
   return Buffer.concat(
     hex.map((x) => (typeof x === "string" ? Buffer.from(x, "hex") : x)),
   );
+}
+
+export function deflate(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return deflateRawSync(utf8(literals, ...values));
+}
+
+export function deflateLength32(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return longUint(deflateRawSync(utf8(literals, ...values)).byteLength);
+}
+
+export function dosDate(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  const dateString = baseTemplate(literals, ...values);
+  assert(
+    /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(dateString),
+    "must be a valid ISO timestamp with second precision",
+  );
+  return longUint(new DosDate(dateString).getDosDateTime());
+}
+
+export function longUint(value: number): Uint8Array {
+  const buffer = Buffer.alloc(4);
+  buffer.writeUint32LE(value);
+  return buffer;
+}
+
+export function shortUint(value: number): Uint8Array {
+  const buffer = Buffer.alloc(2);
+  buffer.writeUint16LE(value);
+  return buffer;
 }
 
 export function utf8(
@@ -49,6 +105,20 @@ export function utf8(
   ...values: unknown[]
 ): Uint8Array {
   return Buffer.from(baseTemplate(literals, ...values));
+}
+
+export function utf8length(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return shortUint(utf8(literals, ...values).byteLength);
+}
+
+export function utf8length32(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return longUint(utf8(literals, ...values).byteLength);
 }
 
 function baseTemplate(
