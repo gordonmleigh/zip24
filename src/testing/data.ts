@@ -1,5 +1,21 @@
 import { CodePage437Encoder } from "../internal/cp437.js";
 
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function* asyncIterable(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): AsyncGenerator<Uint8Array> {
+  for (const [index, literal] of literals.entries()) {
+    if (literal) {
+      yield Buffer.from(literal);
+    }
+    if (index < values.length) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      yield Buffer.from(`${values[index]}`);
+    }
+  }
+}
+
 export function cp437(
   literals: TemplateStringsArray,
   ...values: unknown[]

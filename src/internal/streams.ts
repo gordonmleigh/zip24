@@ -123,11 +123,13 @@ export async function bufferFromIterable(
   input: ByteStream,
 ): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+
   for await (const chunk of input) {
     chunks.push(chunk);
+    byteLength += chunk.byteLength;
   }
 
-  const byteLength = chunks.reduce((a, x) => a + x.byteLength, 0);
   const output = new Uint8Array(byteLength);
   let offset = 0;
 

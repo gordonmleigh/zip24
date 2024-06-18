@@ -3,6 +3,7 @@ import {
   DosFileAttributes,
   GeneralPurposeFlags,
   UnixFileAttributes,
+  ZipFormatError,
   ZipPlatform,
   ZipVersion,
   type CompressionAlgorithms,
@@ -98,7 +99,7 @@ export async function* decompress(
   } else if (entry.compressionMethod === CompressionMethod.Stored) {
     output = input;
   } else {
-    throw new Error(
+    throw new ZipFormatError(
       `unknown compression method ${(entry.compressionMethod as number).toString(16)}`,
     );
   }
@@ -112,7 +113,10 @@ export async function* decompress(
     yield chunk;
   }
 
-  if (bytesRead !== entry.uncompressedSize || checkCrc32 !== entry.crc32) {
-    throw new Error(`zip file is corrupt`);
+  if (bytesRead !== entry.uncompressedSize) {
+    throw new ZipFormatError(`zip file is corrupt (file size mismatch)`);
+  }
+  if (checkCrc32 !== entry.crc32) {
+    throw new ZipFormatError(`zip file is corrupt (crc32 mismatch)`);
   }
 }
