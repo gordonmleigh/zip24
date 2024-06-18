@@ -10,7 +10,7 @@ import {
   type CentralDirectory,
 } from "../internal/central-directory.js";
 import {
-  readDirectoryEntry,
+  readDirectoryHeader,
   readDirectoryVariableFields,
 } from "../internal/directory-entry.js";
 import { lazy } from "../internal/lazy.js";
@@ -105,7 +105,7 @@ export class ZipReader implements ZipReaderLike {
     // read the central directory a chunk at a time
     for (let index = 0; index < this.entryCount; ++index) {
       if (offset + CentralHeaderLength >= bufferLength) {
-        // we ran out of buffer, read a new chunk
+        // there isn't enough buffer left to read a whole header, read a new chunk
         const result = await this.reader.read({ buffer, position });
         offset = 0;
         bufferLength = result.bytesRead;
@@ -113,19 +113,19 @@ export class ZipReader implements ZipReaderLike {
       }
 
       const entry = new ZipEntryReader();
-      readDirectoryEntry(entry, buffer, offset);
+      readDirectoryHeader(entry, buffer, offset);
 
-      if (offset + entry.totalRecordLength <= buffer.byteLength) {
-        readDirectoryVariableFields(entry, buffer, offset);
-      } else {
-        // we ran out of buffer, read a new chunk from the current offset
+      if (offset + entry.totalRecordLength > buffer.byteLength) {
+        // there isn't enough buffer left to read all of the variable fields,
+        // read a new chunk starting from the start of the header
         position -= bufferLength - offset;
+        offset = 0;
         const result = await this.reader.read({ buffer, position });
         position += result.bytesRead;
         bufferLength = result.bytesRead;
-        readDirectoryVariableFields(entry, buffer, offset);
       }
 
+      readDirectoryVariableFields(entry, buffer, offset);
       entry.uncompressedData = getData(entry, this.reader, this.decompressors);
 
       offset += entry.totalRecordLength;
@@ -141,10 +141,6 @@ export class ZipReader implements ZipReaderLike {
   }
 
   private readonly openInternal = lazy(async (): Promise<void> => {
-    if (this.directory) {
-      return;
-    }
-
     // read up to 1MB to find all of the trailer
     const bufferSize = Math.min(this.fileSize, 1024 ** 2);
     const position = this.fileSize - bufferSize;
@@ -169,7 +165,10 @@ export class ZipReader implements ZipReaderLike {
         length: result.byteLength,
       });
 
-      assert(readResult.bytesRead === bufferSize, `unexpected end of file`);
+      assert(
+        readResult.bytesRead === result.byteLength,
+        `unexpected end of file`,
+      );
       readZip64Eocdr(this.directory, buffer, 0);
     }
   });
@@ -188,7 +187,7 @@ function getData(
       position: entry.localHeaderOffset,
     });
 
-    assert(result.bytesRead === LocalHeaderLength, `unexpected EOF`);
+    assert(result.bytesRead === LocalHeaderLength, `unexpected end of file`);
     return entry.localHeaderOffset + readLocalHeaderSize(buffer, 0);
   });
 
@@ -198,7 +197,10 @@ function getData(
 
       yield* decompress(
         entry,
-        iterableFromRandomAccessReader(reader, { position }),
+        iterableFromRandomAccessReader(reader, {
+          position,
+          byteLength: entry.compressedSize,
+        }),
         decompressors,
       );
     },

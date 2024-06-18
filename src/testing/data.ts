@@ -35,6 +35,14 @@ export async function* base64iterable(
   yield base64(literals, ...values);
 }
 
+export function bigUint(value: number): Uint8Array {
+  assert(value >= 0 && value <= Number.MAX_SAFE_INTEGER);
+  const buffer = Buffer.alloc(8);
+  buffer.writeUint32LE(value >>> 0);
+  buffer.writeUint32LE((value / 0x1_0000_0000) >>> 0, 4);
+  return buffer;
+}
+
 export function cp437(
   literals: TemplateStringsArray,
   ...values: unknown[]

@@ -81,7 +81,7 @@ describe("iterableFromRandomAccessReader", () => {
           options.position,
           options.position + length,
         );
-        options.buffer.subarray(options.offset, chunk.length).set(chunk);
+        options.buffer.set(chunk, options.offset);
 
         return Promise.resolve({
           buffer: options.buffer,
@@ -114,7 +114,7 @@ describe("iterableFromRandomAccessReader", () => {
           options.position,
           options.position + length,
         );
-        options.buffer.subarray(options.offset, chunk.length).set(chunk);
+        options.buffer.set(chunk, options.offset);
 
         return Promise.resolve({
           buffer: options.buffer,

@@ -44,7 +44,7 @@ describe("readEocdr", () => {
       "89273498892734988927349889273498", // nonsense (32 bytes)
 
       "504b0606", // EOCDR64 signature (0x06064b50)
-      "3800000000000000", // record size
+      "2c00000000000000", // record size (SizeOfFixedFields + SizeOfVariableData - 12)
       "2d00", // version made by
       "2d00", // version needed
       "00000000", // number of this disk
@@ -56,7 +56,7 @@ describe("readEocdr", () => {
 
       "504b0607", // EOCDL signature (0x07064b50)
       "00000000", // central directory start disk
-      "20ff000000000000", // central directory offset
+      "2000000001000000", // central directory offset
       "01000000", // total number of disks
 
       "504b0506", // EOCDR signature (0x06054b50)
@@ -77,7 +77,7 @@ describe("readEocdr", () => {
       size: 0,
     };
 
-    const result = readEocdr(directory, buffer, 0xff00);
+    const result = readEocdr(directory, buffer, 0x1_0000_0000);
     assert(result.ok);
 
     assert.strictEqual(directory.comment, "Gordon is cool");
@@ -205,7 +205,7 @@ describe("readEocdr", () => {
       "89273498892734988927349889273498", // nonsense (32 bytes)
 
       "ffffffff", // EOCDR64 signature (0x06064b50)
-      "3800000000000000", // record size
+      "2c00000000000000", // record size (SizeOfFixedFields + SizeOfVariableData - 12)
       "2d00", // version made by
       "2d00", // version needed
       "00000000", // number of this disk

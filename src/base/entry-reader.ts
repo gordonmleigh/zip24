@@ -104,7 +104,7 @@ export async function* decompress(
     );
   }
 
-  let checkCrc32: number | undefined;
+  let checkCrc32 = 0;
   let bytesRead = 0;
 
   for await (const chunk of output) {

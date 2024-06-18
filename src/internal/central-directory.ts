@@ -104,7 +104,7 @@ export function readEocdr(
       throw new MultiDiskError();
     }
 
-    const eocdr64Offset = view.readUint32LE(eocdlBufferOffset + 8);
+    const eocdr64Offset = view.readUint64LE(eocdlBufferOffset + 8);
     if (eocdr64Offset < fileOffset) {
       // zip64 eocdr is 56 bytes long
       return { ok: false, eocdr64Offset, byteLength: 56 };

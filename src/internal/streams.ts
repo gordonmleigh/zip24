@@ -24,11 +24,29 @@ export type RandomAccessReader = {
   ) => PromiseLike<RandomAccessReadResult>;
 };
 
-type RandomAccessReaderSourceOptions = {
+export type RandomAccessReaderSourceOptions = {
   byteLength?: number;
   chunkSize?: number;
   position?: number;
 };
+
+export function randomAccessReaderFromBuffer(
+  source: Uint8Array,
+): RandomAccessReader {
+  return {
+    read({ buffer, position, offset = 0, length = buffer.length - offset }) {
+      const bytesRead = Math.min(
+        length,
+        Math.max(0, source.byteLength - position),
+      );
+
+      if (bytesRead !== 0) {
+        buffer.set(source.subarray(position, position + bytesRead), offset);
+      }
+      return Promise.resolve({ bytesRead, buffer });
+    },
+  };
+}
 
 export async function* iterableFromReadableStream(
   stream: ReadableStream,
@@ -64,16 +82,13 @@ export async function* iterableFromRandomAccessReader(
   reader: RandomAccessReader,
   options: RandomAccessReaderSourceOptions = {},
 ): AsyncGenerator<Uint8Array, undefined, undefined> {
-  const { chunkSize = DefaultChunkSize, byteLength } = options;
-  let { position = 0 } = options;
-  let bytesRead = 0;
+  const byteLength = options.byteLength ?? Number.POSITIVE_INFINITY;
+  const chunkSize = options.chunkSize ?? DefaultChunkSize;
+  let position = options.position ?? 0;
+  const endPosition = position + byteLength;
 
   for (;;) {
-    const bufferSize =
-      byteLength === undefined
-        ? chunkSize
-        : Math.min(byteLength - bytesRead, chunkSize);
-
+    const bufferSize = Math.min(chunkSize, endPosition - position);
     if (bufferSize === 0) {
       return;
     }
@@ -89,7 +104,6 @@ export async function* iterableFromRandomAccessReader(
     if (result.bytesRead > 0) {
       yield buffer.subarray(0, result.bytesRead);
       position += result.bytesRead;
-      bytesRead += result.bytesRead;
     } else {
       return;
     }

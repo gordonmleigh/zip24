@@ -223,6 +223,16 @@ function readZip64Field(
   bufferOffset: number,
   byteLength: number,
 ): void {
+  // ## Zip64 Extended Information Extra Field (4.5.3):
+
+  // | offset | field                          | size |
+  // | ------ | ------------------------------ | ---- |
+  // | 0      | tag (0x0001)                   | 2    |
+  // | 2      | size                           | 2    |
+  // | 4      | uncompressed size (optional)   | 8    |
+  // | ...    | compressed size (optional)     | 8    |
+  // | ...    | local header offset (optional) | 8    |
+  // | ...    | disk number (optional)         | 4    |
   const view = new BufferView(buffer, bufferOffset, byteLength);
   let offset = 4;
 

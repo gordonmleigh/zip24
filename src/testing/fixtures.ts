@@ -1,4 +1,7 @@
+import { CompressionMethod, ZipVersion } from "../common.js";
+import { computeCrc32 } from "../internal/crc32.js";
 import {
+  bigUint,
   cp437,
   cp437length,
   crc32,
@@ -151,3 +154,179 @@ export const Zip32WithThreeEntries = data(
   cp437length`Gordon is cool`, // .ZIP file comment length
   cp437`Gordon is cool`, // .ZIP file comment
 );
+
+export type ZipGenerationOptions = {
+  fileCommentLength?: number;
+  fileCount: number;
+  fileSize?: number;
+  zip64?: boolean;
+  zip64ExtensibleDataLength?: number;
+};
+
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function* generateZip(
+  options: ZipGenerationOptions,
+): AsyncGenerator<Uint8Array> {
+  const {
+    fileCommentLength = 0,
+    fileCount,
+    fileSize = 10,
+    zip64 = false,
+    zip64ExtensibleDataLength = 0,
+  } = options;
+
+  const compressionMethod = CompressionMethod.Stored;
+
+  const version = zip64 ? ZipVersion.Zip64 : ZipVersion.Deflate64;
+  let position = 0;
+
+  const directoryChunks: Uint8Array[] = [];
+
+  for (let fileIndex = 0; fileIndex < fileCount; ++fileIndex) {
+    // repeat `fileNNNNNN` as many times as necessary to fill the size
+    const uncompressedContent = Buffer.from(
+      `file${fileIndex.toString().padStart(6, "0")}`.repeat(
+        Math.ceil(fileSize / 10),
+      ),
+    );
+
+    const compressedContent = uncompressedContent;
+
+    const crc32 = computeCrc32(uncompressedContent);
+    const localHeaderOffset = position;
+
+    let localExtraField: Uint8Array;
+    if (zip64) {
+      localExtraField = data(
+        shortUint(0x0001), // Zip64 Extended Information Extra Field Tag
+        shortUint(16), // record size
+        bigUint(uncompressedContent.byteLength), // uncompressed size
+        bigUint(compressedContent.byteLength), // compressed size
+      );
+    } else {
+      localExtraField = data();
+    }
+
+    let directoryExtraField: Uint8Array;
+    if (zip64) {
+      directoryExtraField = data(
+        shortUint(0x0001), // Zip64 Extended Information Extra Field Tag
+        shortUint(24), // record size
+        bigUint(uncompressedContent.byteLength), // uncompressed size
+        bigUint(compressedContent.byteLength), // compressed size
+        bigUint(localHeaderOffset), // local header offset
+      );
+    } else {
+      directoryExtraField = data();
+    }
+
+    const localChunk = data(
+      longUint(0x04034b50), // local header signature
+      shortUint(version), // version needed
+      shortUint(0), // flags
+      shortUint(compressionMethod), // compression method
+      longUint(fileIndex), // last modified
+      longUint(crc32), // crc32
+      longUint(zip64 ? 0xffff_ffff : compressedContent.byteLength), // compressed size
+      longUint(zip64 ? 0xffff_ffff : uncompressedContent.byteLength), // uncompressed size
+      cp437length`path ${fileIndex}`, // file name length
+      shortUint(localExtraField.byteLength), // extra field length
+      cp437`path ${fileIndex}`, // file name
+      localExtraField, // extra field
+    );
+
+    position += localChunk.byteLength;
+    yield localChunk;
+
+    position += compressedContent.byteLength;
+    yield compressedContent;
+
+    const pattern = `comment ${fileIndex}`;
+    const fileComment = Buffer.from(
+      pattern.repeat(Math.ceil(fileCommentLength / pattern.length)),
+    );
+
+    const directoryChunk = data(
+      longUint(0x02014b50), // central directory header signature
+      shortUint(version | (3 << 8)), // version made by, platform (3 = Unix)
+      shortUint(version), // version needed
+      shortUint(0), // flags
+      shortUint(compressionMethod), // compression method
+      longUint(fileIndex), // last modified
+      longUint(crc32), // crc32
+      longUint(zip64 ? 0xffff_ffff : compressedContent.byteLength), // compressed size
+      longUint(zip64 ? 0xffff_ffff : uncompressedContent.byteLength), // uncompressed size
+      cp437length`path ${fileIndex}`, // file name length
+      shortUint(directoryExtraField.byteLength), // extra field length
+      shortUint(fileComment.byteLength), // file comment length
+      shortUint(0), // disk number start
+      shortUint(0), // internal file attributes
+      longUint((0o10_0644 << 16) >>> 0), // external file attributes
+      longUint(localHeaderOffset), // relative offset of local header
+      cp437`path ${fileIndex}`, // file name
+      directoryExtraField, // extra field
+      fileComment, // the comment
+    );
+
+    directoryChunks.push(directoryChunk);
+  }
+
+  const centralDirectoryOffset = position;
+
+  for (const chunk of directoryChunks) {
+    position += chunk.byteLength;
+    yield chunk;
+  }
+
+  const eocdrOffset = position;
+  const centralDirectorySize = eocdrOffset - centralDirectoryOffset;
+
+  if (zip64) {
+    const extensibleDataSector = Buffer.alloc(zip64ExtensibleDataLength);
+    if (zip64ExtensibleDataLength) {
+      extensibleDataSector.writeUint32LE(
+        extensibleDataSector.byteLength - 4,
+        2,
+      ); // data size
+    }
+
+    const zip64EocdrChunk = data(
+      longUint(0x06064b50), // EOCDR64 signature (0x06064b50)
+      bigUint(56 - 12 + extensibleDataSector.byteLength), // record size (SizeOfFixedFields + SizeOfVariableData - 12)
+      shortUint(version), // version made by
+      shortUint(version), // version needed
+      longUint(0), // number of this disk
+      longUint(0), // central directory start disk
+      bigUint(fileCount), // total entries this disk
+      bigUint(fileCount), // total entries on all disks
+      bigUint(centralDirectorySize), // size of the central directory
+      bigUint(centralDirectoryOffset), // central directory offset
+      extensibleDataSector,
+    );
+
+    position += zip64EocdrChunk.byteLength;
+    yield zip64EocdrChunk;
+
+    const eocdlChunk = data(
+      longUint(0x07064b50), // EOCDL signature
+      longUint(0), // central directory start disk
+      bigUint(eocdrOffset), // central directory offset
+      longUint(1), // total number of disks
+    );
+
+    position += eocdlChunk.byteLength;
+    yield eocdlChunk;
+  }
+
+  yield data(
+    longUint(0x06054b50), // signature
+    shortUint(zip64 ? 0xffff : 0), // number of this disk
+    shortUint(zip64 ? 0xffff : 0), // central directory start disk
+    shortUint(zip64 ? 0xffff : fileCount), // total entries this disk
+    shortUint(zip64 ? 0xffff : fileCount), // total entries on all disks
+    longUint(zip64 ? 0xffff_ffff : centralDirectorySize), // size of the central directory
+    longUint(zip64 ? 0xffff_ffff : centralDirectoryOffset), // central directory offset
+    cp437length`the zip file comment`, // .ZIP file comment length
+    cp437`the zip file comment`, // .ZIP file comment
+  );
+}
