@@ -2,13 +2,12 @@ import {
   CompressionMethod,
   DosFileAttributes,
   UnixFileAttributes,
-  ZipPlatform,
 } from "../internal/field-types.js";
 import { readableStreamFromIterable } from "../internal/streams.js";
 import {
-  ZipWriterBase,
+  ZipWriter as ZipWriterBase,
   type ZipEntryData,
-  type ZipWriterBaseOptions,
+  type ZipWriterOptions as ZipWriterBaseOptions,
 } from "../internal/zip-writer-base.js";
 import { defaultCompressors } from "./compression.js";
 
@@ -57,29 +56,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     entry: ZipEntryInfo,
     content?: ZipEntryData,
   ): Promise<void> {
-    const { attributes, ...rest } = entry;
-
-    let externalFileAttributes = 0;
-    let platformMadeBy: ZipPlatform | undefined;
-
-    if (attributes instanceof DosFileAttributes) {
-      externalFileAttributes = attributes.value;
-      platformMadeBy = ZipPlatform.DOS;
-    } else if (attributes instanceof UnixFileAttributes) {
-      externalFileAttributes = ((attributes.value & 0xffff) << 16) >>> 0;
-      platformMadeBy = ZipPlatform.UNIX;
-    } else if (attributes !== undefined) {
-      throw new Error(`invalid value for attributes`);
-    }
-
-    await this.writer.addFileEntry(
-      {
-        ...rest,
-        externalFileAttributes,
-        platformMadeBy,
-      },
-      content,
-    );
+    await this.writer.addFile(entry, content);
   }
 
   /**

@@ -5,6 +5,10 @@ const reverseCp437 = Object.fromEntries(
   [...cp437].map((value, index) => [value, index]),
 );
 
+export function canBeCodePage437Encoded(value: string): boolean {
+  return [...value].every((char) => char in reverseCp437);
+}
+
 export class CodePage437Decoder implements TextDecoder {
   public readonly encoding = "cp437";
   public readonly fatal = false;

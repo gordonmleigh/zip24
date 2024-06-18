@@ -1,6 +1,25 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { CodePage437Decoder, CodePage437Encoder } from "./cp437.js";
+import {
+  CodePage437Decoder,
+  CodePage437Encoder,
+  canBeCodePage437Encoded,
+} from "./cp437.js";
+
+const allCodePoints =
+  "\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
+
+describe("canBeCodePage437Encoded", () => {
+  it("returns true for encodable strings", () => {
+    const result = canBeCodePage437Encoded(allCodePoints);
+    assert.strictEqual(result, true);
+  });
+
+  it("returns false for non-encodable strings", () => {
+    assert.strictEqual(canBeCodePage437Encoded("🥲"), false);
+    assert.strictEqual(canBeCodePage437Encoded("日本語"), false);
+  });
+});
 
 describe("CodePage437Decoder", () => {
   describe("decode()", () => {
@@ -68,9 +87,6 @@ describe("CodePage437Decoder", () => {
     });
   });
 });
-
-const allCodePoints =
-  "\u0000☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
 
 function makeAllCodePointBuffer(garbage = false): ArrayBuffer {
   const buffer = new ArrayBuffer(garbage ? 276 : 256);

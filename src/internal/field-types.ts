@@ -1,5 +1,6 @@
 import { assert } from "./assert.js";
 import { BitField } from "./binary.js";
+import { ZipFormatError } from "./errors.js";
 
 export enum CompressionMethod {
   Stored = 0,
@@ -33,6 +34,7 @@ export type CommonAttributes = {
   isReadOnly: boolean;
   isDirectory: boolean;
   isFile: boolean;
+  rawValue: number;
 };
 
 export class DosFileAttributes extends BitField implements CommonAttributes {
@@ -80,6 +82,13 @@ export class DosFileAttributes extends BitField implements CommonAttributes {
         `unable to set isFile to false (set another type flag to true instead)`,
       );
     }
+  }
+
+  public get rawValue(): number {
+    return this.value;
+  }
+  public set rawValue(value: number) {
+    this.value = value;
   }
 }
 
@@ -144,6 +153,13 @@ export class UnixFileAttributes extends BitField implements CommonAttributes {
     this.value = (this.value & 0o177000) | (value & 0o777);
   }
 
+  public get rawValue(): number {
+    return (this.value << 16) >>> 0;
+  }
+  public set rawValue(value: number) {
+    this.value = value >>> 16;
+  }
+
   public get type(): number {
     return this.value & 0o170000;
   }
@@ -178,6 +194,39 @@ export class GeneralPurposeFlags extends BitField {
   public set hasUtf8Strings(value: boolean) {
     this.setBit(11, value);
   }
+}
+
+const PlatformAttributes = {
+  [ZipPlatform.DOS]: DosFileAttributes,
+  [ZipPlatform.UNIX]: UnixFileAttributes,
+};
+
+export type PlatformAttributes = {
+  [K in keyof typeof PlatformAttributes]: (typeof PlatformAttributes)[K] extends new () => infer I
+    ? I
+    : never;
+};
+
+export function makePlatformAttributes<P extends ZipPlatform>(
+  platform: P,
+  rawValue?: number,
+): PlatformAttributes[P];
+export function makePlatformAttributes(
+  platform: ZipPlatform,
+  rawValue?: number,
+): PlatformAttributes[ZipPlatform] {
+  const ctor = PlatformAttributes[platform];
+  if (!ctor) {
+    throw new ZipFormatError(`unknown platform ${platform}`);
+  }
+
+  const instance = new ctor();
+
+  if (rawValue !== undefined) {
+    instance.rawValue = rawValue;
+  }
+
+  return instance;
 }
 
 /**

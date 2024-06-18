@@ -1,6 +1,6 @@
 import { assert } from "./assert.js";
 import { BufferView } from "./binary.js";
-import { CodePage437Encoder } from "./cp437.js";
+import { CodePage437Encoder, canBeCodePage437Encoded } from "./cp437.js";
 import { computeCrc32 } from "./crc32.js";
 import {
   ByteLengthStrategy,
@@ -12,10 +12,20 @@ import {
   GeneralPurposeFlags,
   ZipPlatform,
   ZipVersion,
+  makePlatformAttributes,
   type CompressionAlgorithms,
 } from "./field-types.js";
+import type {
+  CompressionInfoFields,
+  DataDescriptor,
+  DecodedCentralHeader,
+  RawCentralHeader,
+  RawLocalHeader,
+  Zip64ExtraField,
+} from "./records.js";
 import { Semaphore } from "./semaphore.js";
 import {
+  CentralHeaderLength,
   CentralHeaderSignature,
   DataDescriptorSignature,
   EndOfCentralDirectorySignature,
@@ -29,31 +39,17 @@ import {
   mapIterable,
 } from "./streams.js";
 
-type EntryInfoBase = {
-  compressedSize: number;
-  compressionMethod: CompressionMethod;
-  crc32: number;
-  externalFileAttributes: number;
-  platformMadeBy: ZipPlatform;
-  uncompressedSize: number;
-  versionMadeBy: ZipVersion;
-  zip64: boolean;
+type PublicEntryFields = Omit<
+  DecodedCentralHeader,
+  "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
+>;
+
+export type ZipEntryOptions = {
+  utf8?: boolean;
+  zip64?: boolean;
 };
 
-type FullEntryInfo = EntryInfoBase & {
-  comment: Uint8Array;
-  extraField?: Uint8Array;
-  hasDataDescriptor: boolean;
-  lastModified: DosDate;
-  localHeaderOffset: number;
-  path: Uint8Array;
-};
-
-export type ZipEntryInfo = Partial<EntryInfoBase> & {
-  comment?: string;
-  lastModified?: Date;
-  path?: string;
-};
+export type ZipEntryInfo = Partial<PublicEntryFields> & ZipEntryOptions;
 
 export type ZipEntryData =
   | Uint8Array
@@ -62,32 +58,28 @@ export type ZipEntryData =
   // eslint-disable-next-line n/no-unsupported-features/node-builtins
   | ReadableStream<Uint8Array>;
 
-type DataDescriptor = {
-  compressedSize: number;
-  crc32: number;
-  uncompressedSize: number;
+type ZipEntryInternalOptions = ZipEntryOptions & {
+  hasDataDescriptor?: boolean;
 };
 
-type EntrySizes = {
-  compressedSize: number;
-  localHeaderOffset?: number;
-  uncompressedSize: number;
-};
+type InternalHeader = RawCentralHeader & { zip64?: boolean };
 
-export type ZipWriterBaseOptions = {
+export type ZipWriterOptions = {
   compressors: CompressionAlgorithms;
   highWaterMark?: number;
   startingOffset?: number;
 };
 
-export class ZipWriterBase implements AsyncIterable<Uint8Array> {
+export class ZipWriter implements AsyncIterable<Uint8Array> {
   private readonly buffer: DoubleEndedBuffer<Uint8Array>;
   private readonly bufferSemaphore = new Semaphore(1);
   private readonly compressors: CompressionAlgorithms;
-  private readonly directory: FullEntryInfo[] = [];
+  private readonly directory: InternalHeader[] = [];
   private readonly startingOffset: number;
 
-  public constructor(options: ZipWriterBaseOptions) {
+  private zip64 = false;
+
+  public constructor(options: ZipWriterOptions) {
     const { compressors, highWaterMark = 0xa000, startingOffset = 0 } = options;
 
     // the buffer stores outgoing data chunks
@@ -100,7 +92,7 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     yield* this.buffer;
   }
 
-  public readonly addFileEntry = this.bufferSemaphore.synchronize(
+  public readonly addFile = this.bufferSemaphore.synchronize(
     (file: ZipEntryInfo, content?: ZipEntryData) =>
       this.writeFileEntry(file, content),
   );
@@ -117,103 +109,89 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     file: ZipEntryInfo,
     content?: ZipEntryData,
   ): Promise<void> {
-    const encoder = new TextEncoder();
+    const localHeaderOffset = this.startingOffset + this.buffer.written;
 
-    let data: AsyncIterable<Uint8Array> | Iterable<Uint8Array>;
-    if (typeof content === "string") {
-      data = [encoder.encode(content)];
-    } else if (content instanceof Uint8Array) {
-      data = [content];
-    } else if (content && Symbol.asyncIterator in content) {
-      data = content;
-    } else if (content) {
-      data = iterableFromReadableStream(content);
-    } else {
-      data = [];
-    }
+    // normalize the options
+    const platform = file.platformMadeBy ?? ZipPlatform.DOS;
+    const attributes = file.attributes ?? makePlatformAttributes(platform);
+    const hasDataDescriptor = needsDataDescriptor(file);
+    const utf8 = !!file.utf8 || needsUtf8(file);
+    const zip64 = !!file.zip64 || needs64bit({ ...file, localHeaderOffset });
+    const options = { hasDataDescriptor, utf8, zip64 };
+    const version = minimumVersion(options, file.versionMadeBy);
 
-    const entry: FullEntryInfo = {
+    const flags = new GeneralPurposeFlags();
+    flags.hasDataDescriptor = hasDataDescriptor;
+    flags.hasUtf8Strings = utf8;
+
+    const encoder = utf8 ? new TextEncoder() : new CodePage437Encoder();
+
+    const localHeader: RawLocalHeader = {
       compressedSize: file.compressedSize ?? 0,
-      comment: encoder.encode(file.comment),
       compressionMethod: file.compressionMethod ?? CompressionMethod.Deflate,
       crc32: file.crc32 ?? 0,
-      externalFileAttributes: file.externalFileAttributes ?? 0,
-      hasDataDescriptor:
-        file.compressedSize === undefined ||
-        file.crc32 === undefined ||
-        file.uncompressedSize === undefined,
-      lastModified: file.lastModified
-        ? new DosDate(file.lastModified)
-        : new DosDate(),
-      localHeaderOffset: this.startingOffset + this.buffer.written,
+      flags,
+      lastModified: file.lastModified ?? new Date(),
       path: encoder.encode(file.path),
-      platformMadeBy: file.platformMadeBy ?? ZipPlatform.DOS,
       uncompressedSize: file.uncompressedSize ?? 0,
-      versionMadeBy: file.versionMadeBy ?? ZipVersion.Deflate,
-      zip64:
-        !!file.zip64 ||
-        (file.compressedSize !== undefined &&
-          file.compressedSize > 0xffff_ffff) ||
-        (file.uncompressedSize !== undefined &&
-          file.uncompressedSize > 0xffff_ffff),
+      platformMadeBy: platform,
+      versionMadeBy: version,
     };
 
-    if (entry.zip64) {
-      entry.versionMadeBy = ZipVersion.Zip64;
-    }
+    await this.writeLocalHeader(localHeader, options);
 
-    await this.writeLocalHeader(entry);
-    await this.writeFileData(entry, data);
+    const dataDescriptor = await this.writeFileData(
+      { ...file, compressionMethod: localHeader.compressionMethod },
+      content,
+      options,
+    );
 
-    if (entry.hasDataDescriptor) {
-      if (entry.zip64) {
-        await this.writeDataDescriptor64(entry);
-      } else {
-        await this.writeDataDescriptor32(entry);
-      }
-    }
+    const directoryHeader: InternalHeader = {
+      ...localHeader,
+      ...dataDescriptor,
+      ...options,
+      attributes,
+      comment: encoder.encode(file.comment),
+      localHeaderOffset,
+      internalAttributes: 0,
+      versionNeeded: version,
+    };
 
-    this.directory.push(entry);
+    this.zip64 ||= zip64;
+    this.directory.push(directoryHeader);
   }
 
   private async writeCentralDirectory(fileComment?: string): Promise<void> {
-    const offset = this.startingOffset + this.buffer.written;
-    let zip64 = false;
+    const directoryOffset = this.startingOffset + this.buffer.written;
 
     for (const entry of this.directory) {
       await this.writeDirectoryHeader(entry);
-      zip64 ||= entry.zip64;
     }
 
-    const size = this.startingOffset + this.buffer.written - offset;
-    zip64 ||= this.buffer.written >= 0xffff_ffff;
+    const fileSize = this.startingOffset + this.buffer.written;
+    const directorySize = fileSize - directoryOffset;
+    const zip64 = this.zip64 || fileSize >= 0xffff_ffff;
 
     if (zip64) {
-      await this.writeZip64EndOfCentralDirectory(offset, size);
-      await this.writeZip64EndOfCentralDirectoryLocator(offset);
+      await this.writeZip64EndOfCentralDirectory(
+        directoryOffset,
+        directorySize,
+      );
+      await this.writeZip64EndOfCentralDirectoryLocator(directoryOffset);
     }
 
-    await this.writeEndOfCentralDirectory(offset, size, zip64, fileComment);
+    await this.writeEndOfCentralDirectory(
+      directoryOffset,
+      directorySize,
+      zip64,
+      fileComment,
+    );
   }
 
-  private async writeLocalHeader(entry: FullEntryInfo): Promise<void> {
-    const compressedSize = maskValue(entry, entry.compressedSize);
-    const crc32 = maskValue(entry, entry.crc32);
-    const uncompressedSize = maskValue(entry, entry.uncompressedSize);
-
-    const extraField = entry.zip64
-      ? this.makeZip64ExtraField({
-          compressedSize: entry.hasDataDescriptor ? 0 : entry.compressedSize,
-          uncompressedSize: entry.hasDataDescriptor
-            ? 0
-            : entry.uncompressedSize,
-        })
-      : new Uint8Array(0);
-
-    const flags = new GeneralPurposeFlags();
-    flags.hasDataDescriptor = entry.hasDataDescriptor;
-    flags.hasUtf8Strings = true;
-
+  private async writeLocalHeader(
+    entry: RawLocalHeader,
+    options: ZipEntryInternalOptions,
+  ): Promise<void> {
     // Local File Header (4.3.7)
     //
     // | offset | field                     | size |
@@ -232,55 +210,40 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     // | 30     | file name                 | ...  |
     // | ...    | extra field               | ...  |
 
+    const { zip64, hasDataDescriptor } = options;
+
+    // set the mask values according to the options
+    const dataDescriptorMask = hasDataDescriptor ? 0 : undefined;
+    const zip64Mask = zip64 ? 0xffff_ffff : dataDescriptorMask;
+
+    const extraField = zip64
+      ? this.makeZip64ExtraField({
+          compressedSize: dataDescriptorMask ?? entry.compressedSize,
+          uncompressedSize: dataDescriptorMask ?? entry.uncompressedSize,
+        })
+      : new Uint8Array(0);
+
     const buffer = BufferView.alloc(
       30 + entry.path.byteLength + extraField.byteLength,
     );
 
     buffer.writeUint32LE(LocalHeaderSignature, 0);
     buffer.writeUint16LE(entry.versionMadeBy, 4);
-    buffer.writeUint16LE(flags.value, 6);
+    buffer.writeUint16LE(entry.flags.value, 6);
     buffer.writeUint16LE(entry.compressionMethod, 8);
-    buffer.writeUint32LE(entry.lastModified.getDosDateTime(), 10);
-    buffer.writeUint32LE(crc32, 14);
-    buffer.writeUint32LE(compressedSize, 18);
-    buffer.writeUint32LE(uncompressedSize, 22);
+    buffer.writeUint32LE(new DosDate(entry.lastModified).getDosDateTime(), 10);
+    buffer.writeUint32LE(dataDescriptorMask ?? entry.crc32, 14);
+    buffer.writeUint32LE(zip64Mask ?? entry.compressedSize, 18);
+    buffer.writeUint32LE(zip64Mask ?? entry.uncompressedSize, 22);
     buffer.writeUint16LE(entry.path.byteLength, 26);
     buffer.writeUint16LE(extraField.byteLength, 28);
     buffer.setBytes(30, entry.path);
-
-    if (extraField) {
-      buffer.setBytes(30 + entry.path.byteLength, extraField);
-    }
+    buffer.setBytes(30 + entry.path.byteLength, extraField);
 
     await this.buffer.write(buffer.getOriginalBytes());
   }
 
-  private async writeDirectoryHeader(entry: FullEntryInfo): Promise<void> {
-    if (entry.localHeaderOffset > 0xffff_ffff) {
-      entry.zip64 = true;
-    }
-
-    const extraField = entry.zip64
-      ? this.makeZip64ExtraField({
-          compressedSize: entry.compressedSize,
-          uncompressedSize: entry.uncompressedSize,
-          localHeaderOffset: entry.localHeaderOffset,
-        })
-      : new Uint8Array();
-
-    const flags = new GeneralPurposeFlags();
-    flags.hasDataDescriptor = entry.hasDataDescriptor;
-    flags.hasUtf8Strings = true;
-
-    const zip64 = entry.zip64;
-    const compressedSize = maskValue({ zip64 }, entry.compressedSize);
-    const uncompressedSize = maskValue({ zip64 }, entry.uncompressedSize);
-
-    const localHeaderOffsetValue = maskValue(
-      { zip64 },
-      entry.localHeaderOffset,
-    );
-
+  private async writeDirectoryHeader(entry: InternalHeader): Promise<void> {
     // Central Directory Header (4.3.12)
     //
     // | offset | field                           | size |
@@ -306,8 +269,15 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     // |        | extra field (variable size)     |      |
     // |        | file comment (variable size)    |      |
 
+    // if zip64 is enabled then some values should be masked in the header
+    const zip64Mask = entry.zip64 ? 0xffff_ffff : undefined;
+
+    const extraField = entry.zip64
+      ? this.makeZip64ExtraField(entry)
+      : new Uint8Array(0);
+
     const buffer = BufferView.alloc(
-      46 +
+      CentralHeaderLength +
         entry.path.byteLength +
         extraField.byteLength +
         entry.comment.byteLength,
@@ -317,19 +287,19 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     buffer.writeUint8(entry.versionMadeBy, 4);
     buffer.writeUint8(entry.platformMadeBy, 5);
     buffer.writeUint16LE(entry.versionMadeBy, 6);
-    buffer.writeUint16LE(flags.value, 8);
+    buffer.writeUint16LE(entry.flags.value, 8);
     buffer.writeUint16LE(entry.compressionMethod, 10);
-    buffer.writeUint32LE(entry.lastModified.getDosDateTime(), 12);
+    buffer.writeUint32LE(new DosDate(entry.lastModified).getDosDateTime(), 12);
     buffer.writeUint32LE(entry.crc32, 16);
-    buffer.writeUint32LE(compressedSize, 20);
-    buffer.writeUint32LE(uncompressedSize, 24);
+    buffer.writeUint32LE(zip64Mask ?? entry.compressedSize, 20);
+    buffer.writeUint32LE(zip64Mask ?? entry.uncompressedSize, 24);
     buffer.writeUint16LE(entry.path.byteLength, 28);
     buffer.writeUint16LE(extraField?.byteLength ?? 0, 30);
     buffer.writeUint16LE(entry.comment.byteLength, 32);
     buffer.writeUint16LE(0, 34); // disk number start
-    buffer.writeUint16LE(0, 36); // internal file attributes
-    buffer.writeUint32LE(entry.externalFileAttributes, 38);
-    buffer.writeUint32LE(localHeaderOffsetValue, 42);
+    buffer.writeUint16LE(entry.internalAttributes, 36); // internal file attributes
+    buffer.writeUint32LE(entry.attributes.rawValue, 38);
+    buffer.writeUint32LE(zip64Mask ?? entry.localHeaderOffset, 42);
     buffer.setBytes(46, entry.path);
     buffer.setBytes(46 + entry.path.byteLength, extraField);
 
@@ -342,9 +312,26 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
   }
 
   private async writeFileData(
-    entry: FullEntryInfo,
-    data: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
-  ): Promise<void> {
+    entry: Partial<CompressionInfoFields> & {
+      compressionMethod: CompressionMethod;
+    },
+    content: ZipEntryData | undefined,
+    options: ZipEntryInternalOptions,
+  ): Promise<DataDescriptor> {
+    // normalize the input data
+    let data: AsyncIterable<Uint8Array> | Iterable<Uint8Array>;
+    if (typeof content === "string") {
+      data = [new TextEncoder().encode(content)];
+    } else if (content instanceof Uint8Array) {
+      data = [content];
+    } else if (content && Symbol.asyncIterator in content) {
+      data = content;
+    } else if (content) {
+      data = iterableFromReadableStream(content);
+    } else {
+      data = [];
+    }
+
     let compressor = this.compressors[entry.compressionMethod];
     if (!compressor && entry.compressionMethod === CompressionMethod.Stored) {
       compressor = identityStream;
@@ -378,7 +365,27 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
       await this.buffer.write(chunk);
     }
 
-    Object.assign(entry, descriptor);
+    if (options.hasDataDescriptor) {
+      if (options.zip64) {
+        await this.writeDataDescriptor64(descriptor);
+      } else {
+        await this.writeDataDescriptor32(descriptor);
+      }
+    }
+
+    if (
+      (entry.compressedSize !== undefined &&
+        descriptor.compressedSize !== entry.compressedSize) ||
+      (entry.crc32 !== undefined && descriptor.crc32 !== entry.crc32) ||
+      (entry.uncompressedSize !== undefined &&
+        descriptor.uncompressedSize !== entry.uncompressedSize)
+    ) {
+      throw new Error(
+        `compressedSize, crc32, or uncompressedSize were supplied but are invalid`,
+      );
+    }
+
+    return descriptor;
   }
 
   private async writeDataDescriptor32(entry: DataDescriptor): Promise<void> {
@@ -421,7 +428,7 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     await this.buffer.write(buffer.getOriginalBytes());
   }
 
-  private makeZip64ExtraField(entry: EntrySizes): Uint8Array {
+  private makeZip64ExtraField(entry: Zip64ExtraField): Uint8Array {
     // Zip64 Extended Information Extra Field (4.5.3):
 
     // | offset | field                          | size |
@@ -531,12 +538,12 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
     const buffer = BufferView.alloc(22 + commentBytes.length);
 
     buffer.writeUint32LE(EndOfCentralDirectorySignature, 0);
-    buffer.writeUint16LE(0, 4);
-    buffer.writeUint16LE(0, 6);
-    buffer.writeUint16LE(zip64 ? 0 : this.directory.length, 8);
-    buffer.writeUint16LE(zip64 ? 0 : this.directory.length, 10);
-    buffer.writeUint32LE(zip64 ? 0 : size, 12);
-    buffer.writeUint32LE(zip64 ? 0 : offset, 16);
+    buffer.writeUint16LE(zip64 ? 0xffff : 0, 4);
+    buffer.writeUint16LE(zip64 ? 0xffff : 0, 6);
+    buffer.writeUint16LE(zip64 ? 0xffff : this.directory.length, 8);
+    buffer.writeUint16LE(zip64 ? 0xffff : this.directory.length, 10);
+    buffer.writeUint32LE(zip64 ? 0xffff_ffff : size, 12);
+    buffer.writeUint32LE(zip64 ? 0xffff_ffff : offset, 16);
     buffer.writeUint16LE(commentBytes.byteLength, 20);
     buffer.setBytes(22, commentBytes);
 
@@ -544,15 +551,59 @@ export class ZipWriterBase implements AsyncIterable<Uint8Array> {
   }
 }
 
-function maskValue(
-  options: { hasDataDescriptor?: boolean; zip64?: boolean },
-  value: number,
-): number {
-  if (options.zip64) {
-    return 0xffff_ffff;
+function minimumVersion(
+  options: ZipEntryOptions,
+  requestedVersion?: ZipVersion,
+): ZipVersion {
+  const minRequired = Math.max(
+    requestedVersion ?? ZipVersion.Deflate,
+    options.utf8 ? ZipVersion.UtfEncoding : ZipVersion.Deflate,
+    options.zip64 ? ZipVersion.UtfEncoding : ZipVersion.Deflate,
+  ) as ZipVersion;
+
+  if (requestedVersion !== undefined && requestedVersion < minRequired) {
+    throw new Error(
+      `versionMadeBy is explicitly set but is lower than the required value`,
+    );
   }
-  if (options.hasDataDescriptor) {
-    return 0;
+
+  return minRequired;
+}
+
+function needs64bit(
+  entry: Partial<Zip64ExtraField> & ZipEntryOptions,
+): boolean {
+  const value =
+    !!entry.zip64 ||
+    (entry.compressedSize ?? 0) > 0xffff_ffff ||
+    (entry.uncompressedSize ?? 0) > 0xffff_ffff ||
+    (entry.localHeaderOffset ?? 0) > 0xffff_ffff;
+
+  if (entry.zip64 === false && value) {
+    throw new Error(
+      `zip64 is explicitly false but the entry sizes are bigger than 32 bit`,
+    );
+  }
+  return value;
+}
+
+function needsDataDescriptor(values: Partial<DataDescriptor>): boolean {
+  return (
+    values.compressedSize === undefined ||
+    values.crc32 === undefined ||
+    values.uncompressedSize === undefined
+  );
+}
+
+function needsUtf8(entry: ZipEntryInfo): boolean {
+  const value =
+    !!entry.utf8 ||
+    (!!entry.comment && !canBeCodePage437Encoded(entry.comment)) ||
+    (!!entry.path && !canBeCodePage437Encoded(entry.path));
+  if (entry.utf8 === false && value) {
+    throw new Error(
+      `utf8 is explicitly false but the path or comment requires utf8 encoding`,
+    );
   }
   return value;
 }

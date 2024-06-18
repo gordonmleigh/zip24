@@ -118,6 +118,26 @@ describe("DosFileAttributes", () => {
       );
     });
   });
+
+  describe("rawValue", () => {
+    it("returns the value", () => {
+      const value1 = new DosFileAttributes(0b10011);
+      assert.strictEqual(value1.rawValue, 0b10011);
+
+      const value2 = new DosFileAttributes(0b10100);
+      assert.strictEqual(value2.rawValue, 0b10100);
+    });
+
+    it("sets the value", () => {
+      const value1 = new DosFileAttributes();
+      value1.rawValue = 0b10011;
+      assert.strictEqual(value1.value, 0b10011);
+
+      const value2 = new DosFileAttributes();
+      value2.rawValue = 0b10100;
+      assert.strictEqual(value2.value, 0b10100);
+    });
+  });
 });
 
 describe("UnixFileAttributes", () => {
@@ -254,6 +274,26 @@ describe("UnixFileAttributes", () => {
       const value2 = new UnixFileAttributes(0o170_000);
       value2.permissions = 0o321;
       assert.strictEqual(value2.value, 0o170_321);
+    });
+  });
+
+  describe("rawValue", () => {
+    it("returns the value shifted to the upper word", () => {
+      const value1 = new UnixFileAttributes(0xa29c);
+      assert.strictEqual(value1.rawValue, 0xa29c0000);
+
+      const value2 = new UnixFileAttributes(0xf8d1);
+      assert.strictEqual(value2.rawValue, 0xf8d10000);
+    });
+
+    it("sets the value shifted to the lower word", () => {
+      const value1 = new UnixFileAttributes();
+      value1.rawValue = 0xa29c0000;
+      assert.strictEqual(value1.value, 0xa29c);
+
+      const value2 = new UnixFileAttributes();
+      value2.rawValue = 0xf8d10000;
+      assert.strictEqual(value2.value, 0xf8d1);
     });
   });
 

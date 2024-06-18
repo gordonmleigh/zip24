@@ -7,6 +7,22 @@ import type {
   ZipVersion,
 } from "./field-types.js";
 
+export type LocalHeaderBase = {
+  compressedSize: number;
+  compressionMethod: CompressionMethod;
+  crc32: number;
+  flags: GeneralPurposeFlags;
+  lastModified: Date;
+  platformMadeBy: ZipPlatform;
+  uncompressedSize: number;
+  versionMadeBy: ZipVersion;
+};
+
+export type RawLocalHeader = LocalHeaderBase & {
+  extraField?: Uint8Array;
+  path: Uint8Array;
+};
+
 export type CentralHeaderBase = {
   attributes: DosFileAttributes | UnixFileAttributes;
   flags: GeneralPurposeFlags;
@@ -36,13 +52,37 @@ export type CentralHeaderDecodedVariableFields = {
   path: string;
 };
 
-export type DecodedCentralHeader = CentralHeaderFixedFields &
+export type CentralHeaderRawVariableFields = {
+  comment: Uint8Array;
+  extraField?: Uint8Array;
+  path: Uint8Array;
+};
+
+export type DecodedCentralHeader = CentralHeaderBase &
   CentralHeaderDecodedVariableFields;
+
+export type DecodedCentralHeaderWithLengths = DecodedCentralHeader &
+  CentralHeaderLengthFields;
+
+export type RawCentralHeader = CentralHeaderBase &
+  CentralHeaderRawVariableFields;
 
 export type CompressionInfoFields = {
   compressedSize: number;
   compressionMethod: CompressionMethod;
   crc32: number;
+  uncompressedSize: number;
+};
+
+export type DataDescriptor = {
+  compressedSize: number;
+  crc32: number;
+  uncompressedSize: number;
+};
+
+export type Zip64ExtraField = {
+  compressedSize: number;
+  localHeaderOffset?: number;
   uncompressedSize: number;
 };
 

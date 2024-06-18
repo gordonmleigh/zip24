@@ -2,37 +2,35 @@ import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { CodePage437Encoder } from "./cp437.js";
 import { computeCrc32 } from "./crc32.js";
-import { ZipFormatError, ZipSignatureError } from "./errors.js";
+import { ZipSignatureError } from "./errors.js";
 import {
   DosDate,
-  DosFileAttributes,
   GeneralPurposeFlags,
-  UnixFileAttributes,
-  ZipPlatform,
+  makePlatformAttributes,
 } from "./field-types.js";
 import {
   ExtendedDataTag,
   type CentralHeaderDecodedVariableFields,
   type CentralHeaderFixedFields,
   type CentralHeaderLengthFields,
-  type DecodedCentralHeader,
+  type DecodedCentralHeaderWithLengths,
 } from "./records.js";
 import { CentralHeaderLength, CentralHeaderSignature } from "./signatures.js";
 
 export function readDirectoryEntry(
-  entry: Partial<DecodedCentralHeader>,
+  entry: Partial<DecodedCentralHeaderWithLengths>,
   buffer: BufferLike,
   bufferOffset = 0,
-): asserts entry is DecodedCentralHeader {
+): asserts entry is DecodedCentralHeaderWithLengths {
   readDirectoryHeader(entry, buffer, bufferOffset);
   readDirectoryVariableFields(entry, buffer, bufferOffset);
 }
 
 export function readDirectoryHeader(
-  entry: Partial<DecodedCentralHeader>,
+  entry: Partial<DecodedCentralHeaderWithLengths>,
   buffer: BufferLike,
   bufferOffset = 0,
-): asserts entry is DecodedCentralHeader {
+): asserts entry is DecodedCentralHeaderWithLengths {
   // Central Directory Header (4.3.12)
   //
   // | offset | field                           | size |
@@ -95,17 +93,10 @@ export function readDirectoryHeader(
 
   entry.internalAttributes = view.readUint16LE(36);
 
-  const externalFileAttributes = view.readUint32LE(38);
-  if (entry.platformMadeBy === ZipPlatform.DOS) {
-    entry.attributes = new DosFileAttributes(externalFileAttributes & 0xff);
-  } else if (entry.platformMadeBy === ZipPlatform.UNIX) {
-    entry.attributes = new UnixFileAttributes(
-      (externalFileAttributes >>> 16) & 0xffff,
-    );
-  } else {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    throw new ZipFormatError(`unknown platform ${entry.platformMadeBy}`);
-  }
+  entry.attributes = makePlatformAttributes(
+    entry.platformMadeBy,
+    view.readUint32LE(38),
+  );
 
   entry.localHeaderOffset = view.readUint32LE(42);
 }
@@ -125,7 +116,7 @@ export function readDirectoryVariableFields(
   entry: CentralHeaderFixedFields & Partial<CentralHeaderDecodedVariableFields>,
   buffer: BufferLike,
   bufferOffset = 0,
-): asserts entry is DecodedCentralHeader {
+): asserts entry is DecodedCentralHeaderWithLengths {
   const view = new BufferView(buffer, bufferOffset);
   const signature = view.readUint32LE(0);
 
@@ -152,7 +143,7 @@ export function readDirectoryVariableFields(
 }
 
 export function readExtraFields(
-  entry: Partial<DecodedCentralHeader>,
+  entry: Partial<DecodedCentralHeaderWithLengths>,
   buffer: BufferLike,
   bufferOffset = 0,
   byteLength?: number,
@@ -187,7 +178,7 @@ export function readExtraFields(
 }
 
 function readUnicodeField(
-  entry: Partial<DecodedCentralHeader>,
+  entry: Partial<DecodedCentralHeaderWithLengths>,
   field: "path" | "comment",
   buffer: BufferLike,
   bufferOffset: number,
@@ -224,7 +215,7 @@ function readUnicodeField(
 }
 
 function readZip64Field(
-  entry: Partial<DecodedCentralHeader>,
+  entry: Partial<DecodedCentralHeaderWithLengths>,
   buffer: BufferLike,
   bufferOffset: number,
   byteLength: number,
