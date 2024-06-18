@@ -27,6 +27,8 @@ import {
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
 
+const DefaultChunkSize = 1024 ** 2;
+
 /**
  * Options for {@link ZipReader} instance.
  */
@@ -38,6 +40,11 @@ export type ZipReaderOptions = {
  * An object which can read a zip file from a {@link RandomAccessReader}.
  */
 export class ZipReader implements ZipReaderLike {
+  /**
+   * The default buffer size when reading data.
+   */
+  public static DefaultChunkSize = DefaultChunkSize;
+
   /**
    * Create a new instance and call open().
    */
@@ -97,7 +104,7 @@ export class ZipReader implements ZipReaderLike {
     await this.open();
     assert(this.directory, `expected this.directory to have a value`);
 
-    const buffer = new Uint8Array(1024 ** 2);
+    const buffer = new Uint8Array(ZipReader.DefaultChunkSize);
 
     let position = this.directory.offset;
     let offset = 0;
@@ -145,7 +152,7 @@ export class ZipReader implements ZipReaderLike {
 
   private readonly openInternal = lazy(async (): Promise<void> => {
     // read up to 1MB to find all of the trailer
-    const bufferSize = Math.min(this.fileSize, 1024 ** 2);
+    const bufferSize = Math.min(this.fileSize, DefaultChunkSize);
     const position = this.fileSize - bufferSize;
 
     const buffer = new Uint8Array(bufferSize);
