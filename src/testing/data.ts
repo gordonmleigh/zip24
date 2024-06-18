@@ -16,6 +16,21 @@ export async function* asyncIterable(
   }
 }
 
+export function base64(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): Uint8Array {
+  return Buffer.from(baseTemplate(literals, ...values), "base64");
+}
+
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function* base64iterable(
+  literals: TemplateStringsArray,
+  ...values: unknown[]
+): AsyncGenerator<Uint8Array> {
+  yield base64(literals, ...values);
+}
+
 export function cp437(
   literals: TemplateStringsArray,
   ...values: unknown[]

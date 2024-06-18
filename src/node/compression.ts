@@ -5,17 +5,17 @@ import { CompressionMethod, type CompressionAlgorithms } from "../common.js";
 /**
  * Default Node.js (zlib) compression methods.
  */
-export const defaultCompressors: CompressionAlgorithms = {
+export const defaultCompressors = {
   [CompressionMethod.Deflate]: (input) => {
     return Readable.from(input).pipe(createDeflateRaw());
   },
-};
+} satisfies CompressionAlgorithms;
 
 /**
  * Default Node.js (zlib) decompression methods.
  */
-export const defaultDecompressors: CompressionAlgorithms = {
+export const defaultDecompressors = {
   [CompressionMethod.Deflate]: (input) => {
     return Readable.from(input).pipe(createInflateRaw());
   },
-};
+} satisfies CompressionAlgorithms;

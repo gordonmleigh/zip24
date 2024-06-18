@@ -7,7 +7,7 @@ import {
 /**
  * Default Web API (CompressionStream) compression methods.
  */
-export const defaultCompressors: CompressionAlgorithms = {
+export const defaultCompressors = {
   [CompressionMethod.Deflate]: (
     input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
   ): AsyncIterable<Uint8Array> => {
@@ -18,12 +18,12 @@ export const defaultCompressors: CompressionAlgorithms = {
       ),
     );
   },
-};
+} satisfies CompressionAlgorithms;
 
 /**
  * Default Web API (DecompressionStream) decompression methods.
  */
-export const defaultDecompressors: CompressionAlgorithms = {
+export const defaultDecompressors = {
   [CompressionMethod.Deflate]: (
     input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
   ): AsyncIterable<Uint8Array> => {
@@ -34,4 +34,4 @@ export const defaultDecompressors: CompressionAlgorithms = {
       ),
     );
   },
-};
+} satisfies CompressionAlgorithms;
