@@ -5,6 +5,7 @@ import {
   ExtendedDataTag,
   GeneralPurposeFlags,
   UnixFileAttributes,
+  ZipFormatError,
   ZipPlatform,
   ZipSignatureError,
   ZipVersion,
@@ -16,7 +17,7 @@ import { computeCrc32 } from "./crc32.js";
 import { CentralHeaderLength, CentralHeaderSignature } from "./signatures.js";
 
 export type ZipEntry = {
-  attributes?: DosFileAttributes | UnixFileAttributes;
+  attributes: DosFileAttributes | UnixFileAttributes;
   comment: string;
   commentLength: number;
   compressedSize: number;
@@ -110,6 +111,8 @@ export function readDirectoryHeader(
     entry.attributes = new UnixFileAttributes(
       (externalFileAttributes >>> 16) & 0xffff,
     );
+  } else {
+    throw new ZipFormatError(`unknown platform ${entry.platformMadeBy}`);
   }
 
   entry.localHeaderOffset = view.readUint32LE(42);

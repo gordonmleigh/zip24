@@ -35,18 +35,19 @@ export class ZipEntryReader implements ZipEntryInternal, ZipEntryLike {
   public extraFieldLength = 0;
   public commentLength = 0;
   public internalAttributes = 0;
-  public attributes?: DosFileAttributes | UnixFileAttributes;
+  public attributes: DosFileAttributes | UnixFileAttributes =
+    new DosFileAttributes();
   public localHeaderOffset = 0;
   public path = "";
   public comment = "";
 
   public get isDirectory(): boolean {
-    return this.path.endsWith("/") || !!this.attributes?.isDirectory;
+    return this.path.endsWith("/") || !!this.attributes.isDirectory;
   }
 
   public get isFile(): boolean {
     // is indeterminate if we can't understand the attributes
-    return !this.path.endsWith("/") && !!this.attributes?.isFile;
+    return !this.path.endsWith("/") && !!this.attributes.isFile;
   }
 
   public get totalRecordLength(): number {

@@ -310,7 +310,7 @@ export type ZipReaderLike = {
  * Represents an object which can read a zip file entry.
  */
 export type ZipEntryLike = {
-  readonly attributes?: DosFileAttributes | UnixFileAttributes;
+  readonly attributes: DosFileAttributes | UnixFileAttributes;
   readonly comment: string;
   readonly compressedSize: number;
   readonly compressionMethod: CompressionMethod;

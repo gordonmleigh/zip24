@@ -5,6 +5,7 @@ import {
   DosFileAttributes,
   GeneralPurposeFlags,
   UnixFileAttributes,
+  ZipFormatError,
   ZipPlatform,
   ZipSignatureError,
   ZipVersion,
@@ -103,12 +104,47 @@ describe("readDirectoryEntry()", () => {
     assert.strictEqual(entry.commentLength, 6);
 
     assert.strictEqual(entry.localHeaderOffset, 0x12efcdab);
-    assert.strictEqual(entry.attributes?.value, 0x81a4);
+    assert.strictEqual(entry.attributes.value, 0x81a4);
 
     assert.strictEqual(entry.totalRecordLength, 46 + 8 + 0 + 6);
 
     assert.strictEqual(entry.path, "ôöò/path");
     assert.strictEqual(entry.comment, "☺☻♥♦♣♠");
+  });
+
+  it("throws if the platform is unknown", () => {
+    const buffer = data(
+      /* 00 +04 */ "504b0102", // signature  (0x02014b50)
+      /* 04 +02 */ "15ff", // version made by (21 = 2.1), platform (ff = ?)
+      /* 06 +02 */ "1500", // version needed (21 = 2.1)
+      /* 08 +02 */ "4100", // flags
+      /* 10 +02 */ "0800", // compression method (8 = DEFLATE)
+      /* 12 +02 */ "6a51", // last mod file time (10:11:20)
+      /* 14 +02 */ "a656", // last mod file date, (2023-05-06)
+      /* 16 +04 */ "12345678", // crc-32
+      /* 20 +04 */ "87654321", // compressed size
+      /* 24 +04 */ "12348765", // uncompressed size
+      /* 28 +02 */ "0800", // file name length
+      /* 30 +02 */ "0000", // extra field length
+      /* 32 +02 */ "0600", // file comment length
+      /* 34 +02 */ "0000", // disk number start
+      /* 36 +02 */ "0000", // internal file attributes
+      /* 38 +04 */ "0000a481", // external file attributes
+      /* 42 +04 */ "abcdef12", // relative offset of local header
+      /* 46 +08 */ cp437`ôöò/path`, // file name
+      /* 54 +00 */ "", // extra field
+      /* 54 +11 */ "010203040506", // the comment
+    );
+
+    const entry = new TestZipEntry();
+    assert.throws(
+      () => {
+        readDirectoryEntry(entry, buffer);
+      },
+      (error) =>
+        error instanceof ZipFormatError &&
+        error.message === "unknown platform 255",
+    );
   });
 
   it("sets unixFileAttributes if the platform is unix", () => {
@@ -139,7 +175,7 @@ describe("readDirectoryEntry()", () => {
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.UNIX);
-    assert.strictEqual(entry.attributes?.value, 0x81a4);
+    assert.strictEqual(entry.attributes.value, 0x81a4);
   });
 
   it("sets dosFileAttributes if the platform is DOS", () => {
@@ -170,7 +206,7 @@ describe("readDirectoryEntry()", () => {
     readDirectoryEntry(entry, buffer);
 
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.DOS);
-    assert.strictEqual(entry.attributes?.value, 0x11);
+    assert.strictEqual(entry.attributes.value, 0x11);
   });
 
   it("throws when disk number start is non-zero", () => {
@@ -595,7 +631,8 @@ class TestZipEntry implements ZipEntry {
   public extraFieldLength = 0;
   public commentLength = 0;
   public internalAttributes = 0;
-  public attributes?: DosFileAttributes | UnixFileAttributes;
+  public attributes: DosFileAttributes | UnixFileAttributes =
+    new DosFileAttributes();
   public localHeaderOffset = 0;
   public path = "";
   public comment = "";
