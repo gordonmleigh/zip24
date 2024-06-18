@@ -56,8 +56,8 @@ describe("readDirectoryEntry()", () => {
   it("can read a header", () => {
     const buffer = data(
       /* 00 +04 */ "504b0102", // signature  (0x02014b50)
-      /* 04 +02 */ "1503", // version made by (21 = 2.1), platform (3 = Unix)
-      /* 06 +02 */ "1500", // version needed (21 = 2.1)
+      /* 04 +02 */ "1403", // version made by (20 = 2.0), platform (3 = Unix)
+      /* 06 +02 */ "1400", // version needed (20 = 2.0)
       /* 08 +02 */ "4100", // flags
       /* 10 +02 */ "0800", // compression method (8 = DEFLATE)
       /* 12 +02 */ "6a51", // last mod file time (10:11:20)
@@ -80,9 +80,9 @@ describe("readDirectoryEntry()", () => {
     const entry = new TestZipEntry();
     readDirectoryEntry(entry, buffer);
 
-    assert.strictEqual(entry.versionMadeBy, ZipVersion.Deflate64);
+    assert.strictEqual(entry.versionMadeBy, ZipVersion.Deflate);
     assert.strictEqual(entry.platformMadeBy, ZipPlatform.UNIX);
-    assert.strictEqual(entry.versionNeeded, ZipVersion.Deflate64);
+    assert.strictEqual(entry.versionNeeded, ZipVersion.Deflate);
     assert(entry.flags.hasEncryption);
     assert(entry.flags.hasStrongEncryption);
     assert(!entry.flags.hasUtf8Strings);

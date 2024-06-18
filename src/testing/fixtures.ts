@@ -31,7 +31,7 @@ export const EmptyZip32 = data(
 export const Zip32WithThreeEntries = data(
   //// +0000 LOCAL ENTRY 1 HEADER (30+6+0 = 36 bytes)
   longUint(0x04034b50), // local header signature
-  shortUint(21), // version needed (21 = 2.1)
+  shortUint(20), // version needed (20 = 2.0)
   shortUint(0), // flags
   shortUint(0), // compression method (0 = NONE)
   dosDate`2023-04-05T11:22:34Z`, // last modified
@@ -48,7 +48,7 @@ export const Zip32WithThreeEntries = data(
 
   //// +0062 LOCAL ENTRY 2 HEADER (30+12+0 = 42 bytes)
   longUint(0x04034b50), // local header signature
-  shortUint(21), // version needed (21 = 2.1)
+  shortUint(20), // version needed (20 = 2.0)
   shortUint(0), // flags
   shortUint(8), // compression method (8 = DEFLATE)
   dosDate`1994-03-02T22:44:08Z`, // last modified
@@ -65,7 +65,7 @@ export const Zip32WithThreeEntries = data(
 
   //// +0136 LOCAL ENTRY 3 HEADER (30+7+0 = 36 bytes)
   longUint(0x04034b50), // local header signature
-  shortUint(21), // version needed (21 = 2.1)
+  shortUint(20), // version needed (20 = 2.0)
   shortUint(0), // flags
   shortUint(0), // compression method (0 = NONE)
   dosDate`2001-09-10T09:23:02Z`, // last modified
@@ -82,8 +82,8 @@ export const Zip32WithThreeEntries = data(
 
   //// +0173 DIRECTORY ENTRY 1 (46+6+0+9 = 61 bytes)
   longUint(0x02014b50), // central directory header signature
-  shortUint(21 | (3 << 8)), // version made by (21 = 2.1), platform (3 = Unix)
-  shortUint(21), // version needed (21 = 2.1)
+  shortUint(20 | (3 << 8)), // version made by (20 = 2.0), platform (3 = Unix)
+  shortUint(20), // version needed (20 = 2.0)
   shortUint(0), // flags
   shortUint(0), // compression method (0 = NONE)
   dosDate`2023-04-05T11:22:34Z`, // last modified
@@ -103,8 +103,8 @@ export const Zip32WithThreeEntries = data(
 
   //// +0234 DIRECTORY ENTRY 2 (46+12+0+15 = 73 bytes)
   longUint(0x02014b50), // central directory header signature
-  shortUint(21 | (3 << 8)), // version made by (21 = 2.1), platform (3 = Unix)
-  shortUint(21), // version needed (21 = 2.1)
+  shortUint(20 | (3 << 8)), // version made by (20 = 2.0), platform (3 = Unix)
+  shortUint(20), // version needed (20 = 2.0)
   shortUint(0b1000_0000_0000), // flags (+unicode)
   shortUint(8), // compression method (8 = DEFLATE)
   dosDate`1994-03-02T22:44:08Z`, // last modified
@@ -124,8 +124,8 @@ export const Zip32WithThreeEntries = data(
 
   //// +0307 DIRECTORY ENTRY 3 (46+7+0+9 = 62 bytes)
   longUint(0x02014b50), // central directory header signature
-  shortUint(21 | (3 << 8)), // version made by (21 = 2.1), platform (3 = Unix)
-  shortUint(21), // version needed (21 = 2.1)
+  shortUint(20 | (3 << 8)), // version made by (20 = 2.0), platform (3 = Unix)
+  shortUint(20), // version needed (20 = 2.0)
   shortUint(0), // flags
   shortUint(0), // compression method (0 = NONE)
   dosDate`2001-09-10T09:23:02Z`, // last modified
@@ -177,7 +177,7 @@ export async function* generateZip(
 
   const compressionMethod = CompressionMethod.Stored;
 
-  const version = zip64 ? ZipVersion.Zip64 : ZipVersion.Deflate64;
+  const version = zip64 ? ZipVersion.Zip64 : ZipVersion.Deflate;
   let position = 0;
 
   const directoryChunks: Uint8Array[] = [];

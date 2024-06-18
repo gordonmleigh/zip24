@@ -127,9 +127,9 @@ describe("base/reader", () => {
         //// FILE 0
         const file0 = files[0];
         assert(file0);
-        assert.strictEqual(file0.versionMadeBy, ZipVersion.Deflate64);
+        assert.strictEqual(file0.versionMadeBy, ZipVersion.Deflate);
         assert.strictEqual(file0.platformMadeBy, ZipPlatform.UNIX);
-        assert.strictEqual(file0.versionNeeded, ZipVersion.Deflate64);
+        assert.strictEqual(file0.versionNeeded, ZipVersion.Deflate);
         assert.strictEqual(file0.flags.value, 0);
         assert.strictEqual(file0.compressionMethod, CompressionMethod.Stored);
 
@@ -158,9 +158,9 @@ describe("base/reader", () => {
         //// FILE 1
         const file1 = files[1];
         assert(file1);
-        assert.strictEqual(file1.versionMadeBy, ZipVersion.Deflate64);
+        assert.strictEqual(file1.versionMadeBy, ZipVersion.Deflate);
         assert.strictEqual(file1.platformMadeBy, ZipPlatform.UNIX);
-        assert.strictEqual(file1.versionNeeded, ZipVersion.Deflate64);
+        assert.strictEqual(file1.versionNeeded, ZipVersion.Deflate);
         assert.strictEqual(file1.flags.hasUtf8Strings, true);
         assert.strictEqual(file1.compressionMethod, CompressionMethod.Deflate);
 
@@ -192,9 +192,9 @@ describe("base/reader", () => {
         //// FILE 2
         const file2 = files[2];
         assert(file2);
-        assert.strictEqual(file2.versionMadeBy, ZipVersion.Deflate64);
+        assert.strictEqual(file2.versionMadeBy, ZipVersion.Deflate);
         assert.strictEqual(file2.platformMadeBy, ZipPlatform.UNIX);
-        assert.strictEqual(file2.versionNeeded, ZipVersion.Deflate64);
+        assert.strictEqual(file2.versionNeeded, ZipVersion.Deflate);
         assert.strictEqual(file2.flags.value, 0);
         assert.strictEqual(file2.compressionMethod, CompressionMethod.Stored);
 

@@ -17,14 +17,12 @@ export enum ZipPlatform {
   // 19 - OS X (Darwin)            20 thru 255 - unused
   DOS = 0,
   UNIX = 3,
-  NTFS = 10,
-  Darwin = 19,
 }
 
 export enum ZipVersion {
   Deflate = 20,
-  Deflate64 = 21,
   Zip64 = 45,
+  UtfEncoding = 63,
 }
 
 export type CommonAttributes = {
