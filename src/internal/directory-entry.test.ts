@@ -9,6 +9,7 @@ import {
   ZipSignatureError,
   ZipVersion,
 } from "../common.js";
+import { cp437, data, utf8 } from "../testing/data.js";
 import {
   readDirectoryEntry,
   readDirectoryVariableFields,
@@ -16,7 +17,6 @@ import {
   type ZipEntry,
 } from "./directory-entry.js";
 import { CentralHeaderLength } from "./signatures.js";
-import { cp437, data, utf8 } from "./test-utils/data.js";
 
 describe("readDirectoryEntry()", () => {
   it("throws if the signature is invalid", () => {

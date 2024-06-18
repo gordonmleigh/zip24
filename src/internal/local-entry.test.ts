@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 import { ZipSignatureError } from "../common.js";
+import { cp437, data, utf8 } from "../testing/data.js";
 import { readLocalHeaderSize } from "./local-entry.js";
-import { cp437, data, utf8 } from "./test-utils/data.js";
 
 describe("readLocalHeaderSize", () => {
   it("throws if the signature is invalid", () => {
