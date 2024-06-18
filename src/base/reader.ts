@@ -27,12 +27,13 @@ import {
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
 
-const DefaultChunkSize = 1024 ** 2;
+const DefaultBufferSize = 1024 ** 2;
 
 /**
  * Options for {@link ZipReader} instance.
  */
 export type ZipReaderOptions = {
+  bufferSize?: number;
   decompressors?: CompressionAlgorithms;
 };
 
@@ -40,11 +41,6 @@ export type ZipReaderOptions = {
  * An object which can read a zip file from a {@link RandomAccessReader}.
  */
 export class ZipReader implements ZipReaderLike {
-  /**
-   * The default buffer size when reading data.
-   */
-  public static DefaultChunkSize = DefaultChunkSize;
-
   /**
    * Create a new instance and call open().
    */
@@ -58,6 +54,7 @@ export class ZipReader implements ZipReaderLike {
     return instance;
   }
 
+  private readonly bufferSize: number;
   private readonly decompressors: CompressionAlgorithms;
   private readonly fileSize: number;
   private readonly reader: RandomAccessReader;
@@ -85,6 +82,7 @@ export class ZipReader implements ZipReaderLike {
     fileSize: number,
     options: ZipReaderOptions = {},
   ) {
+    this.bufferSize = options.bufferSize ?? DefaultBufferSize;
     this.decompressors = options.decompressors ?? defaultDecompressors;
     this.fileSize = fileSize;
     this.reader = reader;
@@ -104,38 +102,43 @@ export class ZipReader implements ZipReaderLike {
     await this.open();
     assert(this.directory, `expected this.directory to have a value`);
 
-    const buffer = new Uint8Array(ZipReader.DefaultChunkSize);
+    const buffer = new Uint8Array(this.bufferSize);
 
     let position = this.directory.offset;
     let offset = 0;
     let bufferLength = 0;
 
-    // read the central directory a chunk at a time
-    for (let index = 0; index < this.entryCount; ++index) {
-      if (offset + CentralHeaderLength >= bufferLength) {
-        // there isn't enough buffer left to read a whole header, read a new chunk
-        const result = await this.reader.read({ buffer, position });
+    const ensureBuffer = async (length: number): Promise<void> => {
+      assert(
+        length <= buffer.byteLength,
+        `the configured buffer size (${this.bufferSize}) is too small to read the full entry (${length})`,
+      );
+
+      if (offset + length > bufferLength) {
+        // there isn't enough buffer left to read all of the variable fields, so
+        // read a new chunk starting from the current file offset (position + offset)
+        position = position - bufferLength + offset;
         offset = 0;
+
+        const result = await this.reader.read({ buffer, position });
+        assert(result.bytesRead >= length, `unexpected end of file`);
         bufferLength = result.bytesRead;
         position += result.bytesRead;
       }
+    };
 
+    // read the central directory a chunk at a time
+    for (let index = 0; index < this.entryCount; ++index) {
       const entry = new ZipEntryReader();
+
+      await ensureBuffer(CentralHeaderLength);
       readDirectoryHeader(entry, buffer, offset);
 
       const headerLength = getDirectoryHeaderLength(entry);
 
-      if (offset + headerLength > buffer.byteLength) {
-        // there isn't enough buffer left to read all of the variable fields,
-        // read a new chunk starting from the start of the header
-        position -= bufferLength - offset;
-        offset = 0;
-        const result = await this.reader.read({ buffer, position });
-        position += result.bytesRead;
-        bufferLength = result.bytesRead;
-      }
-
+      await ensureBuffer(headerLength);
       readDirectoryVariableFields(entry, buffer, offset);
+
       entry.uncompressedData = getData(entry, this.reader, this.decompressors);
 
       offset += headerLength;
@@ -151,8 +154,8 @@ export class ZipReader implements ZipReaderLike {
   }
 
   private readonly openInternal = lazy(async (): Promise<void> => {
-    // read up to 1MB to find all of the trailer
-    const bufferSize = Math.min(this.fileSize, DefaultChunkSize);
+    // read up to the buffer size to try find all of the trailer
+    const bufferSize = Math.min(this.fileSize, this.bufferSize);
     const position = this.fileSize - bufferSize;
 
     const buffer = new Uint8Array(bufferSize);

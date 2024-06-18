@@ -53,6 +53,30 @@ describe("base/reader", () => {
       assert.strictEqual(fileIndex, 100);
     });
 
+    it("can read the central directory in multiple chunks", async () => {
+      const data = await buffer(
+        generateZip({
+          fileCount: 30,
+          fileSize: 10,
+        }),
+      );
+      const reader = new ZipReader(
+        randomAccessReaderFromBuffer(data),
+        data.byteLength,
+        {
+          bufferSize: 100,
+        },
+      );
+
+      let fileIndex = 0;
+      for await (const file of reader) {
+        assert.strictEqual(file.path, `path ${fileIndex}`);
+        ++fileIndex;
+      }
+
+      assert.strictEqual(fileIndex, 30);
+    });
+
     it("can read a very large Zip64", async () => {
       // 12 MB file with 100 files of 100 kB each + roughly 2 MB central dir
       const data = await buffer(
