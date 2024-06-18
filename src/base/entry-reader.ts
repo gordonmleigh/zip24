@@ -1,8 +1,4 @@
 import { computeCrc32 } from "../internal/crc32.js";
-import type {
-  ZipEntryCompressionInfo,
-  ZipEntryHeader,
-} from "../internal/directory-entry.js";
 import { ZipFormatError } from "../internal/errors.js";
 import {
   CompressionMethod,
@@ -13,6 +9,8 @@ import {
   ZipVersion,
   type CompressionAlgorithms,
 } from "../internal/field-types.js";
+import type { ZipEntryLike } from "../internal/interfaces.js";
+import type { CompressionInfoFields } from "../internal/records.js";
 import {
   bufferFromIterable,
   readableStreamFromIterable,
@@ -20,7 +18,7 @@ import {
   type ByteStream,
 } from "../internal/streams.js";
 
-export class ZipEntryReader implements ZipEntryHeader {
+export class ZipEntryReader implements ZipEntryLike {
   private uncompressedDataInternal?: ByteStream;
 
   public platformMadeBy = ZipPlatform.DOS;
@@ -61,13 +59,13 @@ export class ZipEntryReader implements ZipEntryHeader {
     this.uncompressedDataInternal = value;
   }
 
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
-  public createReadableStream(): ReadableStream {
-    return readableStreamFromIterable(this.uncompressedData);
-  }
-
   public async toBuffer(): Promise<Uint8Array> {
     return await bufferFromIterable(this.uncompressedData);
+  }
+
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
+  public toReadableStream(): ReadableStream {
+    return readableStreamFromIterable(this.uncompressedData);
   }
 
   public async toText(encoding?: string): Promise<string> {
@@ -80,7 +78,7 @@ export class ZipEntryReader implements ZipEntryHeader {
 }
 
 export async function* decompress(
-  entry: ZipEntryCompressionInfo,
+  entry: CompressionInfoFields,
   input: ByteStream,
   decompressors: CompressionAlgorithms,
 ): AsyncGenerator<Uint8Array> {

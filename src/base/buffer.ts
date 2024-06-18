@@ -9,6 +9,7 @@ import {
   readDirectoryEntry,
 } from "../internal/directory-entry.js";
 import type { CompressionAlgorithms } from "../internal/field-types.js";
+import type { ZipReaderLike } from "../internal/interfaces.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
@@ -23,7 +24,7 @@ export type ZipBufferReaderOptions = {
 /**
  * An object which can read zip data from a buffer.
  */
-export class ZipBufferReader {
+export class ZipBufferReader implements ZipReaderLike {
   private readonly buffer: BufferView;
   private readonly decompressors: CompressionAlgorithms;
   private readonly directory: CentralDirectory;

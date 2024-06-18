@@ -6,8 +6,6 @@ import {
   readDirectoryEntry,
   readDirectoryVariableFields,
   readExtraFields,
-  type ZipEntryHeader,
-  type ZipEntryMeasurementFields,
 } from "./directory-entry.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
@@ -18,6 +16,10 @@ import {
   ZipPlatform,
   ZipVersion,
 } from "./field-types.js";
+import type {
+  CentralHeaderLengthFields,
+  DecodedCentralHeader,
+} from "./records.js";
 
 describe("readDirectoryEntry()", () => {
   it("throws if the signature is invalid", () => {
@@ -406,7 +408,7 @@ describe("readDirectoryVariableFields", () => {
 
 describe("readExtraFields()", () => {
   it("can read a unicode comment field", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       comment: "hello world",
     };
 
@@ -424,7 +426,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read a unicode path field", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       path: "hello world",
     };
 
@@ -442,7 +444,7 @@ describe("readExtraFields()", () => {
   });
 
   it("ignores unicode path field if the CRC32 does not match", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       path: "hello world",
     };
 
@@ -460,7 +462,7 @@ describe("readExtraFields()", () => {
   });
 
   it("ignores unicode comment field if the header comment is not set", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       comment: "",
     };
 
@@ -478,7 +480,7 @@ describe("readExtraFields()", () => {
   });
 
   it("throws if the unicode path field version is not 1", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       path: "hello world",
     };
 
@@ -496,7 +498,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read sizes from a Zip64 extended info field", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       compressedSize: 0xffff_ffff,
       uncompressedSize: 0xffff_ffff,
     };
@@ -515,7 +517,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read sizes and offset from a Zip64 extended info field", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       compressedSize: 0xffff_ffff,
       uncompressedSize: 0xffff_ffff,
       localHeaderOffset: 0xffff_ffff,
@@ -537,7 +539,7 @@ describe("readExtraFields()", () => {
   });
 
   it("throws if value in Zip64 extended info field is too large for Number", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       compressedSize: 0xffff_ffff,
     };
 
@@ -559,7 +561,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read three fields together", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       comment: "hello",
       path: "world",
       compressedSize: 0xffff_ffff,
@@ -597,7 +599,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can skip over unknown fields", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       compressedSize: 0xffff_ffff,
       uncompressedSize: 0xffff_ffff,
     };
@@ -620,7 +622,7 @@ describe("readExtraFields()", () => {
   });
 
   it("can read from the middle of a buffer", () => {
-    const entry: Partial<ZipEntryHeader> = {
+    const entry: Partial<DecodedCentralHeader> = {
       compressedSize: 0xffff_ffff,
       uncompressedSize: 0xffff_ffff,
     };
@@ -645,7 +647,7 @@ describe("readExtraFields()", () => {
 
 describe("getDirectoryHeaderLength()", () => {
   it("returns the sum of the fixed and variable field lengths", () => {
-    const entry: ZipEntryMeasurementFields = {
+    const entry: CentralHeaderLengthFields = {
       commentLength: 17,
       extraFieldLength: 23,
       pathLength: 47,

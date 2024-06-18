@@ -10,6 +10,7 @@ import {
   readDirectoryVariableFields,
 } from "../internal/directory-entry.js";
 import type { CompressionAlgorithms } from "../internal/field-types.js";
+import type { ZipReaderLike } from "../internal/interfaces.js";
 import { lazy } from "../internal/lazy.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import {
@@ -36,7 +37,7 @@ export type ZipReaderOptions = {
 /**
  * An object which can read a zip file from a {@link RandomAccessReader}.
  */
-export class ZipReader {
+export class ZipReader implements ZipReaderLike {
   /**
    * Create a new instance and call open().
    */

@@ -1,13 +1,13 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import type { ZipEntryCompressionInfo } from "../internal/directory-entry.js";
 import { ZipFormatError } from "../internal/errors.js";
 import {
   CompressionMethod,
   DosFileAttributes,
   UnixFileAttributes,
 } from "../internal/field-types.js";
+import type { CompressionInfoFields } from "../internal/records.js";
 import type { ByteStream } from "../internal/streams.js";
 import { asyncIterable } from "../testing/data.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
@@ -112,19 +112,6 @@ describe("base/entry-reader", () => {
       });
     });
 
-    describe("createReadableStream()", () => {
-      it("returns a ReadableStream for the uncompressedData", async () => {
-        const entry = new ZipEntryReader();
-        entry.uncompressedData = asyncIterable`Bonjour le monde !`;
-
-        const readableStream = entry.createReadableStream();
-        assert(readableStream instanceof ReadableStream);
-
-        const result = await text(readableStream);
-        assert.strictEqual(result, "Bonjour le monde !");
-      });
-    });
-
     describe("toBuffer()", () => {
       it("returns a UInt8Array for the uncompressedData", async () => {
         const entry = new ZipEntryReader();
@@ -134,6 +121,19 @@ describe("base/entry-reader", () => {
 
         const result = Buffer.from(buffer).toString();
         assert.strictEqual(result, "Hallo, Welt!");
+      });
+    });
+
+    describe("toReadableStream()", () => {
+      it("returns a ReadableStream for the uncompressedData", async () => {
+        const entry = new ZipEntryReader();
+        entry.uncompressedData = asyncIterable`Bonjour le monde !`;
+
+        const readableStream = entry.toReadableStream();
+        assert(readableStream instanceof ReadableStream);
+
+        const result = await text(readableStream);
+        assert.strictEqual(result, "Bonjour le monde !");
       });
     });
 
@@ -179,7 +179,7 @@ describe("base/entry-reader", () => {
 
   describe("decompress", () => {
     it("falls back to passing through the input for CompressionMethod.Stored", async () => {
-      const entry: ZipEntryCompressionInfo = {
+      const entry: CompressionInfoFields = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
@@ -193,7 +193,7 @@ describe("base/entry-reader", () => {
     });
 
     it("uses the correct algorithm", async () => {
-      const entry: ZipEntryCompressionInfo = {
+      const entry: CompressionInfoFields = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Deflate,
         compressedSize: 11,
@@ -216,7 +216,7 @@ describe("base/entry-reader", () => {
     });
 
     it("uses the passed algorithm if provided and compression method is Stored", async () => {
-      const entry: ZipEntryCompressionInfo = {
+      const entry: CompressionInfoFields = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
@@ -239,7 +239,7 @@ describe("base/entry-reader", () => {
     });
 
     it("throws if compressionMethod is unknown", () => {
-      const entry: ZipEntryCompressionInfo = {
+      const entry: CompressionInfoFields = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Deflate,
         compressedSize: 11,
@@ -262,7 +262,7 @@ describe("base/entry-reader", () => {
     });
 
     it("throws if uncompressedSize is wrong", () => {
-      const entry: ZipEntryCompressionInfo = {
+      const entry: CompressionInfoFields = {
         crc32: 222957957,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
@@ -280,7 +280,7 @@ describe("base/entry-reader", () => {
     });
 
     it("throws if crc32 is wrong", () => {
-      const entry: ZipEntryCompressionInfo = {
+      const entry: CompressionInfoFields = {
         crc32: 1,
         compressionMethod: CompressionMethod.Stored,
         compressedSize: 11,
