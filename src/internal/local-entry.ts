@@ -49,27 +49,16 @@ export function writeLocalHeader(
   const hasDataDescriptor = entry.flags.hasDataDescriptor;
   const zip64 = !!options?.zip64;
 
-  let extraField: Uint8Array;
+  let zip64ExtraField: Uint8Array | undefined;
   if (zip64) {
     // if there's a data descriptor _and_ zip64, then the header values are
     // set to ffffffff to indicate they're in the zip64 field, and the zip64
     // values are zeroed to indicate they're in the data descriptor, and in this
     // case the data descriptor values will be 64-bit
-    const zip64ExtraField = writeZip64ExtraField({
+    zip64ExtraField = writeZip64ExtraField({
       compressedSize: hasDataDescriptor ? 0 : entry.compressedSize,
       uncompressedSize: hasDataDescriptor ? 0 : entry.uncompressedSize,
     });
-    if (entry.extraField) {
-      extraField = new Uint8Array(
-        entry.extraField.length + zip64ExtraField.length,
-      );
-      extraField.set(entry.extraField);
-      extraField.set(zip64ExtraField, entry.extraField.length);
-    } else {
-      extraField = zip64ExtraField;
-    }
-  } else {
-    extraField = entry.extraField ?? new Uint8Array(0);
   }
 
   let sizeMask: number | undefined;
@@ -83,8 +72,11 @@ export function writeLocalHeader(
     sizeMask = 0;
   }
 
+  const extraFieldLength =
+    (entry.extraField?.byteLength ?? 0) + (zip64ExtraField?.byteLength ?? 0);
+
   const buffer = BufferView.alloc(
-    30 + entry.path.byteLength + extraField.byteLength,
+    30 + entry.path.byteLength + extraFieldLength,
   );
 
   buffer.writeUint32LE(LocalHeaderSignature, 0);
@@ -96,9 +88,21 @@ export function writeLocalHeader(
   buffer.writeUint32LE(sizeMask ?? entry.compressedSize, 18);
   buffer.writeUint32LE(sizeMask ?? entry.uncompressedSize, 22);
   buffer.writeUint16LE(entry.path.byteLength, 26);
-  buffer.writeUint16LE(extraField.byteLength, 28);
-  buffer.setBytes(30, entry.path);
-  buffer.setBytes(30 + entry.path.byteLength, extraField);
+  buffer.writeUint16LE(extraFieldLength, 28);
+
+  let offset = 30;
+
+  buffer.setBytes(offset, entry.path);
+  offset += entry.path.byteLength;
+
+  if (entry.extraField) {
+    buffer.setBytes(offset, entry.extraField);
+    offset += entry.extraField.byteLength;
+  }
+  if (zip64ExtraField) {
+    buffer.setBytes(offset, zip64ExtraField);
+    offset += zip64ExtraField.byteLength;
+  }
 
   return buffer.getOriginalBytes();
 }
