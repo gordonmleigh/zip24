@@ -212,10 +212,10 @@ describe("writeLocalHeader", () => {
       utf8`hello/world`, // file name
 
       // extra field
-      shortUint(1),
-      shortUint(16),
-      bigUint(4321),
-      bigUint(1234),
+      shortUint(1), // tag
+      shortUint(16), // data size
+      bigUint(4321), // uncompressed size
+      bigUint(1234), // compressed size
     );
 
     const result = writeLocalHeader(entry, { zip64: true });
@@ -255,10 +255,10 @@ describe("writeLocalHeader", () => {
       // extra field
       utf8`hello`,
 
-      shortUint(1),
-      shortUint(16),
-      bigUint(4321),
-      bigUint(1234),
+      shortUint(1), // tag
+      shortUint(16), // data size
+      bigUint(4321), // uncompressed size
+      bigUint(1234), // compressed size
     );
 
     const result = writeLocalHeader(entry, { zip64: true });
@@ -295,10 +295,10 @@ describe("writeLocalHeader", () => {
       utf8`hello/world`, // file name
 
       // extra field
-      shortUint(1),
-      shortUint(16),
-      bigUint(0),
-      bigUint(0),
+      shortUint(1), // tag
+      shortUint(16), // data size
+      bigUint(0), // uncompressed size
+      bigUint(0), // compressed size
     );
 
     const result = writeLocalHeader(entry, { zip64: true });
