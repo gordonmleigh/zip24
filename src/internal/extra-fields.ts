@@ -7,6 +7,7 @@ import {
   type CentralHeaderBase,
   type DecodedCentralHeader,
   type DecodedCentralHeaderWithLengths,
+  type Zip64ExtraField,
 } from "./records.js";
 
 export function readExtraFields(
@@ -136,4 +137,31 @@ export function readZip64ExtraField(
     entry.localHeaderOffset = view.readUint64LE(offset);
     offset += 8;
   }
+}
+
+export function writeZip64ExtraField(entry: Zip64ExtraField): Uint8Array {
+  // Zip64 Extended Information Extra Field (4.5.3):
+
+  // | offset | field                          | size |
+  // | ------ | ------------------------------ | ---- |
+  // | 0      | tag (0x0001)                   | 2    |
+  // | 2      | size                           | 2    |
+  // | 4      | uncompressed size (optional)   | 8    |
+  // | ...    | compressed size (optional)     | 8    |
+  // | ...    | local header offset (optional) | 8    |
+  // | ...    | disk number (optional)         | 4    |
+
+  const size = entry.localHeaderOffset === undefined ? 16 : 24;
+
+  const buffer = BufferView.alloc(4 + size);
+  buffer.writeUint16LE(0x0001, 0);
+  buffer.writeUint16LE(size, 2);
+  buffer.writeUint64LE(entry.uncompressedSize, 4);
+  buffer.writeUint64LE(entry.compressedSize, 12);
+
+  if (entry.localHeaderOffset !== undefined) {
+    buffer.writeUint64LE(entry.localHeaderOffset, 20);
+  }
+
+  return buffer.getOriginalBytes();
 }

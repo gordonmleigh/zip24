@@ -1,8 +1,24 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { cp437, data, utf8 } from "../testing/data.js";
+import {
+  bigUint,
+  cp437,
+  data,
+  dosDate,
+  hex,
+  longUint,
+  shortUint,
+  utf8,
+  utf8length,
+} from "../testing/data.js";
 import { ZipSignatureError } from "./errors.js";
-import { readLocalHeaderSize } from "./local-entry.js";
+import {
+  CompressionMethod,
+  GeneralPurposeFlags,
+  ZipVersion,
+} from "./field-types.js";
+import { readLocalHeaderSize, writeLocalHeader } from "./local-entry.js";
+import type { RawLocalHeader } from "./records.js";
 
 describe("readLocalHeaderSize", () => {
   it("throws if the signature is invalid", () => {
@@ -57,5 +73,236 @@ describe("readLocalHeaderSize", () => {
 
     const result = readLocalHeaderSize(buffer, 32);
     assert.strictEqual(result, 51);
+  });
+});
+
+describe("writeLocalHeader", () => {
+  it("writes all the basic fields", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawLocalHeader = {
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      path: utf8`hello/world`,
+      uncompressedSize: 4321,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x04034b50), // signature
+      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(1234), // compressed size
+      longUint(4321), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(0), // extra field length
+      utf8`hello/world`, // file name
+    );
+
+    const result = writeLocalHeader(entry);
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("includes the extra field data if given", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawLocalHeader = {
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      path: utf8`hello/world`,
+      uncompressedSize: 4321,
+      versionNeeded: ZipVersion.UtfEncoding,
+      extraField: utf8`random rubbish`,
+    };
+
+    const expected = hex(
+      longUint(0x04034b50), // signature
+      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(1234), // compressed size
+      longUint(4321), // uncompressed size
+      utf8length`hello/world`, // file name length
+      utf8length`random rubbish`, // extra field length
+      utf8`hello/world`, // file name
+      utf8`random rubbish`, // extra field
+    );
+
+    const result = writeLocalHeader(entry);
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("masks size and crc32 fields when hasDataDescriptor flag is set", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasDataDescriptor = true;
+
+    const entry: RawLocalHeader = {
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      path: utf8`hello/world`,
+      uncompressedSize: 4321,
+      versionNeeded: ZipVersion.UtfEncoding,
+      extraField: utf8`random rubbish`,
+    };
+
+    const expected = hex(
+      longUint(0x04034b50), // signature
+      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(8), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(0), // crc32
+      longUint(0), // compressed size
+      longUint(0), // uncompressed size
+      utf8length`hello/world`, // file name length
+      utf8length`random rubbish`, // extra field length
+      utf8`hello/world`, // file name
+      utf8`random rubbish`, // extra field
+    );
+
+    const result = writeLocalHeader(entry);
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("writes zip64 field when zip64 option is set", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawLocalHeader = {
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      path: utf8`hello/world`,
+      uncompressedSize: 4321,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x04034b50), // signature
+      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(0xffff_ffff), // compressed size
+      longUint(0xffff_ffff), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(20), // extra field length
+      utf8`hello/world`, // file name
+
+      // extra field
+      shortUint(1),
+      shortUint(16),
+      bigUint(4321),
+      bigUint(1234),
+    );
+
+    const result = writeLocalHeader(entry, { zip64: true });
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("appends zip64 field to existing extraField when zip64 option is set", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawLocalHeader = {
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      extraField: utf8`hello`,
+      flags,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      path: utf8`hello/world`,
+      uncompressedSize: 4321,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x04034b50), // signature
+      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(0xffff_ffff), // compressed size
+      longUint(0xffff_ffff), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(25), // extra field length
+      utf8`hello/world`, // file name
+
+      // extra field
+      utf8`hello`,
+
+      shortUint(1),
+      shortUint(16),
+      bigUint(4321),
+      bigUint(1234),
+    );
+
+    const result = writeLocalHeader(entry, { zip64: true });
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("writes masked zip64 field when zip64 option and hasDataDescriptor flag is set", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasDataDescriptor = true;
+
+    const entry: RawLocalHeader = {
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      path: utf8`hello/world`,
+      uncompressedSize: 4321,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x04034b50), // signature
+      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(8), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(0), // crc32
+      longUint(0xffff_ffff), // compressed size
+      longUint(0xffff_ffff), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(20), // extra field length
+      utf8`hello/world`, // file name
+
+      // extra field
+      shortUint(1),
+      shortUint(16),
+      bigUint(0),
+      bigUint(0),
+    );
+
+    const result = writeLocalHeader(entry, { zip64: true });
+
+    assert.strictEqual(hex(result), expected);
   });
 });

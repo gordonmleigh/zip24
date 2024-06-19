@@ -1,11 +1,12 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { data } from "../testing/data.js";
+import { data, hex } from "../testing/data.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   readExtraFields,
   readUnicodeExtraField,
   readZip64ExtraField,
+  writeZip64ExtraField,
 } from "./extra-fields.js";
 import type { DecodedCentralHeader } from "./records.js";
 
@@ -355,6 +356,44 @@ describe("readZip64ExtraField", () => {
       (error) =>
         error instanceof ZipFormatError &&
         error.message === "Zip64 field not long enough",
+    );
+  });
+});
+
+describe("writeZip64ExtraField", () => {
+  it("writes uncompressedSize and compressedSize", () => {
+    const result = writeZip64ExtraField({
+      uncompressedSize: 0xcba987654321,
+      compressedSize: 0x123456789abc,
+    });
+
+    assert.strictEqual(
+      hex(result),
+      hex(
+        "0100", // tag: Zip64 extended information extra field
+        "1000", // size
+        "21436587a9cb0000", // uncompressed size
+        "bc9a785634120000", // compressed size
+      ),
+    );
+  });
+
+  it("writes uncompressedSize, compressedSize and localHeaderOffset", () => {
+    const result = writeZip64ExtraField({
+      uncompressedSize: 0xcba987654321,
+      compressedSize: 0x123456789abc,
+      localHeaderOffset: 0xffffffeeeeee,
+    });
+
+    assert.strictEqual(
+      hex(result),
+      hex(
+        "0100", // tag: Zip64 extended information extra field
+        "1800", // size
+        "21436587a9cb0000", // uncompressed size
+        "bc9a785634120000", // compressed size
+        "eeeeeeffffff0000", // local header offset
+      ),
     );
   });
 });

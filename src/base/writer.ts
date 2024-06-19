@@ -18,6 +18,7 @@ import {
   makePlatformAttributes,
   type CompressionAlgorithms,
 } from "../internal/field-types.js";
+import { writeLocalHeader } from "../internal/local-entry.js";
 import type {
   CompressionInfoFields,
   DataDescriptor,
@@ -32,7 +33,6 @@ import {
   CentralHeaderSignature,
   DataDescriptorSignature,
   EndOfCentralDirectorySignature,
-  LocalHeaderSignature,
   Zip64EocdlSignature,
   Zip64EocdrSignature,
 } from "../internal/signatures.js";
@@ -41,11 +41,6 @@ import {
   iterableFromReadableStream,
   mapIterable,
 } from "../internal/streams.js";
-
-type PublicEntryFields = Omit<
-  DecodedCentralHeader,
-  "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
->;
 import { defaultCompressors } from "./compression.js";
 
 export type ZipEntryOptions = {
@@ -61,6 +56,11 @@ export type ZipEntryData =
   | AsyncIterable<Uint8Array>
   // eslint-disable-next-line n/no-unsupported-features/node-builtins
   | ReadableStream<Uint8Array>;
+
+type PublicEntryFields = Omit<
+  DecodedCentralHeader,
+  "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
+>;
 
 type ZipEntryInternalOptions = ZipEntryOptions & {
   hasDataDescriptor?: boolean;
@@ -138,11 +138,10 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
       lastModified: file.lastModified ?? new Date(),
       path: encoder.encode(file.path),
       uncompressedSize: file.uncompressedSize ?? 0,
-      platformMadeBy: platform,
-      versionMadeBy: version,
+      versionNeeded: version,
     };
 
-    await this.writeLocalHeader(localHeader, options);
+    await this.buffer.write(writeLocalHeader(localHeader, { zip64 }));
 
     const dataDescriptor = await this.writeFileData(
       { ...file, compressionMethod: localHeader.compressionMethod },
@@ -158,7 +157,8 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
       comment: encoder.encode(file.comment),
       localHeaderOffset,
       internalAttributes: 0,
-      versionNeeded: version,
+      platformMadeBy: platform,
+      versionMadeBy: version,
     };
 
     this.zip64 ||= zip64;
@@ -190,61 +190,6 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
       zip64,
       fileComment,
     );
-  }
-
-  private async writeLocalHeader(
-    entry: RawLocalHeader,
-    options: ZipEntryInternalOptions,
-  ): Promise<void> {
-    // Local File Header (4.3.7)
-    //
-    // | offset | field                     | size |
-    // | ------ | ------------------------- | ---- |
-    // | 0      | signature (0x04034b50)    | 4    |
-    // | 4      | version needed to extract | 2    |
-    // | 6      | general purpose bit flag  | 2    |
-    // | 8      | compression method        | 2    |
-    // | 10     | last mod file time        | 2    |
-    // | 12     | last mod file date        | 2    |
-    // | 14     | crc-32                    | 4    |
-    // | 18     | compressed size           | 4    |
-    // | 22     | uncompressed size         | 4    |
-    // | 26     | file name length          | 2    |
-    // | 28     | extra field length        | 2    |
-    // | 30     | file name                 | ...  |
-    // | ...    | extra field               | ...  |
-
-    const { zip64, hasDataDescriptor } = options;
-
-    // set the mask values according to the options
-    const dataDescriptorMask = hasDataDescriptor ? 0 : undefined;
-    const zip64Mask = zip64 ? 0xffff_ffff : dataDescriptorMask;
-
-    const extraField = zip64
-      ? this.makeZip64ExtraField({
-          compressedSize: dataDescriptorMask ?? entry.compressedSize,
-          uncompressedSize: dataDescriptorMask ?? entry.uncompressedSize,
-        })
-      : new Uint8Array(0);
-
-    const buffer = BufferView.alloc(
-      30 + entry.path.byteLength + extraField.byteLength,
-    );
-
-    buffer.writeUint32LE(LocalHeaderSignature, 0);
-    buffer.writeUint16LE(entry.versionMadeBy, 4);
-    buffer.writeUint16LE(entry.flags.value, 6);
-    buffer.writeUint16LE(entry.compressionMethod, 8);
-    buffer.writeUint32LE(new DosDate(entry.lastModified).getDosDateTime(), 10);
-    buffer.writeUint32LE(dataDescriptorMask ?? entry.crc32, 14);
-    buffer.writeUint32LE(zip64Mask ?? entry.compressedSize, 18);
-    buffer.writeUint32LE(zip64Mask ?? entry.uncompressedSize, 22);
-    buffer.writeUint16LE(entry.path.byteLength, 26);
-    buffer.writeUint16LE(extraField.byteLength, 28);
-    buffer.setBytes(30, entry.path);
-    buffer.setBytes(30 + entry.path.byteLength, extraField);
-
-    await this.buffer.write(buffer.getOriginalBytes());
   }
 
   private async writeDirectoryHeader(entry: InternalHeader): Promise<void> {

@@ -13,9 +13,8 @@ export type LocalHeaderBase = {
   crc32: number;
   flags: GeneralPurposeFlags;
   lastModified: Date;
-  platformMadeBy: ZipPlatform;
+  versionNeeded: ZipVersion;
   uncompressedSize: number;
-  versionMadeBy: ZipVersion;
 };
 
 export type RawLocalHeader = LocalHeaderBase & {

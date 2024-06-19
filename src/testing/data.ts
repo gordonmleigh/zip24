@@ -64,9 +64,16 @@ export function crc32(
   return longUint(computeCrc32(utf8(literals, ...values)));
 }
 
-export function data(...hex: (string | Uint8Array)[]): Uint8Array {
+export function data(...values: (string | Uint8Array)[]): Uint8Array {
   return Buffer.concat(
-    hex.map((x) => (typeof x === "string" ? Buffer.from(x, "hex") : x)),
+    values.map((value) => {
+      if (typeof value === "string") {
+        const noWhitespace = value.replaceAll(/\s/g, "");
+        assert(/^[\da-f]*$/.test(noWhitespace), `not a hex string: ${value}`);
+        return Buffer.from(noWhitespace, "hex");
+      }
+      return value;
+    }),
   );
 }
 
@@ -94,6 +101,26 @@ export function dosDate(
     "must be a valid ISO timestamp with second precision",
   );
   return longUint(new DosDate(dateString).getDosDateTime());
+}
+
+export function hex(...parts: (string | Uint8Array)[]): string {
+  const buffer = data(...parts);
+  let output = "";
+
+  // format in single bytes in groups of 8 to help debugging
+  for (let byte = 0; byte < buffer.byteLength; ++byte) {
+    // we know it's in bounds because the for loop checks
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    output += buffer[byte]!.toString(16).padStart(2, "0");
+
+    if ((byte + 1) % 8 === 0) {
+      output += "    ";
+    } else if (byte + 1 < buffer.byteLength) {
+      output += " ";
+    }
+  }
+
+  return output;
 }
 
 export function longUint(value: number): Uint8Array {
