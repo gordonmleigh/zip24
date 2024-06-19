@@ -378,8 +378,8 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     // | offset | field                        | size |
     // | ------ | ---------------------------- | ---- |
     // | 0      | signature (0x07064b50)       | 4    |
-    // | 4      | central directory start disk | 4    |
-    // | 8      | central directory offset     | 8    |
+    // | 4      | start disk of Zip64 EOCDR    | 4    |
+    // | 8      | offset of Zip64 EOCDR        | 8    |
     // | 16     | total number of disks        | 4    |
     // | 20     | (end)                        |      |
 

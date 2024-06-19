@@ -51,8 +51,8 @@ describe("readEocdr", () => {
       "010203abcdef0000", // central directory offset
 
       "504b0607", // EOCDL signature (0x07064b50)
-      "00000000", // central directory start disk
-      "2000000001000000", // central directory offset
+      "00000000", // start disk of Zip64 EOCDR
+      "2000000001000000", // offset of Zip64 EOCDR
       "01000000", // total number of disks
 
       "504b0506", // EOCDR signature (0x06054b50)
@@ -85,8 +85,8 @@ describe("readEocdr", () => {
   it("returns the offset and length when the EOCDR64 is not in the buffer", () => {
     const buffer = data(
       "504b0607", // EOCDL signature (0x07064b50)
-      "00000000", // central directory start disk
-      "20ff000000000000", // central directory offset
+      "00000000", // start disk of Zip64 EOCDR
+      "20ff000000000000", // offset of Zip64 EOCDR
       "01000000", // total number of disks
 
       "504b0506", // EOCDR signature (0x06054b50)
@@ -145,8 +145,8 @@ describe("readEocdr", () => {
   it("throws if EOCDL has more than one disk", () => {
     const buffer = data(
       "504b0607", // EOCDL signature (0x07064b50)
-      "00000000", // central directory start disk
-      "20ff000000000000", // central directory offset
+      "00000000", // start disk of Zip64 EOCDR
+      "20ff000000000000", // offset of Zip64 EOCDR
       "02000000", // total number of disks
 
       "504b0506", // EOCDR signature (0x06054b50)
@@ -212,8 +212,8 @@ describe("readEocdr", () => {
       "010203abcdef0000", // central directory offset
 
       "504b0607", // EOCDL signature (0x07064b50)
-      "00000000", // central directory start disk
-      "20ff000000000000", // central directory offset
+      "00000000", // start disk of Zip64 EOCDR
+      "20ff000000000000", // offset of Zip64 EOCDR
       "01000000", // total number of disks
 
       "504b0506", // EOCDR signature (0x06054b50)

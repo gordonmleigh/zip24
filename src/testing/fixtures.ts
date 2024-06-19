@@ -309,8 +309,8 @@ export async function* generateZip(
 
     const eocdlChunk = data(
       longUint(0x07064b50), // EOCDL signature
-      longUint(0), // central directory start disk
-      bigUint(eocdrOffset), // central directory offset
+      longUint(0), // start disk of Zip64 EOCDR
+      bigUint(eocdrOffset), // offset of Zip64 EOCDR
       longUint(1), // total number of disks
     );
 
