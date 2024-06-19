@@ -46,6 +46,7 @@ type PublicEntryFields = Omit<
   DecodedCentralHeader,
   "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
 >;
+import { defaultCompressors } from "./compression.js";
 
 export type ZipEntryOptions = {
   utf8?: boolean;
@@ -68,7 +69,7 @@ type ZipEntryInternalOptions = ZipEntryOptions & {
 type InternalHeader = RawCentralHeader & { zip64?: boolean };
 
 export type ZipWriterOptions = {
-  compressors: CompressionAlgorithms;
+  compressors?: CompressionAlgorithms;
   highWaterMark?: number;
   startingOffset?: number;
 };
@@ -82,12 +83,12 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
 
   private zip64 = false;
 
-  public constructor(options: ZipWriterOptions) {
+  public constructor(options: ZipWriterOptions = {}) {
     const { compressors, highWaterMark = 0xa000, startingOffset = 0 } = options;
 
     // the buffer stores outgoing data chunks
     this.buffer = new DoubleEndedBuffer(new ByteLengthStrategy(highWaterMark));
-    this.compressors = compressors;
+    this.compressors = compressors ?? defaultCompressors;
     this.startingOffset = startingOffset;
   }
 
