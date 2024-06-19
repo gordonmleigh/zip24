@@ -6,4 +6,7 @@ export const Zip64EocdlSignature = 0x07064b50;
 export const Zip64EocdrSignature = 0x06064b50;
 
 export const CentralHeaderLength = 46;
+export const EndOfCentralDirectoryLength = 22;
+export const Zip64EocdlLength = 20;
+export const Zip64EocdrLength = 56;
 export const LocalHeaderLength = 30;

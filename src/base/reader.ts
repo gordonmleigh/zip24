@@ -1,8 +1,7 @@
 import { assert } from "../internal/assert.js";
 import {
-  readEocdr,
   readZip64Eocdr,
-  type CentralDirectory,
+  readZipTrailer,
 } from "../internal/central-directory.js";
 import {
   getDirectoryHeaderLength,
@@ -13,9 +12,11 @@ import type { CompressionAlgorithms } from "../internal/field-types.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
 import { lazy } from "../internal/lazy.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
+import type { CentralDirectory } from "../internal/records.js";
 import {
   CentralHeaderLength,
   LocalHeaderLength,
+  Zip64EocdrLength,
 } from "../internal/signatures.js";
 import {
   iterableFromRandomAccessReader,
@@ -159,27 +160,23 @@ export class ZipReader implements ZipReaderLike {
     const readResult = await this.reader.read({ buffer, position });
     assert(readResult.bytesRead === bufferSize, `unexpected end of file`);
 
-    this.directory = {
-      comment: "",
-      count: 0,
-      offset: 0,
-      size: 0,
-    };
-    const result = readEocdr(this.directory, buffer, position);
+    const result = readZipTrailer(buffer, position);
+    this.directory = result.directory;
 
     if (!result.ok) {
       // we didn't manage to read the zip64 eocdr within the original buffer
       const readResult = await this.reader.read({
         buffer,
         position: result.eocdr64Offset,
-        length: result.byteLength,
+        length: Zip64EocdrLength,
       });
 
       assert(
-        readResult.bytesRead === result.byteLength,
+        readResult.bytesRead === Zip64EocdrLength,
         `unexpected end of file`,
       );
-      readZip64Eocdr(this.directory, buffer, 0);
+
+      readZip64Eocdr(this.directory, buffer);
     }
   });
 }

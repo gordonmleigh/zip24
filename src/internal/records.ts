@@ -22,6 +22,22 @@ export type RawLocalHeader = LocalHeaderBase & {
   path: Uint8Array;
 };
 
+export type CentralDirectory = {
+  comment: string;
+  count: number;
+  offset: number;
+  size: number;
+  zip64?: CentralDirectory64VersionInfo;
+};
+
+export type CentralDirectory64 = Required<CentralDirectory>;
+
+export type CentralDirectory64VersionInfo = {
+  platformMadeBy: ZipPlatform;
+  versionMadeBy: ZipVersion;
+  versionNeeded: ZipVersion;
+};
+
 export type CentralHeaderBase = {
   attributes: DosFileAttributes | UnixFileAttributes;
   flags: GeneralPurposeFlags;

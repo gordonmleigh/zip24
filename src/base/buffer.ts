@@ -1,9 +1,6 @@
 import { assert } from "../internal/assert.js";
 import { BufferView, type BufferLike } from "../internal/binary.js";
-import {
-  readEocdr,
-  type CentralDirectory,
-} from "../internal/central-directory.js";
+import { readZipTrailer } from "../internal/central-directory.js";
 import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
@@ -11,6 +8,7 @@ import {
 import type { CompressionAlgorithms } from "../internal/field-types.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
+import type { CentralDirectory } from "../internal/records.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader, decompress } from "./entry-reader.js";
 
@@ -47,14 +45,9 @@ export class ZipBufferReader implements ZipReaderLike {
     this.buffer = new BufferView(buffer);
     this.decompressors = options.decompressors ?? defaultDecompressors;
 
-    this.directory = {
-      comment: "",
-      count: 0,
-      offset: 0,
-      size: 0,
-    };
-    const { ok } = readEocdr(this.directory, buffer, 0);
-    assert(ok, `expected to find EOCDR in buffer`);
+    const result = readZipTrailer(buffer);
+    assert(result.ok, `expected to find EOCDR in buffer`);
+    this.directory = result.directory;
   }
 
   /**
