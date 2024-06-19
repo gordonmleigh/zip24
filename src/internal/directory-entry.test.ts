@@ -1,10 +1,22 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { cp437, data, utf8 } from "../testing/data.js";
+import {
+  bigUint,
+  cp437,
+  data,
+  dosDate,
+  hex,
+  longUint,
+  shortUint,
+  tinyUint,
+  utf8,
+  utf8length,
+} from "../testing/data.js";
 import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
   readDirectoryVariableFields,
+  writeDirectoryHeader,
 } from "./directory-entry.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
@@ -12,10 +24,11 @@ import {
   DosDate,
   DosFileAttributes,
   GeneralPurposeFlags,
+  UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
 } from "./field-types.js";
-import type { CentralHeaderLengthFields } from "./records.js";
+import type { CentralHeaderLengthFields, RawCentralHeader } from "./records.js";
 
 describe("readDirectoryEntry()", () => {
   it("throws if the signature is invalid", () => {
@@ -412,5 +425,253 @@ describe("getDirectoryHeaderLength()", () => {
 
     const result = getDirectoryHeaderLength(entry);
     assert.strictEqual(result, 133);
+  });
+});
+
+describe("writeDirectoryHeader", () => {
+  it("writes all the basic fields", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawCentralHeader = {
+      attributes: new UnixFileAttributes(0o10_755),
+      comment: utf8`the file comment`,
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      internalAttributes: 0,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      localHeaderOffset: 298374,
+      path: utf8`hello/world`,
+      platformMadeBy: ZipPlatform.UNIX,
+      uncompressedSize: 4321,
+      versionMadeBy: ZipVersion.Zip64,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x02014b50), // signature
+      tinyUint(ZipVersion.Zip64), // version made by
+      tinyUint(ZipPlatform.UNIX), // platform made by
+      shortUint(ZipVersion.Zip64), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(1234), // compressed size
+      longUint(4321), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(0), // extra field length
+      utf8length`the file comment`, // file comment length
+      shortUint(0), // disk number start
+      shortUint(0), // internal file attributes
+      longUint((0o10_755 << 16) >>> 0), // external file attributes
+      longUint(298374), // relative offset of local header
+      utf8`hello/world`, // file name
+      "", // extra field
+      utf8`the file comment`, // file comment
+    );
+
+    const result = writeDirectoryHeader(entry);
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("throws if the attributes and platform don't match", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawCentralHeader = {
+      attributes: new UnixFileAttributes(0o10_755),
+      comment: utf8`the file comment`,
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      internalAttributes: 0,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      localHeaderOffset: 298374,
+      path: utf8`hello/world`,
+      platformMadeBy: ZipPlatform.DOS,
+      uncompressedSize: 4321,
+      versionMadeBy: ZipVersion.Zip64,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    assert.throws(
+      () => writeDirectoryHeader(entry),
+      (error) =>
+        error instanceof TypeError &&
+        error.message ===
+          "the attributes value and platformMadeBy must correlate",
+    );
+  });
+
+  it("includes the extra field data if given", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawCentralHeader = {
+      attributes: new UnixFileAttributes(0o10_755),
+      comment: utf8`the file comment`,
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      extraField: utf8`random rubbish`,
+      flags,
+      internalAttributes: 0,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      localHeaderOffset: 298374,
+      path: utf8`hello/world`,
+      platformMadeBy: ZipPlatform.UNIX,
+      uncompressedSize: 4321,
+      versionMadeBy: ZipVersion.Zip64,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x02014b50), // signature
+      tinyUint(ZipVersion.Zip64), // version made by
+      tinyUint(ZipPlatform.UNIX), // platform made by
+      shortUint(ZipVersion.Zip64), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(1234), // compressed size
+      longUint(4321), // uncompressed size
+      utf8length`hello/world`, // file name length
+      utf8length`random rubbish`, // extra field length
+      utf8length`the file comment`, // file comment length
+      shortUint(0), // disk number start
+      shortUint(0), // internal file attributes
+      longUint((0o10_755 << 16) >>> 0), // external file attributes
+      longUint(298374), // relative offset of local header
+      utf8`hello/world`, // file name
+      utf8`random rubbish`, // extra field
+      utf8`the file comment`, // file comment
+    );
+
+    const result = writeDirectoryHeader(entry);
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("writes zip64 field when zip64 option is set", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawCentralHeader = {
+      attributes: new UnixFileAttributes(0o10_755),
+      comment: utf8`the file comment`,
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      flags,
+      internalAttributes: 0,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      localHeaderOffset: 298374,
+      path: utf8`hello/world`,
+      platformMadeBy: ZipPlatform.UNIX,
+      uncompressedSize: 4321,
+      versionMadeBy: ZipVersion.Zip64,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x02014b50), // signature
+      tinyUint(ZipVersion.Zip64), // version made by
+      tinyUint(ZipPlatform.UNIX), // platform made by
+      shortUint(ZipVersion.Zip64), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(0xffff_ffff), // compressed size
+      longUint(0xffff_ffff), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(28), // extra field length
+      utf8length`the file comment`, // file comment length
+      shortUint(0), // disk number start
+      shortUint(0), // internal file attributes
+      longUint((0o10_755 << 16) >>> 0), // external file attributes
+      longUint(0xffff_ffff), // relative offset of local header
+      utf8`hello/world`, // file name
+
+      // extra field
+      shortUint(1), // tag
+      shortUint(24), // data size
+      bigUint(4321), // uncompressed size
+      bigUint(1234), // compressed size
+      bigUint(298374), // relative offset of local header
+
+      // file comment
+      utf8`the file comment`,
+    );
+
+    const result = writeDirectoryHeader(entry, { zip64: true });
+
+    assert.strictEqual(hex(result), expected);
+  });
+
+  it("appends zip64 field to existing extraField when zip64 option is set", () => {
+    const flags = new GeneralPurposeFlags();
+    flags.hasUtf8Strings = true;
+
+    const entry: RawCentralHeader = {
+      attributes: new UnixFileAttributes(0o10_755),
+      comment: utf8`the file comment`,
+      compressedSize: 1234,
+      compressionMethod: CompressionMethod.Deflate,
+      crc32: 9087345,
+      extraField: utf8`hello world`,
+      flags,
+      internalAttributes: 0,
+      lastModified: new Date("2021-11-15T13:15:22Z"),
+      localHeaderOffset: 298374,
+      path: utf8`hello/world`,
+      platformMadeBy: ZipPlatform.UNIX,
+      uncompressedSize: 4321,
+      versionMadeBy: ZipVersion.Zip64,
+      versionNeeded: ZipVersion.UtfEncoding,
+    };
+
+    const expected = hex(
+      longUint(0x02014b50), // signature
+      tinyUint(ZipVersion.Zip64), // version made by
+      tinyUint(ZipPlatform.UNIX), // platform made by
+      shortUint(ZipVersion.Zip64), // version needed to extract
+      shortUint(0x800), // flags
+      shortUint(CompressionMethod.Deflate), // compression method
+      dosDate`2021-11-15T13:15:22Z`, // last modified
+      longUint(9087345), // crc32
+      longUint(0xffff_ffff), // compressed size
+      longUint(0xffff_ffff), // uncompressed size
+      utf8length`hello/world`, // file name length
+      shortUint(39), // extra field length
+      utf8length`the file comment`, // file comment length
+      shortUint(0), // disk number start
+      shortUint(0), // internal file attributes
+      longUint((0o10_755 << 16) >>> 0), // external file attributes
+      longUint(0xffff_ffff), // relative offset of local header
+      utf8`hello/world`, // file name
+
+      // extra fields
+      utf8`hello world`,
+
+      shortUint(1), // tag
+      shortUint(24), // data size
+      bigUint(4321), // uncompressed size
+      bigUint(1234), // compressed size
+      bigUint(298374), // relative offset of local header
+
+      // file comment
+      utf8`the file comment`,
+    );
+
+    const result = writeDirectoryHeader(entry, { zip64: true });
+
+    assert.strictEqual(hex(result), expected);
   });
 });

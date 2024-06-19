@@ -5,13 +5,13 @@ import {
   canBeCodePage437Encoded,
 } from "../internal/cp437.js";
 import { computeCrc32 } from "../internal/crc32.js";
+import { writeDirectoryHeader } from "../internal/directory-entry.js";
 import {
   ByteLengthStrategy,
   DoubleEndedBuffer,
 } from "../internal/double-ended-buffer.js";
 import {
   CompressionMethod,
-  DosDate,
   GeneralPurposeFlags,
   ZipPlatform,
   ZipVersion,
@@ -29,8 +29,6 @@ import type {
 } from "../internal/records.js";
 import { Semaphore } from "../internal/semaphore.js";
 import {
-  CentralHeaderLength,
-  CentralHeaderSignature,
   DataDescriptorSignature,
   EndOfCentralDirectorySignature,
   Zip64EocdlSignature,
@@ -168,8 +166,8 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   private async writeCentralDirectory(fileComment?: string): Promise<void> {
     const directoryOffset = this.startingOffset + this.buffer.written;
 
-    for (const entry of this.directory) {
-      await this.writeDirectoryHeader(entry);
+    for (const { zip64, ...entry } of this.directory) {
+      await this.buffer.write(writeDirectoryHeader(entry, { zip64 }));
     }
 
     const fileSize = this.startingOffset + this.buffer.written;
@@ -190,74 +188,6 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
       zip64,
       fileComment,
     );
-  }
-
-  private async writeDirectoryHeader(entry: InternalHeader): Promise<void> {
-    // Central Directory Header (4.3.12)
-    //
-    // | offset | field                           | size |
-    // | ------ | ------------------------------- | ---- |
-    // | 0      | signature (0x02014b50)          | 4    |
-    // | 4      | version made by                 | 2    |
-    // | 6      | version needed to extract       | 2    |
-    // | 8      | general purpose bit flag        | 2    |
-    // | 10     | compression method              | 2    |
-    // | 12     | last mod file time              | 2    |
-    // | 14     | last mod file date              | 2    |
-    // | 16     | crc-32                          | 4    |
-    // | 20     | compressed size                 | 4    |
-    // | 24     | uncompressed size               | 4    |
-    // | 28     | file name length                | 2    |
-    // | 30     | extra field length              | 2    |
-    // | 32     | file comment length             | 2    |
-    // | 34     | disk number start               | 2    |
-    // | 36     | internal file attributes        | 2    |
-    // | 38     | external file attributes        | 4    |
-    // | 42     | relative offset of local header | 4    |
-    // | 46     | file name (variable size)       |      |
-    // |        | extra field (variable size)     |      |
-    // |        | file comment (variable size)    |      |
-
-    // if zip64 is enabled then some values should be masked in the header
-    const zip64Mask = entry.zip64 ? 0xffff_ffff : undefined;
-
-    const extraField = entry.zip64
-      ? this.makeZip64ExtraField(entry)
-      : new Uint8Array(0);
-
-    const buffer = BufferView.alloc(
-      CentralHeaderLength +
-        entry.path.byteLength +
-        extraField.byteLength +
-        entry.comment.byteLength,
-    );
-
-    buffer.writeUint32LE(CentralHeaderSignature, 0);
-    buffer.writeUint8(entry.versionMadeBy, 4);
-    buffer.writeUint8(entry.platformMadeBy, 5);
-    buffer.writeUint16LE(entry.versionMadeBy, 6);
-    buffer.writeUint16LE(entry.flags.value, 8);
-    buffer.writeUint16LE(entry.compressionMethod, 10);
-    buffer.writeUint32LE(new DosDate(entry.lastModified).getDosDateTime(), 12);
-    buffer.writeUint32LE(entry.crc32, 16);
-    buffer.writeUint32LE(zip64Mask ?? entry.compressedSize, 20);
-    buffer.writeUint32LE(zip64Mask ?? entry.uncompressedSize, 24);
-    buffer.writeUint16LE(entry.path.byteLength, 28);
-    buffer.writeUint16LE(extraField?.byteLength ?? 0, 30);
-    buffer.writeUint16LE(entry.comment.byteLength, 32);
-    buffer.writeUint16LE(0, 34); // disk number start
-    buffer.writeUint16LE(entry.internalAttributes, 36); // internal file attributes
-    buffer.writeUint32LE(entry.attributes.rawValue, 38);
-    buffer.writeUint32LE(zip64Mask ?? entry.localHeaderOffset, 42);
-    buffer.setBytes(46, entry.path);
-    buffer.setBytes(46 + entry.path.byteLength, extraField);
-
-    buffer.setBytes(
-      46 + entry.path.byteLength + extraField.byteLength,
-      entry.comment,
-    );
-
-    await this.buffer.write(buffer.getOriginalBytes());
   }
 
   private async writeFileData(

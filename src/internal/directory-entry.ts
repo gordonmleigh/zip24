@@ -1,10 +1,11 @@
 import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { ZipSignatureError } from "./errors.js";
-import { readExtraFields } from "./extra-fields.js";
+import { readExtraFields, writeZip64ExtraField } from "./extra-fields.js";
 import {
   DosDate,
   GeneralPurposeFlags,
+  isPlatformAttributes,
   makePlatformAttributes,
 } from "./field-types.js";
 import type {
@@ -12,6 +13,7 @@ import type {
   CentralHeaderFixedFields,
   CentralHeaderLengthFields,
   DecodedCentralHeaderWithLengths,
+  RawCentralHeader,
 } from "./records.js";
 import { CentralHeaderLength, CentralHeaderSignature } from "./signatures.js";
 
@@ -138,4 +140,95 @@ export function readDirectoryVariableFields(
     CentralHeaderLength + entry.pathLength,
     entry.extraFieldLength,
   );
+}
+
+export type CentralHeaderOptions = {
+  zip64?: boolean;
+};
+
+export function writeDirectoryHeader(
+  entry: RawCentralHeader,
+  options?: CentralHeaderOptions,
+): Uint8Array {
+  // Central Directory Header (4.3.12)
+  //
+  // | offset | field                           | size |
+  // | ------ | ------------------------------- | ---- |
+  // | 0      | signature (0x02014b50)          | 4    |
+  // | 4      | version made by                 | 2    |
+  // | 6      | version needed to extract       | 2    |
+  // | 8      | general purpose bit flag        | 2    |
+  // | 10     | compression method              | 2    |
+  // | 12     | last mod file time              | 2    |
+  // | 14     | last mod file date              | 2    |
+  // | 16     | crc-32                          | 4    |
+  // | 20     | compressed size                 | 4    |
+  // | 24     | uncompressed size               | 4    |
+  // | 28     | file name length                | 2    |
+  // | 30     | extra field length              | 2    |
+  // | 32     | file comment length             | 2    |
+  // | 34     | disk number start               | 2    |
+  // | 36     | internal file attributes        | 2    |
+  // | 38     | external file attributes        | 4    |
+  // | 42     | relative offset of local header | 4    |
+  // | 46     | file name (variable size)       |      |
+  // |        | extra field (variable size)     |      |
+  // |        | file comment (variable size)    |      |
+
+  const zip64 = !!options?.zip64;
+
+  let zip64ExtraField: Uint8Array | undefined;
+  if (zip64) {
+    zip64ExtraField = writeZip64ExtraField(entry);
+  }
+
+  const extraFieldLength =
+    (entry.extraField?.byteLength ?? 0) + (zip64ExtraField?.byteLength ?? 0);
+
+  const buffer = BufferView.alloc(
+    46 + entry.path.byteLength + extraFieldLength + entry.comment.byteLength,
+  );
+
+  if (!isPlatformAttributes(entry.platformMadeBy, entry.attributes)) {
+    throw new TypeError(
+      `the attributes value and platformMadeBy must correlate`,
+    );
+  }
+
+  buffer.writeUint32LE(CentralHeaderSignature, 0);
+  buffer.writeUint8(entry.versionMadeBy, 4);
+  buffer.writeUint8(entry.platformMadeBy, 5);
+  buffer.writeUint16LE(entry.versionMadeBy, 6);
+  buffer.writeUint16LE(entry.flags.value, 8);
+  buffer.writeUint16LE(entry.compressionMethod, 10);
+  buffer.writeUint32LE(new DosDate(entry.lastModified).getDosDateTime(), 12);
+  buffer.writeUint32LE(entry.crc32, 16);
+  buffer.writeUint32LE(zip64 ? 0xffff_ffff : entry.compressedSize, 20);
+  buffer.writeUint32LE(zip64 ? 0xffff_ffff : entry.uncompressedSize, 24);
+  buffer.writeUint16LE(entry.path.byteLength, 28);
+  buffer.writeUint16LE(extraFieldLength, 30);
+  buffer.writeUint16LE(entry.comment.byteLength, 32);
+  buffer.writeUint16LE(0, 34); // disk number start
+  buffer.writeUint16LE(entry.internalAttributes, 36); // internal file attributes
+  buffer.writeUint32LE(entry.attributes.rawValue, 38);
+  buffer.writeUint32LE(zip64 ? 0xffff_ffff : entry.localHeaderOffset, 42);
+
+  let offset = 46;
+
+  buffer.setBytes(offset, entry.path);
+  offset += entry.path.byteLength;
+
+  if (entry.extraField) {
+    buffer.setBytes(offset, entry.extraField);
+    offset += entry.extraField.byteLength;
+  }
+  if (zip64ExtraField) {
+    buffer.setBytes(offset, zip64ExtraField);
+    offset += zip64ExtraField.byteLength;
+  }
+
+  buffer.setBytes(offset, entry.comment);
+  offset += entry.comment.byteLength;
+
+  return buffer.getOriginalBytes();
 }

@@ -229,6 +229,17 @@ export function makePlatformAttributes(
   return instance;
 }
 
+export function isPlatformAttributes<P extends ZipPlatform>(
+  platform: P,
+  attributes: unknown,
+): attributes is PlatformAttributes[P] {
+  const ctor = PlatformAttributes[platform];
+  if (!ctor) {
+    throw new ZipFormatError(`unknown platform ${platform}`);
+  }
+  return attributes instanceof ctor;
+}
+
 /**
  * An extension to the {@link Date} class to support DOS-encoded values.
  */

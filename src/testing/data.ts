@@ -135,6 +135,12 @@ export function shortUint(value: number): Uint8Array {
   return buffer;
 }
 
+export function tinyUint(value: number): Uint8Array {
+  const buffer = Buffer.alloc(1);
+  buffer.writeUint8(value);
+  return buffer;
+}
+
 export function utf8(
   literals: TemplateStringsArray,
   ...values: unknown[]
