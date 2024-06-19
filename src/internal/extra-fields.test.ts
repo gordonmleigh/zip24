@@ -4,8 +4,8 @@ import { data } from "../testing/data.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   readExtraFields,
-  readUnicodeField,
-  readZip64Field,
+  readUnicodeExtraField,
+  readZip64ExtraField,
 } from "./extra-fields.js";
 import type { DecodedCentralHeader } from "./records.js";
 
@@ -95,7 +95,7 @@ describe.skip("readExtraFields()", () => {
   });
 });
 
-describe("readUnicodeField", () => {
+describe("readUnicodeExtraField", () => {
   it("can read a unicode comment field", () => {
     const entry: Partial<DecodedCentralHeader> = {
       comment: "hello world",
@@ -109,7 +109,7 @@ describe("readUnicodeField", () => {
       "414243", // data: ABC
     );
 
-    readUnicodeField(entry, buffer);
+    readUnicodeExtraField(entry, buffer);
 
     assert.strictEqual(entry.comment, "ABC");
   });
@@ -127,7 +127,7 @@ describe("readUnicodeField", () => {
       "414243", // data: ABC
     );
 
-    readUnicodeField(entry, buffer);
+    readUnicodeExtraField(entry, buffer);
 
     assert.strictEqual(entry.path, "ABC");
   });
@@ -145,7 +145,7 @@ describe("readUnicodeField", () => {
       "414243", // data: ABC
     );
 
-    readUnicodeField(entry, buffer);
+    readUnicodeExtraField(entry, buffer);
 
     assert.strictEqual(entry.path, "hello world");
   });
@@ -163,7 +163,7 @@ describe("readUnicodeField", () => {
       "414243", // data: ABC
     );
 
-    readUnicodeField(entry, buffer);
+    readUnicodeExtraField(entry, buffer);
 
     assert.strictEqual(entry.comment, "");
   });
@@ -183,7 +183,7 @@ describe("readUnicodeField", () => {
 
     assert.throws(
       () => {
-        readUnicodeField(entry, buffer);
+        readUnicodeExtraField(entry, buffer);
       },
       (error) =>
         error instanceof ZipSignatureError &&
@@ -206,7 +206,7 @@ describe("readUnicodeField", () => {
 
     assert.throws(
       () => {
-        readUnicodeField(entry, buffer);
+        readUnicodeExtraField(entry, buffer);
       },
       (error) =>
         error instanceof ZipFormatError &&
@@ -215,7 +215,7 @@ describe("readUnicodeField", () => {
   });
 });
 
-describe("readZip64Field", () => {
+describe("readZip64ExtraField", () => {
   it("can read sizes from a Zip64 extended info field", () => {
     const entry: Partial<DecodedCentralHeader> = {
       compressedSize: 0xffff_ffff,
@@ -229,7 +229,7 @@ describe("readZip64Field", () => {
       "0605040302010000", // compressed size
     );
 
-    readZip64Field(entry, buffer);
+    readZip64ExtraField(entry, buffer);
 
     assert.strictEqual(entry.uncompressedSize, 0x060504030201);
     assert.strictEqual(entry.compressedSize, 0x010203040506);
@@ -250,7 +250,7 @@ describe("readZip64Field", () => {
       "0302010302010000", // local header offset
     );
 
-    readZip64Field(entry, buffer);
+    readZip64ExtraField(entry, buffer);
 
     assert.strictEqual(entry.uncompressedSize, 0x060504030201);
     assert.strictEqual(entry.compressedSize, 0x010203040506);
@@ -270,7 +270,7 @@ describe("readZip64Field", () => {
 
     assert.throws(
       () => {
-        readZip64Field(entry, buffer);
+        readZip64ExtraField(entry, buffer);
       },
       // number loses precision so we use a regexp to match the error message
       (error) =>
@@ -284,7 +284,7 @@ describe("readZip64Field", () => {
   it("throws if the tag is not valid", () => {
     assert.throws(
       () => {
-        readZip64Field(
+        readZip64ExtraField(
           {},
           data(
             "0200", // tag
@@ -302,7 +302,7 @@ describe("readZip64Field", () => {
   it("throws if the field isn't long enough", () => {
     assert.throws(
       () => {
-        readZip64Field(
+        readZip64ExtraField(
           {
             uncompressedSize: 0xffff_ffff,
           },
@@ -319,7 +319,7 @@ describe("readZip64Field", () => {
 
     assert.throws(
       () => {
-        readZip64Field(
+        readZip64ExtraField(
           {
             uncompressedSize: 0xffff_ffff,
             compressedSize: 0xffff_ffff,
@@ -338,7 +338,7 @@ describe("readZip64Field", () => {
 
     assert.throws(
       () => {
-        readZip64Field(
+        readZip64ExtraField(
           {
             uncompressedSize: 0xffff_ffff,
             compressedSize: 0xffff_ffff,

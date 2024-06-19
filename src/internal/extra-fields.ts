@@ -29,11 +29,11 @@ export function readExtraFields(
     switch (tag) {
       case ExtendedDataTag.UnicodeCommentField:
       case ExtendedDataTag.UnicodePathField:
-        readUnicodeField(entry, view, offset);
+        readUnicodeExtraField(entry, view, offset);
         break;
 
       case ExtendedDataTag.Zip64ExtendedInfo:
-        readZip64Field(entry, view, offset);
+        readZip64ExtraField(entry, view, offset);
         break;
     }
 
@@ -41,7 +41,7 @@ export function readExtraFields(
   }
 }
 
-export function readUnicodeField(
+export function readUnicodeExtraField(
   entry: Partial<DecodedCentralHeader>,
   buffer: BufferLike,
   bufferOffset = 0,
@@ -90,7 +90,7 @@ export function readUnicodeField(
   }
 }
 
-export function readZip64Field(
+export function readZip64ExtraField(
   entry: Partial<CentralHeaderBase>,
   buffer: BufferLike,
   bufferOffset = 0,
