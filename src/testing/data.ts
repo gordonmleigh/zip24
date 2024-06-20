@@ -102,26 +102,6 @@ export function fromHex(value: string): Buffer {
   return Buffer.from(noWhitespace, "hex");
 }
 
-export function hex(...parts: (string | Uint8Array)[]): string {
-  const buffer = data(...parts);
-  let output = "";
-
-  // format in single bytes in groups of 8 to help debugging
-  for (let byte = 0; byte < buffer.byteLength; ++byte) {
-    // we know it's in bounds because the for loop checks
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    output += buffer[byte]!.toString(16).padStart(2, "0");
-
-    if ((byte + 1) % 8 === 0) {
-      output += "    ";
-    } else if (byte + 1 < buffer.byteLength) {
-      output += " ";
-    }
-  }
-
-  return output;
-}
-
 export function longUint(value: number): Uint8Array {
   const buffer = Buffer.alloc(4);
   buffer.writeUint32LE(value);

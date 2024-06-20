@@ -1,3 +1,4 @@
+/* c8 ignore start */
 import assert, { AssertionError } from "node:assert";
 import { hexDiff } from "./display.js";
 

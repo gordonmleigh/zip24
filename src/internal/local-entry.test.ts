@@ -1,13 +1,13 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
+import { assertBufferEqual } from "../testing/assert.js";
 import {
   asyncIterable,
   bigUint,
   cp437,
   data,
   dosDate,
-  hex,
   longUint,
   shortUint,
   utf8,
@@ -24,13 +24,8 @@ import {
   readLocalHeaderSize,
   writeLocalHeader,
 } from "./local-entry.js";
-import type {
-  CompressionInfoFields,
-  RawLocalHeader,
-} from "./records.js";
-import { 
-  type ByteStream,
-} from "./streams.js";
+import type { CompressionInfoFields, RawLocalHeader } from "./records.js";
+import type { ByteStream } from "./streams.js";
 
 describe("readLocalHeaderSize", () => {
   it("throws if the signature is invalid", () => {
@@ -225,7 +220,7 @@ describe("writeLocalHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x04034b50), // signature
       shortUint(ZipVersion.UtfEncoding), // version needed to extract
       shortUint(0x800), // flags
@@ -241,7 +236,7 @@ describe("writeLocalHeader", () => {
 
     const result = writeLocalHeader(entry);
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("includes the extra field data if given", () => {
@@ -260,7 +255,7 @@ describe("writeLocalHeader", () => {
       extraField: utf8`random rubbish`,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x04034b50), // signature
       shortUint(ZipVersion.UtfEncoding), // version needed to extract
       shortUint(0x800), // flags
@@ -277,7 +272,7 @@ describe("writeLocalHeader", () => {
 
     const result = writeLocalHeader(entry);
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("masks size and crc32 fields when hasDataDescriptor flag is set", () => {
@@ -296,7 +291,7 @@ describe("writeLocalHeader", () => {
       extraField: utf8`random rubbish`,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x04034b50), // signature
       shortUint(ZipVersion.UtfEncoding), // version needed to extract
       shortUint(8), // flags
@@ -313,7 +308,7 @@ describe("writeLocalHeader", () => {
 
     const result = writeLocalHeader(entry);
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("writes zip64 field when zip64 option is set", () => {
@@ -331,7 +326,7 @@ describe("writeLocalHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x04034b50), // signature
       shortUint(ZipVersion.UtfEncoding), // version needed to extract
       shortUint(0x800), // flags
@@ -353,7 +348,7 @@ describe("writeLocalHeader", () => {
 
     const result = writeLocalHeader(entry, { zip64: true });
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("appends zip64 field to existing extraField when zip64 option is set", () => {
@@ -372,7 +367,7 @@ describe("writeLocalHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x04034b50), // signature
       shortUint(ZipVersion.UtfEncoding), // version needed to extract
       shortUint(0x800), // flags
@@ -396,7 +391,7 @@ describe("writeLocalHeader", () => {
 
     const result = writeLocalHeader(entry, { zip64: true });
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("writes masked zip64 field when zip64 option and hasDataDescriptor flag is set", () => {
@@ -414,7 +409,7 @@ describe("writeLocalHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x04034b50), // signature
       shortUint(ZipVersion.UtfEncoding), // version needed to extract
       shortUint(8), // flags
@@ -436,6 +431,6 @@ describe("writeLocalHeader", () => {
 
     const result = writeLocalHeader(entry, { zip64: true });
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 });

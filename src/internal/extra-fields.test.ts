@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { data, hex } from "../testing/data.js";
+import { assertBufferEqual } from "../testing/assert.js";
+import { data } from "../testing/data.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   readExtraFields,
@@ -367,9 +368,9 @@ describe("writeZip64ExtraField", () => {
       compressedSize: 0x123456789abc,
     });
 
-    assert.strictEqual(
-      hex(result),
-      hex(
+    assertBufferEqual(
+      result,
+      data(
         "0100", // tag: Zip64 extended information extra field
         "1000", // size
         "21436587a9cb0000", // uncompressed size
@@ -385,9 +386,9 @@ describe("writeZip64ExtraField", () => {
       localHeaderOffset: 0xffffffeeeeee,
     });
 
-    assert.strictEqual(
-      hex(result),
-      hex(
+    assertBufferEqual(
+      result,
+      data(
         "0100", // tag: Zip64 extended information extra field
         "1800", // size
         "21436587a9cb0000", // uncompressed size

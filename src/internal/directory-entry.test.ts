@@ -1,11 +1,11 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
+import { assertBufferEqual } from "../testing/assert.js";
 import {
   bigUint,
   cp437,
   data,
   dosDate,
-  hex,
   longUint,
   shortUint,
   tinyUint,
@@ -450,7 +450,7 @@ describe("writeDirectoryHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x02014b50), // signature
       tinyUint(ZipVersion.Zip64), // version made by
       tinyUint(ZipPlatform.UNIX), // platform made by
@@ -475,7 +475,7 @@ describe("writeDirectoryHeader", () => {
 
     const result = writeDirectoryHeader(entry);
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("throws if the attributes and platform don't match", () => {
@@ -530,7 +530,7 @@ describe("writeDirectoryHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x02014b50), // signature
       tinyUint(ZipVersion.Zip64), // version made by
       tinyUint(ZipPlatform.UNIX), // platform made by
@@ -555,7 +555,7 @@ describe("writeDirectoryHeader", () => {
 
     const result = writeDirectoryHeader(entry);
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("writes zip64 field when zip64 option is set", () => {
@@ -579,7 +579,7 @@ describe("writeDirectoryHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x02014b50), // signature
       tinyUint(ZipVersion.Zip64), // version made by
       tinyUint(ZipPlatform.UNIX), // platform made by
@@ -612,7 +612,7 @@ describe("writeDirectoryHeader", () => {
 
     const result = writeDirectoryHeader(entry, { zip64: true });
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 
   it("appends zip64 field to existing extraField when zip64 option is set", () => {
@@ -637,7 +637,7 @@ describe("writeDirectoryHeader", () => {
       versionNeeded: ZipVersion.UtfEncoding,
     };
 
-    const expected = hex(
+    const expected = data(
       longUint(0x02014b50), // signature
       tinyUint(ZipVersion.Zip64), // version made by
       tinyUint(ZipPlatform.UNIX), // platform made by
@@ -672,6 +672,6 @@ describe("writeDirectoryHeader", () => {
 
     const result = writeDirectoryHeader(entry, { zip64: true });
 
-    assert.strictEqual(hex(result), expected);
+    assertBufferEqual(result, expected);
   });
 });
