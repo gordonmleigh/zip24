@@ -8,10 +8,10 @@ import {
   readDirectoryHeader,
   readDirectoryVariableFields,
 } from "../internal/directory-entry.js";
+import { asyncDisposeOrClose } from "../internal/disposable.js";
 import type { CompressionAlgorithms } from "../internal/field-types.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
 import { lazy } from "../internal/lazy.js";
-import { readLocalHeaderSize } from "../internal/local-entry.js";
 import {
   decompressEntry,
   readLocalHeaderSize,
@@ -26,6 +26,7 @@ import {
   iterableFromRandomAccessReader,
   type RandomAccessReader,
 } from "../internal/streams.js";
+import type { Constructor } from "../internal/type-utils.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader } from "./entry-reader.js";
 
@@ -42,15 +43,16 @@ export type ZipReaderOptions = {
 /**
  * An object which can read a zip file from a {@link RandomAccessReader}.
  */
-export class ZipReader implements ZipReaderLike {
+export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
   /**
    * Create a new instance and call open().
    */
-  public static async fromReader(
+  public static async fromReader<Instance extends ZipReader>(
+    this: Constructor<Instance>,
     reader: RandomAccessReader,
     fileSize: number,
     options?: ZipReaderOptions,
-  ): Promise<ZipReader> {
+  ): Promise<Instance> {
     const instance = new this(reader, fileSize, options);
     await instance.open();
     return instance;
@@ -95,6 +97,27 @@ export class ZipReader implements ZipReaderLike {
    */
   public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader> {
     return this.files();
+  }
+
+  /**
+   * Close the underlying reader.
+   */
+  public [Symbol.dispose](): void {
+    void this.close();
+  }
+
+  /**
+   * Close the underlying reader.
+   */
+  public async [Symbol.asyncDispose](): Promise<void> {
+    await this.close();
+  }
+
+  /**
+   * Close the underlying reader.
+   */
+  public async close(): Promise<void> {
+    await asyncDisposeOrClose(this.reader);
   }
 
   /**

@@ -19,6 +19,7 @@ export type RandomAccessReadResult = {
 };
 
 export type RandomAccessReader = {
+  close?: () => void | PromiseLike<void>;
   read: (
     options: RandomAccessReadOptions,
   ) => PromiseLike<RandomAccessReadResult>;

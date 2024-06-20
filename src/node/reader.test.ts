@@ -135,7 +135,7 @@ describe("node/reader", () => {
         const filePath = ".local/test-ZipReader-open.zip";
         await writeFile(filePath, data);
 
-        const reader = await ZipReader.open(filePath);
+        await using reader = await ZipReader.open(filePath);
 
         let fileIndex = 0;
         for await (const file of reader) {

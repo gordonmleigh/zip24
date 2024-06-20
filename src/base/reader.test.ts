@@ -7,7 +7,10 @@ import {
   ZipPlatform,
   ZipVersion,
 } from "../internal/field-types.js";
-import { randomAccessReaderFromBuffer } from "../internal/streams.js";
+import {
+  randomAccessReaderFromBuffer,
+  type RandomAccessReader,
+} from "../internal/streams.js";
 import {
   EmptyZip32,
   Zip32WithThreeEntries,
@@ -274,6 +277,60 @@ describe("base/reader", () => {
         assert.strictEqual(result[0], files[0]);
         assert.strictEqual(result[1], files[1]);
       });
+    });
+
+    describe("close()", () => {
+      it("closes the underlying reader", async () => {
+        let hasWaited = false;
+
+        const close = mock.fn(async () => {
+          await Promise.resolve();
+          hasWaited = true;
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+        const reader: RandomAccessReader = { close } as any;
+        const zipReader = new ZipReader(reader, 0);
+
+        await zipReader.close();
+
+        assert.strictEqual(close.mock.callCount(), 1);
+        assert.strictEqual(hasWaited, true);
+      });
+    });
+  });
+
+  describe("[Symbol.asyncDispose]()", () => {
+    it("closes the underlying reader", async () => {
+      let hasWaited = false;
+
+      const close = mock.fn(async () => {
+        await Promise.resolve();
+        hasWaited = true;
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      const reader: RandomAccessReader = { close } as any;
+      const zipReader = new ZipReader(reader, 0);
+
+      await zipReader[Symbol.asyncDispose]();
+
+      assert.strictEqual(close.mock.callCount(), 1);
+      assert.strictEqual(hasWaited, true);
+    });
+  });
+
+  describe("[Symbol.dispose]()", () => {
+    it("closes the underlying reader", () => {
+      const close = mock.fn();
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      const reader: RandomAccessReader = { close } as any;
+      const zipReader = new ZipReader(reader, 0);
+
+      zipReader[Symbol.dispose]();
+
+      assert.strictEqual(close.mock.callCount(), 1);
     });
   });
 });
