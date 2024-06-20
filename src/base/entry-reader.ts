@@ -1,5 +1,3 @@
-import { computeCrc32 } from "../internal/crc32.js";
-import { ZipFormatError } from "../internal/errors.js";
 import {
   CompressionMethod,
   DosFileAttributes,
@@ -7,10 +5,8 @@ import {
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
-  type CompressionAlgorithms,
 } from "../internal/field-types.js";
 import type { ZipEntryLike } from "../internal/interfaces.js";
-import type { CompressionInfoFields } from "../internal/records.js";
 import {
   bufferFromIterable,
   readableStreamFromIterable,
@@ -74,40 +70,5 @@ export class ZipEntryReader implements ZipEntryLike {
 
   public async *[Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
     yield* this.uncompressedData;
-  }
-}
-
-export async function* decompress(
-  entry: CompressionInfoFields,
-  input: ByteStream,
-  decompressors: CompressionAlgorithms,
-): AsyncGenerator<Uint8Array> {
-  const decompressor = decompressors[entry.compressionMethod];
-  let output: ByteStream;
-
-  if (decompressor) {
-    output = decompressor(input);
-  } else if (entry.compressionMethod === CompressionMethod.Stored) {
-    output = input;
-  } else {
-    throw new ZipFormatError(
-      `unknown compression method ${(entry.compressionMethod as number).toString(16)}`,
-    );
-  }
-
-  let checkCrc32 = 0;
-  let bytesRead = 0;
-
-  for await (const chunk of output) {
-    checkCrc32 = computeCrc32(chunk, checkCrc32);
-    bytesRead += chunk.byteLength;
-    yield chunk;
-  }
-
-  if (bytesRead !== entry.uncompressedSize) {
-    throw new ZipFormatError(`zip file is corrupt (file size mismatch)`);
-  }
-  if (checkCrc32 !== entry.crc32) {
-    throw new ZipFormatError(`zip file is corrupt (crc32 mismatch)`);
   }
 }

@@ -1,16 +1,12 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
-import { describe, it, mock } from "node:test";
-import { ZipFormatError } from "../internal/errors.js";
+import { describe, it } from "node:test";
 import {
-  CompressionMethod,
   DosFileAttributes,
   UnixFileAttributes,
 } from "../internal/field-types.js";
-import type { CompressionInfoFields } from "../internal/records.js";
-import type { ByteStream } from "../internal/streams.js";
 import { asyncIterable } from "../testing/data.js";
-import { ZipEntryReader, decompress } from "./entry-reader.js";
+import { ZipEntryReader } from "./entry-reader.js";
 
 describe("base/entry-reader", () => {
   describe("ZipEntryReader", () => {
@@ -174,127 +170,6 @@ describe("base/entry-reader", () => {
         assert.strictEqual(result5.done, true);
         assert.strictEqual(result5.value, undefined);
       });
-    });
-  });
-
-  describe("decompress", () => {
-    it("falls back to passing through the input for CompressionMethod.Stored", async () => {
-      const entry: CompressionInfoFields = {
-        crc32: 222957957,
-        compressionMethod: CompressionMethod.Stored,
-        compressedSize: 11,
-        uncompressedSize: 11,
-      };
-
-      const input = asyncIterable`hello world`;
-
-      const output = await text(decompress(entry, input, {}));
-      assert.strictEqual(output, "hello world");
-    });
-
-    it("uses the correct algorithm", async () => {
-      const entry: CompressionInfoFields = {
-        crc32: 222957957,
-        compressionMethod: CompressionMethod.Deflate,
-        compressedSize: 11,
-        uncompressedSize: 11,
-      };
-
-      // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-      const algorithm = mock.fn(async function* (input: ByteStream) {
-        yield Buffer.from("hello world");
-      });
-
-      const input = asyncIterable`hello fred`;
-
-      const output = await text(
-        decompress(entry, input, {
-          [CompressionMethod.Deflate]: algorithm,
-        }),
-      );
-      assert.strictEqual(output, "hello world");
-    });
-
-    it("uses the passed algorithm if provided and compression method is Stored", async () => {
-      const entry: CompressionInfoFields = {
-        crc32: 222957957,
-        compressionMethod: CompressionMethod.Stored,
-        compressedSize: 11,
-        uncompressedSize: 11,
-      };
-
-      // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-      const algorithm = mock.fn(async function* (input: ByteStream) {
-        yield Buffer.from("hello world");
-      });
-
-      const input = asyncIterable`hello fred`;
-
-      const output = await text(
-        decompress(entry, input, {
-          [CompressionMethod.Stored]: algorithm,
-        }),
-      );
-      assert.strictEqual(output, "hello world");
-    });
-
-    it("throws if compressionMethod is unknown", () => {
-      const entry: CompressionInfoFields = {
-        crc32: 222957957,
-        compressionMethod: CompressionMethod.Deflate,
-        compressedSize: 11,
-        uncompressedSize: 11,
-      };
-
-      // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-      const algorithm = mock.fn(async function* (input: ByteStream) {
-        yield Buffer.from("hello world");
-      });
-
-      const input = asyncIterable`hello fred`;
-
-      assert.rejects(
-        text(decompress(entry, input, {})),
-        (error) =>
-          error instanceof ZipFormatError &&
-          error.message === `unknown compression method 8`,
-      );
-    });
-
-    it("throws if uncompressedSize is wrong", () => {
-      const entry: CompressionInfoFields = {
-        crc32: 222957957,
-        compressionMethod: CompressionMethod.Stored,
-        compressedSize: 11,
-        uncompressedSize: 22,
-      };
-
-      const input = asyncIterable`hello world`;
-
-      assert.rejects(
-        text(decompress(entry, input, {})),
-        (error) =>
-          error instanceof ZipFormatError &&
-          error.message === `zip file is corrupt (file size mismatch)`,
-      );
-    });
-
-    it("throws if crc32 is wrong", () => {
-      const entry: CompressionInfoFields = {
-        crc32: 1,
-        compressionMethod: CompressionMethod.Stored,
-        compressedSize: 11,
-        uncompressedSize: 11,
-      };
-
-      const input = asyncIterable`hello world`;
-
-      assert.rejects(
-        text(decompress(entry, input, {})),
-        (error) =>
-          error instanceof ZipFormatError &&
-          error.message === `zip file is corrupt (crc32 mismatch)`,
-      );
     });
   });
 });

@@ -7,10 +7,13 @@ import {
 } from "../internal/directory-entry.js";
 import type { CompressionAlgorithms } from "../internal/field-types.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
-import { readLocalHeaderSize } from "../internal/local-entry.js";
+import {
+  decompressEntry,
+  readLocalHeaderSize,
+} from "../internal/local-entry.js";
 import type { CentralDirectory } from "../internal/records.js";
 import { defaultDecompressors } from "./compression.js";
-import { ZipEntryReader, decompress } from "./entry-reader.js";
+import { ZipEntryReader } from "./entry-reader.js";
 
 /**
  * Options for {@link ZipBufferEntryReader}.
@@ -71,7 +74,7 @@ export class ZipBufferReader implements ZipReaderLike {
         entry.compressedSize,
       );
 
-      entry.uncompressedData = decompress(
+      entry.uncompressedData = decompressEntry(
         entry,
         [compressedData],
         this.decompressors,

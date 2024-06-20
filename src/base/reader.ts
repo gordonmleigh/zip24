@@ -12,6 +12,10 @@ import type { CompressionAlgorithms } from "../internal/field-types.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
 import { lazy } from "../internal/lazy.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
+import {
+  decompressEntry,
+  readLocalHeaderSize,
+} from "../internal/local-entry.js";
 import type { CentralDirectory } from "../internal/records.js";
 import {
   CentralHeaderLength,
@@ -23,7 +27,7 @@ import {
   type RandomAccessReader,
 } from "../internal/streams.js";
 import { defaultDecompressors } from "./compression.js";
-import { ZipEntryReader, decompress } from "./entry-reader.js";
+import { ZipEntryReader } from "./entry-reader.js";
 
 const DefaultBufferSize = 1024 ** 2;
 
@@ -202,7 +206,7 @@ function getData(
     [Symbol.asyncIterator]: async function* (): AsyncGenerator<Uint8Array> {
       const position = await getDataOffset();
 
-      yield* decompress(
+      yield* decompressEntry(
         entry,
         iterableFromRandomAccessReader(reader, {
           position,

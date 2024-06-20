@@ -1,9 +1,15 @@
 import { BufferView, type BufferLike } from "./binary.js";
-import { ZipSignatureError } from "./errors.js";
+import { computeCrc32 } from "./crc32.js";
+import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import { writeZip64ExtraField } from "./extra-fields.js";
-import { DosDate } from "./field-types.js";
-import type { RawLocalHeader } from "./records.js";
+import {
+  CompressionMethod,
+  DosDate,
+  type CompressionAlgorithms,
+} from "./field-types.js";
+import type { CompressionInfoFields, RawLocalHeader } from "./records.js";
 import { LocalHeaderSignature } from "./signatures.js";
+import type { ByteStream } from "./streams.js";
 
 export type LocalHeaderOptions = {
   zip64?: boolean;
@@ -40,6 +46,41 @@ export function readLocalHeaderSize(
   const fileNameLength = view.readUint16LE(26);
   const extraFieldLength = view.readUint16LE(28);
   return 30 + fileNameLength + extraFieldLength;
+}
+
+export async function* decompressEntry(
+  entry: CompressionInfoFields,
+  input: ByteStream,
+  decompressors: CompressionAlgorithms,
+): AsyncGenerator<Uint8Array> {
+  const decompressor = decompressors[entry.compressionMethod];
+  let output: ByteStream;
+
+  if (decompressor) {
+    output = decompressor(input);
+  } else if (entry.compressionMethod === CompressionMethod.Stored) {
+    output = input;
+  } else {
+    throw new ZipFormatError(
+      `unknown compression method ${(entry.compressionMethod as number).toString(16)}`,
+    );
+  }
+
+  let checkCrc32 = 0;
+  let bytesRead = 0;
+
+  for await (const chunk of output) {
+    checkCrc32 = computeCrc32(chunk, checkCrc32);
+    bytesRead += chunk.byteLength;
+    yield chunk;
+  }
+
+  if (bytesRead !== entry.uncompressedSize) {
+    throw new ZipFormatError(`zip file is corrupt (file size mismatch)`);
+  }
+  if (checkCrc32 !== entry.crc32) {
+    throw new ZipFormatError(`zip file is corrupt (crc32 mismatch)`);
+  }
 }
 
 export function writeLocalHeader(
