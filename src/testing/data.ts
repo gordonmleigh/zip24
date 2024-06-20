@@ -66,14 +66,7 @@ export function crc32(
 
 export function data(...values: (string | Uint8Array)[]): Uint8Array {
   return Buffer.concat(
-    values.map((value) => {
-      if (typeof value === "string") {
-        const noWhitespace = value.replaceAll(/\s/g, "");
-        assert(/^[\da-f]*$/.test(noWhitespace), `not a hex string: ${value}`);
-        return Buffer.from(noWhitespace, "hex");
-      }
-      return value;
-    }),
+    values.map((value) => (typeof value === "string" ? fromHex(value) : value)),
   );
 }
 
@@ -101,6 +94,12 @@ export function dosDate(
     "must be a valid ISO timestamp with second precision",
   );
   return longUint(new DosDate(dateString).getDosDateTime());
+}
+
+export function fromHex(value: string): Buffer {
+  const noWhitespace = value.replaceAll(/\s/g, "");
+  assert(/^[\da-f]*$/.test(noWhitespace), `not a hex string: ${value}`);
+  return Buffer.from(noWhitespace, "hex");
 }
 
 export function hex(...parts: (string | Uint8Array)[]): string {
