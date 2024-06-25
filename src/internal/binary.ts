@@ -164,7 +164,28 @@ export class BufferView extends DataView {
 }
 
 export class BitField {
-  private valueInternal: number;
+  public static flag(bit: number, width = 32): number {
+    this.validateWidth(width);
+
+    if (!Number.isInteger(bit)) {
+      throw new TypeError(`bit must be an integer`);
+    }
+    if (bit < 0 || bit >= width) {
+      throw new RangeError(`can't index bit ${bit} of ${width} bit field`);
+    }
+    return (1 << bit) >>> 0;
+  }
+
+  private static validateWidth(width: number): void {
+    if (!Number.isInteger(width)) {
+      throw new TypeError(`width must be an integer`);
+    }
+    if (width < 0 || width > 32) {
+      throw new RangeError(`BitFields must be 32 bits or less`);
+    }
+  }
+
+  private valueInternal = 0;
 
   public get value(): number {
     return this.valueInternal;
@@ -183,40 +204,16 @@ export class BitField {
     public readonly width = 16,
     value = 0,
   ) {
-    this.valueInternal = value;
-    if (!Number.isInteger(width)) {
-      throw new TypeError(`width must be an integer`);
-    }
-    if (width < 0 || width > 32) {
-      throw new RangeError(`BitFields must be 32 bits or less`);
-    }
-    if (!Number.isInteger(value)) {
-      throw new TypeError(`value must be an integer`);
-    }
-    if (value < 0 || value >= 2 ** width) {
-      throw new RangeError(`value must be within width`);
-    }
+    BitField.validateWidth(width);
+    this.value = value;
   }
 
   public getBit(bit: number): boolean {
-    if (!Number.isInteger(bit)) {
-      throw new TypeError(`bit must be an integer`);
-    }
-    if (bit < 0 || bit >= this.width) {
-      throw new RangeError(`can't get bit ${bit} of ${this.width} bit field`);
-    }
-    return (this.value & (1 << bit)) !== 0;
+    return (this.value & BitField.flag(bit, this.width)) !== 0;
   }
 
   public setBit(bit: number, value: boolean): void {
-    if (!Number.isInteger(bit)) {
-      throw new TypeError(`bit must be an integer`);
-    }
-    if (bit < 0 || bit >= this.width) {
-      throw new RangeError(`can't get bit ${bit} of ${this.width} bit field`);
-    }
-
-    const bitMask = 1 << bit;
+    const bitMask = BitField.flag(bit, this.width);
     if (value) {
       this.value |= bitMask;
     } else {

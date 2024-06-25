@@ -1,5 +1,6 @@
 import assert from "node:assert";
-import { text } from "node:stream/consumers";
+import { Readable } from "node:stream";
+import { buffer, text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { assertBufferEqual } from "../testing/assert.js";
 import {
@@ -13,6 +14,7 @@ import {
   utf8,
   utf8length,
 } from "../testing/data.js";
+import { makeNonIterableReadableStream } from "../testing/util.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   CompressionMethod,
@@ -20,12 +22,24 @@ import {
   ZipVersion,
 } from "./field-types.js";
 import {
+  compressEntry,
   decompressEntry,
+  normalizeEntryData,
   readLocalHeaderSize,
+  writeDataDescriptor32,
+  writeDataDescriptor64,
   writeLocalHeader,
 } from "./local-entry.js";
-import type { CompressionInfoFields, RawLocalHeader } from "./records.js";
-import type { ByteStream } from "./streams.js";
+import type {
+  CompressionInfoFields,
+  DataDescriptor,
+  RawLocalHeader,
+} from "./records.js";
+import {
+  bufferFromIterable,
+  getAsyncIterator,
+  type ByteStream,
+} from "./streams.js";
 
 describe("readLocalHeaderSize", () => {
   it("throws if the signature is invalid", () => {
@@ -144,7 +158,7 @@ describe("decompressEntry", () => {
     assert.strictEqual(output, "hello world");
   });
 
-  it("throws if compressionMethod is unknown", () => {
+  it("throws if compressionMethod is unknown", async () => {
     const entry: CompressionInfoFields = {
       crc32: 222957957,
       compressionMethod: CompressionMethod.Deflate,
@@ -152,14 +166,9 @@ describe("decompressEntry", () => {
       uncompressedSize: 11,
     };
 
-    // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-    const algorithm = mock.fn(async function* (input: ByteStream) {
-      yield Buffer.from("hello world");
-    });
-
     const input = asyncIterable`hello fred`;
 
-    assert.rejects(
+    await assert.rejects(
       text(decompressEntry(entry, input, {})),
       (error) =>
         error instanceof ZipFormatError &&
@@ -167,7 +176,7 @@ describe("decompressEntry", () => {
     );
   });
 
-  it("throws if uncompressedSize is wrong", () => {
+  it("throws if uncompressedSize is wrong", async () => {
     const entry: CompressionInfoFields = {
       crc32: 222957957,
       compressionMethod: CompressionMethod.Stored,
@@ -177,7 +186,7 @@ describe("decompressEntry", () => {
 
     const input = asyncIterable`hello world`;
 
-    assert.rejects(
+    await assert.rejects(
       text(decompressEntry(entry, input, {})),
       (error) =>
         error instanceof ZipFormatError &&
@@ -185,7 +194,7 @@ describe("decompressEntry", () => {
     );
   });
 
-  it("throws if crc32 is wrong", () => {
+  it("throws if crc32 is wrong", async () => {
     const entry: CompressionInfoFields = {
       crc32: 1,
       compressionMethod: CompressionMethod.Stored,
@@ -195,7 +204,7 @@ describe("decompressEntry", () => {
 
     const input = asyncIterable`hello world`;
 
-    assert.rejects(
+    await assert.rejects(
       text(decompressEntry(entry, input, {})),
       (error) =>
         error instanceof ZipFormatError &&
@@ -217,12 +226,12 @@ describe("writeLocalHeader", () => {
       lastModified: new Date("2021-11-15T13:15:22Z"),
       path: utf8`hello/world`,
       uncompressedSize: 4321,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
       longUint(0x04034b50), // signature
-      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(ZipVersion.Utf8Encoding), // version needed to extract
       shortUint(0x800), // flags
       shortUint(CompressionMethod.Deflate), // compression method
       dosDate`2021-11-15T13:15:22Z`, // last modified
@@ -251,13 +260,13 @@ describe("writeLocalHeader", () => {
       lastModified: new Date("2021-11-15T13:15:22Z"),
       path: utf8`hello/world`,
       uncompressedSize: 4321,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
       extraField: utf8`random rubbish`,
     };
 
     const expected = data(
       longUint(0x04034b50), // signature
-      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(ZipVersion.Utf8Encoding), // version needed to extract
       shortUint(0x800), // flags
       shortUint(CompressionMethod.Deflate), // compression method
       dosDate`2021-11-15T13:15:22Z`, // last modified
@@ -287,13 +296,13 @@ describe("writeLocalHeader", () => {
       lastModified: new Date("2021-11-15T13:15:22Z"),
       path: utf8`hello/world`,
       uncompressedSize: 4321,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
       extraField: utf8`random rubbish`,
     };
 
     const expected = data(
       longUint(0x04034b50), // signature
-      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(ZipVersion.Utf8Encoding), // version needed to extract
       shortUint(8), // flags
       shortUint(CompressionMethod.Deflate), // compression method
       dosDate`2021-11-15T13:15:22Z`, // last modified
@@ -323,12 +332,12 @@ describe("writeLocalHeader", () => {
       lastModified: new Date("2021-11-15T13:15:22Z"),
       path: utf8`hello/world`,
       uncompressedSize: 4321,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
       longUint(0x04034b50), // signature
-      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(ZipVersion.Utf8Encoding), // version needed to extract
       shortUint(0x800), // flags
       shortUint(CompressionMethod.Deflate), // compression method
       dosDate`2021-11-15T13:15:22Z`, // last modified
@@ -364,12 +373,12 @@ describe("writeLocalHeader", () => {
       lastModified: new Date("2021-11-15T13:15:22Z"),
       path: utf8`hello/world`,
       uncompressedSize: 4321,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
       longUint(0x04034b50), // signature
-      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(ZipVersion.Utf8Encoding), // version needed to extract
       shortUint(0x800), // flags
       shortUint(CompressionMethod.Deflate), // compression method
       dosDate`2021-11-15T13:15:22Z`, // last modified
@@ -406,12 +415,12 @@ describe("writeLocalHeader", () => {
       lastModified: new Date("2021-11-15T13:15:22Z"),
       path: utf8`hello/world`,
       uncompressedSize: 4321,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
       longUint(0x04034b50), // signature
-      shortUint(ZipVersion.UtfEncoding), // version needed to extract
+      shortUint(ZipVersion.Utf8Encoding), // version needed to extract
       shortUint(8), // flags
       shortUint(CompressionMethod.Deflate), // compression method
       dosDate`2021-11-15T13:15:22Z`, // last modified
@@ -432,5 +441,325 @@ describe("writeLocalHeader", () => {
     const result = writeLocalHeader(entry, { zip64: true });
 
     assertBufferEqual(result, expected);
+  });
+});
+
+describe("writeDataDescriptor32", () => {
+  it("writes all the fields", () => {
+    const descriptor: DataDescriptor = {
+      compressedSize: 987234,
+      uncompressedSize: 9082734,
+      crc32: 234780354,
+    };
+
+    const result = writeDataDescriptor32(descriptor);
+
+    const expected = data(
+      longUint(0x08074b50), // signature
+      longUint(234780354), // crc32
+      longUint(987234), // compressed size
+      longUint(9082734), // uncompressed size
+    );
+
+    assertBufferEqual(result, expected);
+  });
+});
+
+describe("writeDataDescriptor64", () => {
+  it("writes all the fields", () => {
+    const descriptor: DataDescriptor = {
+      compressedSize: 987234,
+      uncompressedSize: 9082734,
+      crc32: 234780354,
+    };
+
+    const result = writeDataDescriptor64(descriptor);
+
+    const expected = data(
+      longUint(0x08074b50), // signature
+      longUint(234780354), // crc32
+      bigUint(987234), // compressed size
+      bigUint(9082734), // uncompressed size
+    );
+
+    assertBufferEqual(result, expected);
+  });
+});
+
+describe("normalizeEntryData", () => {
+  it("makes an empty stream from undefined", async () => {
+    const output = normalizeEntryData(undefined);
+    const iterator = getAsyncIterator(output);
+    const result = await iterator.next();
+
+    assert.strictEqual(result.done, true);
+    assert.strictEqual(result.value, undefined);
+  });
+
+  it("encodes a string to utf-8", async () => {
+    const output = await buffer(normalizeEntryData("😁"));
+    const expected = data("f09f9881");
+    assertBufferEqual(output, expected);
+  });
+
+  it("encodes a stream of strings to utf-8", async () => {
+    const output = await buffer(
+      normalizeEntryData(
+        Readable.from([
+          "to be, or not to be, that is the question",
+          "😁",
+          "日本語",
+        ]),
+      ),
+    );
+
+    const expected = data(
+      utf8`to be, or not to be, that is the question`,
+      "f09f9881",
+      "e697a5e69cace8aa9e",
+    );
+
+    assertBufferEqual(output, expected);
+  });
+
+  it("iterates an AsyncIterable", async () => {
+    const output = await buffer(
+      normalizeEntryData(
+        Readable.from([
+          Buffer.from("one,"),
+          Buffer.from("two,"),
+          Buffer.from("three,"),
+        ]),
+      ),
+    );
+
+    const expected = utf8`one,two,three,`;
+
+    assertBufferEqual(output, expected);
+  });
+
+  it("makes a stream from a buffer", async () => {
+    const output = await buffer(normalizeEntryData(utf8`hello world`));
+    const expected = utf8`hello world`;
+    assertBufferEqual(output, expected);
+  });
+
+  it("iterates a ReadableStream", async () => {
+    const stream = makeNonIterableReadableStream(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(utf8`one,`);
+          controller.enqueue(utf8`two,`);
+          controller.enqueue(utf8`three,`);
+          controller.close();
+        },
+      }),
+    );
+
+    const output = await buffer(normalizeEntryData(stream));
+    const expected = utf8`one,two,three,`;
+
+    assertBufferEqual(output, expected);
+  });
+
+  it("converts ReadableStream<string> to ReadableStream<Uint8Array>", async () => {
+    const stream = makeNonIterableReadableStream(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue("one,");
+          controller.enqueue("two,");
+          controller.enqueue("three,");
+          controller.close();
+        },
+      }),
+    );
+
+    const output = await buffer(normalizeEntryData(stream));
+    const expected = utf8`one,two,three,`;
+
+    assertBufferEqual(output, expected);
+  });
+});
+
+describe("compressEntry", () => {
+  it("falls back to passing through the input for CompressionMethod.Stored", async () => {
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const input = asyncIterable`hello world`;
+
+    const output = await text(
+      compressEntry(CompressionMethod.Stored, {}, dataDescriptor, input, {}),
+    );
+
+    assert.strictEqual(output, "hello world");
+    assert.strictEqual(dataDescriptor.compressedSize, 11);
+    assert.strictEqual(dataDescriptor.uncompressedSize, 11);
+    assert.strictEqual(dataDescriptor.crc32, 222957957);
+  });
+
+  it("uses the correct algorithm", async () => {
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const algorithm = mock.fn(async function* (input: ByteStream) {
+      // `compressEntry` expects the algorithm to consume the input
+      await bufferFromIterable(input);
+      yield Buffer.from("hello fred");
+    });
+
+    const input = asyncIterable`hello world`;
+
+    const output = await text(
+      compressEntry(CompressionMethod.Deflate, {}, dataDescriptor, input, {
+        [CompressionMethod.Deflate]: algorithm,
+      }),
+    );
+
+    assert.strictEqual(algorithm.mock.callCount(), 1);
+    assert.strictEqual(output, "hello fred");
+    assert.strictEqual(dataDescriptor.compressedSize, 10);
+    assert.strictEqual(dataDescriptor.uncompressedSize, 11);
+    assert.strictEqual(dataDescriptor.crc32, 222957957);
+  });
+
+  it("uses the passed algorithm if provided and compression method is Stored", async () => {
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const algorithm = mock.fn(async function* (input: ByteStream) {
+      // `compressEntry` expects the algorithm to consume the input
+      await bufferFromIterable(input);
+      yield Buffer.from("hello fred");
+    });
+
+    const input = asyncIterable`hello world`;
+
+    const output = await text(
+      compressEntry(CompressionMethod.Stored, {}, dataDescriptor, input, {
+        [CompressionMethod.Stored]: algorithm,
+      }),
+    );
+
+    assert.strictEqual(algorithm.mock.callCount(), 1);
+    assert.strictEqual(output, "hello fred");
+    assert.strictEqual(dataDescriptor.compressedSize, 10);
+    assert.strictEqual(dataDescriptor.uncompressedSize, 11);
+    assert.strictEqual(dataDescriptor.crc32, 222957957);
+  });
+
+  it("throws if compressionMethod is unknown", async () => {
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const input = asyncIterable`hello world`;
+
+    await assert.rejects(
+      text(
+        compressEntry(CompressionMethod.Deflate, {}, dataDescriptor, input, {}),
+      ),
+      (error) =>
+        error instanceof ZipFormatError &&
+        error.message === `unknown compression method 8`,
+    );
+  });
+
+  it("throws if uncompressedSize is wrong", async () => {
+    const check: Partial<DataDescriptor> = {
+      uncompressedSize: 3,
+    };
+
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const input = asyncIterable`hello world`;
+
+    await assert.rejects(
+      text(
+        compressEntry(
+          CompressionMethod.Stored,
+          check,
+          dataDescriptor,
+          input,
+          {},
+        ),
+      ),
+      (error) =>
+        error instanceof ZipFormatError &&
+        error.message === `uncompressedSize was supplied but is invalid`,
+    );
+  });
+
+  it("throws if crc32 is wrong", async () => {
+    const check: Partial<DataDescriptor> = {
+      crc32: 3,
+    };
+
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const input = asyncIterable`hello world`;
+
+    await assert.rejects(
+      text(
+        compressEntry(
+          CompressionMethod.Stored,
+          check,
+          dataDescriptor,
+          input,
+          {},
+        ),
+      ),
+      (error) =>
+        error instanceof ZipFormatError &&
+        error.message === `crc32 was supplied but is invalid`,
+    );
+  });
+
+  it("throws if compressedSize is wrong", async () => {
+    const check: Partial<DataDescriptor> = {
+      compressedSize: 3,
+    };
+
+    const dataDescriptor: DataDescriptor = {
+      compressedSize: 0,
+      crc32: 0,
+      uncompressedSize: 0,
+    };
+
+    const input = asyncIterable`hello world`;
+
+    await assert.rejects(
+      text(
+        compressEntry(
+          CompressionMethod.Stored,
+          check,
+          dataDescriptor,
+          input,
+          {},
+        ),
+      ),
+      (error) =>
+        error instanceof ZipFormatError &&
+        error.message === `compressedSize was supplied but is invalid`,
+    );
   });
 });

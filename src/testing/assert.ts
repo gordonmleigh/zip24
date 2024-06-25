@@ -63,7 +63,8 @@ export function assertBufferEqual(
 }
 
 export function assertInstanceOf<
-  T extends new (...parameters: unknown[]) => unknown,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  T extends new (...parameters: any[]) => any,
 >(
   actual: unknown,
   expected: T,

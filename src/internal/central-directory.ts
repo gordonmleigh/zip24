@@ -1,3 +1,4 @@
+import { hasProperty } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { CodePage437Decoder, CodePage437Encoder } from "./cp437.js";
 import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
@@ -211,4 +212,120 @@ export function readZip64Eocdr(
   directory.count = view.readUint64LE(24);
   directory.size = view.readUint64LE(40);
   directory.offset = view.readUint64LE(48);
+}
+
+export function writeZipTrailer(
+  directory: CentralDirectory,
+  fileOffset: number,
+): Uint8Array {
+  let size = EndOfCentralDirectoryLength + directory.comment.length;
+  if (directory.zip64) {
+    size += Zip64EocdlLength + Zip64EocdrLength;
+  }
+
+  const buffer = new Uint8Array(size);
+  let offset = 0;
+
+  if (hasProperty(directory, "zip64")) {
+    writeZip64Eocdr(directory, buffer, 0);
+    offset += Zip64EocdrLength;
+    writeEocdl(fileOffset, buffer, offset);
+    offset += Zip64EocdlLength;
+  }
+
+  writeEocdr(directory, buffer, offset);
+  return buffer;
+}
+
+export function writeEocdr(
+  directory: CentralDirectory,
+  buffer?: BufferLike,
+  bufferOffset = 0,
+): Uint8Array {
+  const commentBytes = new CodePage437Encoder().encode(directory.comment);
+  const recordLength = 22 + commentBytes.byteLength;
+  const zip64 = !!directory.zip64;
+
+  const view = buffer
+    ? new BufferView(buffer, bufferOffset)
+    : BufferView.alloc(bufferOffset + recordLength);
+
+  view.writeUint32LE(EndOfCentralDirectorySignature, 0);
+  view.writeUint16LE(zip64 ? 0xffff : 0, 4);
+  view.writeUint16LE(zip64 ? 0xffff : 0, 6);
+  view.writeUint16LE(zip64 ? 0xffff : directory.count, 8);
+  view.writeUint16LE(zip64 ? 0xffff : directory.count, 10);
+  view.writeUint32LE(zip64 ? 0xffff_ffff : directory.size, 12);
+  view.writeUint32LE(zip64 ? 0xffff_ffff : directory.offset, 16);
+  view.writeUint16LE(commentBytes.byteLength, 20);
+  view.setBytes(22, commentBytes);
+
+  return view.getOriginalBytes();
+}
+
+export function writeEocdl(
+  eocdrOffset: number,
+  buffer?: BufferLike,
+  bufferOffset = 0,
+): Uint8Array {
+  // Zip64 End of Central Directory Locator (4.3.15)
+  //
+  // | offset | field                        | size |
+  // | ------ | ---------------------------- | ---- |
+  // | 0      | signature (0x07064b50)       | 4    |
+  // | 4      | start disk of Zip64 EOCDR    | 4    |
+  // | 8      | offset of Zip64 EOCDR        | 8    |
+  // | 16     | total number of disks        | 4    |
+  // | 20     | (end)                        |      |
+
+  const view = buffer
+    ? new BufferView(buffer, bufferOffset)
+    : BufferView.alloc(bufferOffset + 20);
+
+  view.writeUint32LE(Zip64EocdlSignature, 0);
+  view.writeUint32LE(0, 4);
+  view.writeUint64LE(eocdrOffset, 8);
+  view.writeUint32LE(1, 16);
+
+  return view.getOriginalBytes();
+}
+
+export function writeZip64Eocdr(
+  directory: CentralDirectory64,
+  buffer?: BufferLike,
+  bufferOffset = 0,
+): Uint8Array {
+  // Zip64 End of Central Directory Record (4.3.14)
+  //
+  // | offset | field                         | size |
+  // | ------ | ----------------------------- | ---- |
+  // | 0      | signature (0x06064b50)        | 4    |
+  // | 4      | record size                   | 8    |
+  // | 12     | version made by               | 2    |
+  // | 14     | version needed to extract     | 2    |
+  // | 16     | number of this disk           | 4    |
+  // | 20     | central directory start disk  | 4    |
+  // | 24     | total entries this disk       | 8    |
+  // | 32     | total entries on all disks    | 8    |
+  // | 40     | size of the central directory | 8    |
+  // | 48     | central directory offset      | 8    |
+  // | 56     | (end)                         |      |
+
+  const view = buffer
+    ? new BufferView(buffer, bufferOffset)
+    : BufferView.alloc(bufferOffset + 56);
+
+  view.writeUint32LE(Zip64EocdrSignature, 0);
+  view.writeUint64LE(56 - 12, 4); // should not include first 12 bytes
+  view.writeUint8(directory.zip64.versionMadeBy, 12);
+  view.writeUint8(directory.zip64.platformMadeBy, 13);
+  view.writeUint16LE(directory.zip64.versionNeeded, 14);
+  view.writeUint32LE(0, 16);
+  view.writeUint32LE(0, 20);
+  view.writeUint64LE(directory.count, 24);
+  view.writeUint64LE(directory.count, 32);
+  view.writeUint64LE(directory.size, 40);
+  view.writeUint64LE(directory.offset, 48);
+
+  return view.getOriginalBytes();
 }

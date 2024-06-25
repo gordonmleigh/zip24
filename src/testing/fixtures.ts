@@ -1,3 +1,6 @@
+import { PackageRoot } from "#package-root";
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { computeCrc32 } from "../internal/crc32.js";
 import { CompressionMethod, ZipVersion } from "../internal/field-types.js";
 import {
@@ -329,4 +332,10 @@ export async function* generateZip(
     cp437length`the zip file comment`, // .ZIP file comment length
     cp437`the zip file comment`, // .ZIP file comment
   );
+}
+
+export async function getTemporaryOutputDirectory(): Promise<string> {
+  const localDirectory = resolve(PackageRoot, ".local/");
+  await mkdir(localDirectory, { recursive: true });
+  return localDirectory;
 }

@@ -13,13 +13,13 @@ describe("Deferred", () => {
     assert.strictEqual(result, value);
   });
 
-  it("reject() rejects the promise", () => {
+  it("reject() rejects the promise", async () => {
     const deferred = new Deferred();
     const error = Symbol();
 
     deferred.reject(error);
 
-    assert.rejects(deferred.promise, (reason) => {
+    await assert.rejects(deferred.promise, (reason) => {
       assert.strictEqual(reason, error);
       return true;
     });

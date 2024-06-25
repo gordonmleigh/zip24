@@ -1,6 +1,7 @@
 import { assert } from "./assert.js";
 import { BitField } from "./binary.js";
 import { ZipFormatError } from "./errors.js";
+import type { DecodedCentralHeader } from "./records.js";
 
 export enum CompressionMethod {
   Stored = 0,
@@ -27,7 +28,7 @@ export enum ZipPlatform {
 export enum ZipVersion {
   Deflate = 20,
   Zip64 = 45,
-  UtfEncoding = 63,
+  Utf8Encoding = 63,
 }
 
 export type CommonAttributes = {
@@ -37,7 +38,23 @@ export type CommonAttributes = {
   rawValue: number;
 };
 
+export type ZipEntryData =
+  | Uint8Array
+  | string
+  | AsyncIterable<string>
+  | AsyncIterable<Uint8Array>
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
+  | ReadableStream<string>
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
+  | ReadableStream<Uint8Array>;
+
 export class DosFileAttributes extends BitField implements CommonAttributes {
+  public static readonly Directory = BitField.flag(4);
+  public static readonly File = 0;
+  public static readonly Hidden = BitField.flag(1);
+  public static readonly ReadOnly = BitField.flag(0);
+  public static readonly System = BitField.flag(2);
+
   // https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
   public constructor(value = 0) {
     super(8, value);
@@ -93,24 +110,52 @@ export class DosFileAttributes extends BitField implements CommonAttributes {
 }
 
 export class UnixFileAttributes extends BitField implements CommonAttributes {
+  private static readonly ModeMask = 0o00_7777;
+  private static readonly ModeTypeMask = 0o17_7000;
+  private static readonly PermissionsMask = 0o00_0777;
+  private static readonly TypeMask = 0o17_0000;
+
+  public static readonly DefaultPermissions = 0o644;
+  public static readonly Directory = 0o4_0000;
+  public static readonly File = 0o10_0000;
+  public static readonly SymbolicLink = 0o12_0000;
+
+  public static raw(value: number): number {
+    return (value << 16) >>> 0;
+  }
+
   // https://man7.org/linux/man-pages/man7/inode.7.html
   public constructor(value = 0) {
     super(16, value);
   }
 
   public get isDirectory(): boolean {
-    return this.type === 0o4_0000;
+    return this.type === UnixFileAttributes.Directory;
   }
   public set isDirectory(value: boolean) {
-    this.type = value ? 0o4_0000 : 0o10_0000;
+    this.type = value ? UnixFileAttributes.Directory : UnixFileAttributes.File;
+  }
+
+  public get isExecutable(): boolean {
+    // at least user has execute permission set
+    return (this.permissions & 0b001_000_000) !== 0;
+  }
+  public set isExecutable(value: boolean) {
+    if (value) {
+      // set execute permission for everyone
+      this.permissions = this.permissions | 0b001_001_001;
+    } else {
+      // clear execute permission for everyone
+      this.permissions = this.permissions & 0b110_110_110;
+    }
   }
 
   public get isFile(): boolean {
-    return this.type === 0o10_0000;
+    return this.type === UnixFileAttributes.File;
   }
   public set isFile(value: boolean) {
     if (value) {
-      this.type = 0o10_0000;
+      this.type = UnixFileAttributes.File;
     } else {
       throw new RangeError(
         `unable to set isFile to false (set another type flag to true instead)`,
@@ -133,42 +178,70 @@ export class UnixFileAttributes extends BitField implements CommonAttributes {
   }
 
   public get isSymbolicLink(): boolean {
-    return this.type === 0o12_0000;
+    return this.type === UnixFileAttributes.SymbolicLink;
   }
   public set isSymbolicLink(value: boolean) {
-    this.type = value ? 0o12_0000 : 0o10_0000;
+    this.type = value
+      ? UnixFileAttributes.SymbolicLink
+      : UnixFileAttributes.File;
   }
 
   public get mode(): number {
-    return this.value & 0o7777;
+    return this.value & UnixFileAttributes.ModeMask;
   }
   public set mode(value: number) {
-    this.value = (this.value & 0o17_0000) | (value & 0o7777);
+    this.value =
+      (this.value & UnixFileAttributes.TypeMask) |
+      (value & UnixFileAttributes.ModeMask);
   }
 
   public get permissions(): number {
-    return this.value & 0o777;
+    return this.value & UnixFileAttributes.PermissionsMask;
   }
   public set permissions(value: number) {
-    this.value = (this.value & 0o177000) | (value & 0o777);
+    this.value =
+      (this.value & UnixFileAttributes.ModeTypeMask) |
+      (value & UnixFileAttributes.PermissionsMask);
   }
 
   public get rawValue(): number {
-    return (this.value << 16) >>> 0;
+    return UnixFileAttributes.raw(this.value);
   }
   public set rawValue(value: number) {
     this.value = value >>> 16;
   }
 
   public get type(): number {
-    return this.value & 0o170000;
+    return this.value & UnixFileAttributes.TypeMask;
   }
   public set type(value: number) {
-    this.value = (this.value & 0o7777) | (value & 0o17_0000);
+    this.value =
+      (this.value & UnixFileAttributes.ModeMask) |
+      (value & UnixFileAttributes.TypeMask);
+  }
+
+  public override get value(): number {
+    return super.value;
+  }
+  public override set value(value: number) {
+    // set some defaults (file type, 0644 permissions)
+    let finalValue = value;
+    if (finalValue === 0) {
+      finalValue = UnixFileAttributes.DefaultPermissions;
+    }
+    if ((finalValue & UnixFileAttributes.TypeMask) === 0) {
+      finalValue |= UnixFileAttributes.File;
+    }
+    super.value = finalValue;
   }
 }
 
 export class GeneralPurposeFlags extends BitField {
+  public static readonly HasEncryption = BitField.flag(0);
+  public static readonly HasDataDescriptor = BitField.flag(3);
+  public static readonly HasUtf8Strings = BitField.flag(11);
+  public static readonly HasStrongEncryption = BitField.flag(6);
+
   public constructor(value = 0) {
     super(16, value);
   }
@@ -202,10 +275,14 @@ const PlatformAttributes = {
 };
 
 export type PlatformAttributes = {
-  [K in keyof typeof PlatformAttributes]: (typeof PlatformAttributes)[K] extends new () => infer I
-    ? I
-    : never;
+  [K in keyof typeof PlatformAttributes]: InstanceType<
+    (typeof PlatformAttributes)[K]
+  >;
 };
+
+export type AttributesPlatform<T> = {
+  [K in keyof PlatformAttributes]: T extends PlatformAttributes[K] ? K : never;
+}[keyof PlatformAttributes];
 
 export function makePlatformAttributes<P extends ZipPlatform>(
   platform: P,
@@ -227,6 +304,20 @@ export function makePlatformAttributes(
   }
 
   return instance;
+}
+
+export function getAttributesPlatform<A>(attributes: A): AttributesPlatform<A> {
+  const platform = Object.entries(PlatformAttributes).find(
+    ([, v]) => attributes instanceof v,
+  )?.[0];
+  if (!platform) {
+    throw new TypeError(
+      `expected attributes to be a valid platform attributes instance`,
+    );
+  }
+  const platformNumber = Number.parseInt(platform);
+  assert(Number.isInteger(platformNumber));
+  return platformNumber as AttributesPlatform<A>;
 }
 
 export function isPlatformAttributes<P extends ZipPlatform>(
@@ -358,3 +449,15 @@ export type AsyncTransform = (
 export type CompressionAlgorithms = Partial<
   Record<CompressionMethod, AsyncTransform>
 >;
+
+type PublicEntryFields = Omit<
+  DecodedCentralHeader,
+  "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
+>;
+
+export type ZipEntryOptions = {
+  utf8?: boolean;
+  zip64?: boolean;
+};
+
+export type ZipEntryInfo = Partial<PublicEntryFields> & ZipEntryOptions;

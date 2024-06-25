@@ -1,5 +1,6 @@
 import assert from "node:assert";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { ZipEntryReader } from "../base/entry-reader.js";
@@ -14,6 +15,7 @@ import {
   EmptyZip32,
   Zip32WithThreeEntries,
   generateZip,
+  getTemporaryOutputDirectory,
 } from "../testing/fixtures.js";
 import { ZipReader } from "./reader.js";
 
@@ -128,11 +130,8 @@ describe("node/reader", () => {
           fileCommentLength: 30 * 1024,
         });
 
-        // make sure we're in the workspace root
-        await stat("package.json");
-        await mkdir(".local/", { recursive: true });
-
-        const filePath = ".local/test-ZipReader-open.zip";
+        const outputDirectory = await getTemporaryOutputDirectory();
+        const filePath = resolve(outputDirectory, "test-ZipReader-open.zip");
         await writeFile(filePath, data);
 
         await using reader = await ZipReader.open(filePath);

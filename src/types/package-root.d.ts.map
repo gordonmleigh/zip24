@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "file": "package-root.d.ts",
+  "sourceRoot": "",
+  "sources": [
+    "../../package-root.js"
+  ],
+  "names": [],
+  "mappings": "AAAA;AAGA,EAAA,OAAO,MAAM,WAAW,OAAA,CAA0C;AACA"
+}

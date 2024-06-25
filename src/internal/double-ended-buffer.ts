@@ -1,5 +1,6 @@
 import { Deferred } from "./deferred.js";
 import { Semaphore } from "./semaphore.js";
+import type { AnyIterable } from "./streams.js";
 
 type MeasuredItem<T> = {
   size: number;
@@ -88,6 +89,16 @@ export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
       this.readableItems.release();
       this.endedInternal.resolve();
     }
+  }
+
+  public async pipeFrom(source: AnyIterable<T>): Promise<number> {
+    const start = this.written;
+
+    for await (const chunk of source) {
+      await this.write(chunk);
+    }
+
+    return this.written - start;
   }
 
   public async read(): Promise<T | undefined> {

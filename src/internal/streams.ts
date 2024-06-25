@@ -1,5 +1,5 @@
 /* eslint-disable n/no-unsupported-features/node-builtins */
-import { assert } from "./assert.js";
+import { hasExtraProperty } from "./assert.js";
 
 const DefaultChunkSize = 1024 ** 2; // 1 MB
 
@@ -49,12 +49,12 @@ export function randomAccessReaderFromBuffer(
   };
 }
 
-export async function* iterableFromReadableStream(
-  stream: ReadableStream,
-): AsyncGenerator<Uint8Array, undefined, undefined> {
+export async function* iterableFromReadableStream<T>(
+  stream: ReadableStream<T>,
+): AsyncGenerator<T, undefined, undefined> {
   // prevent narrowing to `never` after this block (using `as any`)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (Symbol.asyncIterator in (stream as any)) {
+  if (isAsyncIterable(stream as any)) {
     yield* stream;
     return;
   }
@@ -66,7 +66,6 @@ export async function* iterableFromReadableStream(
       const result = await reader.read();
 
       if (result.value !== undefined) {
-        assert(result.value instanceof Uint8Array, `expected byte array`);
         yield result.value;
       }
 
@@ -206,14 +205,24 @@ export async function* identityStream<Input>(
   }
 }
 
-function getAsyncIterator<T>(
+export function getAsyncIterator<T>(
   iterable: AnyIterable<T>,
 ): AsyncIterator<T> | Iterator<T> {
-  const input = iterable as Partial<AsyncIterable<Uint8Array>> &
-    Partial<Iterable<Uint8Array>>;
-
-  if (Symbol.asyncIterator in input) {
-    return (input as AsyncIterable<T>)[Symbol.asyncIterator]();
+  if (isAsyncIterable(iterable)) {
+    return iterable[Symbol.asyncIterator]();
   }
-  return (input as Iterable<T>)[Symbol.iterator]();
+  if (isIterable(iterable)) {
+    return iterable[Symbol.iterator]();
+  }
+  throw new TypeError(`value is neither AsyncIterable nor Iterable`);
+}
+
+export function isAsyncIterable(
+  value: unknown,
+): value is AsyncIterable<unknown> {
+  return hasExtraProperty(value, Symbol.asyncIterator);
+}
+
+export function isIterable(value: unknown): value is Iterable<unknown> {
+  return hasExtraProperty(value, Symbol.iterator);
 }

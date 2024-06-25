@@ -1,7 +1,9 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
+import { makeNonIterableReadableStream } from "../testing/util.js";
 import {
   bufferFromIterable,
+  getAsyncIterator,
   identityStream,
   iterableFromRandomAccessReader,
   iterableFromReadableStream,
@@ -15,7 +17,7 @@ import {
 
 describe("iterableFromReadableStream", () => {
   it("creates an iterable that reads all chunks", async () => {
-    const stream = new ReadableStream({
+    const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(Buffer.from("one,"));
         controller.enqueue(Buffer.from("two,"));
@@ -35,27 +37,18 @@ describe("iterableFromReadableStream", () => {
   });
 
   it("works on stream without built-in iterable", async () => {
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(Buffer.from("one,"));
-        controller.enqueue(Buffer.from("two,"));
-        controller.enqueue(Buffer.from("three,"));
-        controller.close();
-      },
-    });
+    const stream = makeNonIterableReadableStream(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(Buffer.from("one,"));
+          controller.enqueue(Buffer.from("two,"));
+          controller.enqueue(Buffer.from("three,"));
+          controller.close();
+        },
+      }),
+    );
 
-    // early versions of ReadableStream don't have Symbol.asyncIterable, so
-    // simulate that
-    const interceptedStream = new Proxy(stream, {
-      has(target, property) {
-        if (property === Symbol.asyncIterator) {
-          return false;
-        }
-        return property in target;
-      },
-    });
-
-    const iterable = iterableFromReadableStream(interceptedStream);
+    const iterable = iterableFromReadableStream(stream);
     const data: Uint8Array[] = [];
 
     for await (const chunk of iterable) {
@@ -264,7 +257,7 @@ describe("mapIterable", () => {
   });
 });
 
-describe("mapIterable", () => {
+describe("identityIterable", () => {
   it("returns each element in the source unchanged", async () => {
     const source = (async function* () {
       const chunks = ["uno", "dos", "tres"];
@@ -282,5 +275,66 @@ describe("mapIterable", () => {
     }
 
     assert.deepStrictEqual(chunks, ["uno", "dos", "tres"]);
+  });
+});
+
+describe("getAsyncIterator", () => {
+  it("returns the async iterator for an async stream", () => {
+    const iterator = Symbol();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+    const getIterator = mock.fn(() => iterator as any);
+
+    const iterable = {
+      [Symbol.asyncIterator]: getIterator,
+    };
+
+    const result = getAsyncIterator(iterable);
+
+    assert.strictEqual(getIterator.mock.callCount(), 1);
+    assert.strictEqual(result, iterator);
+  });
+
+  it("returns the sync iterator for a sync stream", () => {
+    const iterator = Symbol();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+    const getIterator = mock.fn(() => iterator as any);
+
+    const iterable = {
+      [Symbol.iterator]: getIterator,
+    };
+
+    const result = getAsyncIterator(iterable);
+
+    assert.strictEqual(getIterator.mock.callCount(), 1);
+    assert.strictEqual(result, iterator);
+  });
+
+  it("returns the async iterator for a dual-mode stream", () => {
+    const asyncIterator = Symbol();
+    const syncIterator = Symbol();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+    const getAsyncIteratorMethod = mock.fn(() => asyncIterator as any);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+    const getSyncIteratorMethod = mock.fn(() => syncIterator as any);
+
+    const iterable = {
+      [Symbol.asyncIterator]: getAsyncIteratorMethod,
+      [Symbol.iterator]: getSyncIteratorMethod,
+    };
+
+    const result = getAsyncIterator(iterable);
+
+    assert.strictEqual(getAsyncIteratorMethod.mock.callCount(), 1);
+    assert.strictEqual(getSyncIteratorMethod.mock.callCount(), 0);
+    assert.strictEqual(result, asyncIterator);
+  });
+
+  it("throws if the value isn't iterable", () => {
+    assert.throws(
+      () => getAsyncIterator({} as AsyncIterable<unknown>),
+      (error) =>
+        error instanceof TypeError &&
+        error.message === `value is neither AsyncIterable nor Iterable`,
+    );
   });
 });

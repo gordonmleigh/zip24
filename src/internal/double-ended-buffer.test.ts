@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
 import {
   ByteLengthStrategy,
@@ -109,5 +110,28 @@ describe("DoubleEndedBuffer", () => {
     });
 
     assert.strictEqual(buffer.error, error);
+  });
+
+  describe("pipeFrom()", () => {
+    it("writes all chunks from the source", async () => {
+      const buffer = new DoubleEndedBuffer(new ByteLengthStrategy(10));
+      const outputPromise = text(buffer);
+
+      // write this first to help prove that the correct value is returned by
+      // pipeFrom
+      await buffer.write(Buffer.from("01234"));
+
+      const result = await buffer.pipeFrom([
+        Buffer.from("hello"),
+        Buffer.from("world"),
+      ]);
+      assert.strictEqual(result, 10);
+      assert.strictEqual(buffer.written, 15);
+
+      buffer.end();
+      const output = await outputPromise;
+
+      assert.strictEqual(output, "01234helloworld");
+    });
   });
 });

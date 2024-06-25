@@ -447,7 +447,7 @@ describe("writeDirectoryHeader", () => {
       platformMadeBy: ZipPlatform.UNIX,
       uncompressedSize: 4321,
       versionMadeBy: ZipVersion.Zip64,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
@@ -496,7 +496,7 @@ describe("writeDirectoryHeader", () => {
       platformMadeBy: ZipPlatform.DOS,
       uncompressedSize: 4321,
       versionMadeBy: ZipVersion.Zip64,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     assert.throws(
@@ -527,7 +527,7 @@ describe("writeDirectoryHeader", () => {
       platformMadeBy: ZipPlatform.UNIX,
       uncompressedSize: 4321,
       versionMadeBy: ZipVersion.Zip64,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
@@ -576,7 +576,7 @@ describe("writeDirectoryHeader", () => {
       platformMadeBy: ZipPlatform.UNIX,
       uncompressedSize: 4321,
       versionMadeBy: ZipVersion.Zip64,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(
@@ -634,7 +634,7 @@ describe("writeDirectoryHeader", () => {
       platformMadeBy: ZipPlatform.UNIX,
       uncompressedSize: 4321,
       versionMadeBy: ZipVersion.Zip64,
-      versionNeeded: ZipVersion.UtfEncoding,
+      versionNeeded: ZipVersion.Utf8Encoding,
     };
 
     const expected = data(

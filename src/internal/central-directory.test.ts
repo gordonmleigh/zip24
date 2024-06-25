@@ -1,8 +1,26 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { cp437, data } from "../testing/data.js";
-import { readEocdl, readEocdr, readZipTrailer } from "./central-directory.js";
+import { assertBufferEqual } from "../testing/assert.js";
+import {
+  bigUint,
+  cp437,
+  data,
+  longUint,
+  shortUint,
+  tinyUint,
+} from "../testing/data.js";
+import {
+  readEocdl,
+  readEocdr,
+  readZipTrailer,
+  writeEocdl,
+  writeEocdr,
+  writeZip64Eocdr,
+  writeZipTrailer,
+} from "./central-directory.js";
 import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
+import { ZipPlatform, ZipVersion } from "./field-types.js";
+import type { CentralDirectory, CentralDirectory64 } from "./records.js";
 
 describe("readZipTrailer", () => {
   it("can read an EOCDR", () => {
@@ -274,5 +292,209 @@ describe("readEocdr", () => {
         error.message ===
           "invalid signature for end of central directory record (66778800)",
     );
+  });
+});
+
+describe("writeEocdr", () => {
+  it("writes all the basic fields", () => {
+    const directory: CentralDirectory = {
+      comment: "",
+      count: 123,
+      offset: 9087234,
+      size: 237489,
+    };
+
+    const result = writeEocdr(directory);
+
+    const expected = data(
+      longUint(0x06054b50), // signature
+      shortUint(0), // number of this disk
+      shortUint(0), // central directory start disk
+      shortUint(123), // total entries this disk
+      shortUint(123), // total entries on all disks
+      longUint(237489), // size of the central directory
+      longUint(9087234), // central directory offset
+      shortUint(0), // file comment length
+    );
+
+    assertBufferEqual(result, expected);
+  });
+
+  it("includes the comment if given", () => {
+    const directory: CentralDirectory = {
+      comment: "this is the file comment",
+      count: 123,
+      offset: 9087234,
+      size: 237489,
+    };
+
+    const result = writeEocdr(directory);
+
+    const expected = data(
+      longUint(0x06054b50), // signature
+      shortUint(0), // number of this disk
+      shortUint(0), // central directory start disk
+      shortUint(123), // total entries this disk
+      shortUint(123), // total entries on all disks
+      longUint(237489), // size of the central directory
+      longUint(9087234), // central directory offset
+      shortUint(24), // file comment length
+      cp437`this is the file comment`,
+    );
+
+    assertBufferEqual(result, expected);
+  });
+
+  it("masks the sizes and offsets if zip64 is set", () => {
+    const directory: CentralDirectory = {
+      comment: "this is the file comment",
+      count: 123,
+      offset: 9087234,
+      size: 237489,
+      zip64: {
+        platformMadeBy: ZipPlatform.DOS,
+        versionMadeBy: ZipVersion.Zip64,
+        versionNeeded: ZipVersion.Zip64,
+      },
+    };
+
+    const result = writeEocdr(directory);
+
+    const expected = data(
+      longUint(0x06054b50), // signature
+      shortUint(0xffff), // number of this disk
+      shortUint(0xffff), // central directory start disk
+      shortUint(0xffff), // total entries this disk
+      shortUint(0xffff), // total entries on all disks
+      longUint(0xffff_ffff), // size of the central directory
+      longUint(0xffff_ffff), // central directory offset
+      shortUint(24), // file comment length
+      cp437`this is the file comment`,
+    );
+
+    assertBufferEqual(result, expected);
+  });
+});
+
+describe("writeEocdl", () => {
+  it("writes all the fields", () => {
+    const result = writeEocdl(0x123456789abc);
+
+    const expected = data(
+      longUint(0x07064b50), // signature
+      longUint(0), // start disk of Zip64 EOCDR
+      bigUint(0x123456789abc), // offset of Zip64 EOCDR
+      longUint(1), // total number of disks
+    );
+
+    assertBufferEqual(result, expected);
+  });
+});
+
+describe("writeZip64Eocdr", () => {
+  it("writes all the fields", () => {
+    const directory: CentralDirectory64 = {
+      comment: "this is the file comment",
+      count: 0x112233445566,
+      offset: 0x665544332211,
+      size: 0x555544443333,
+      zip64: {
+        platformMadeBy: ZipPlatform.UNIX,
+        versionMadeBy: ZipVersion.Zip64,
+        versionNeeded: ZipVersion.Utf8Encoding,
+      },
+    };
+
+    const result = writeZip64Eocdr(directory);
+
+    const expected = data(
+      longUint(0x06064b50), // EOCDR64 signature (0x06064b50)
+      bigUint(56 - 12), // record size (SizeOfFixedFields + SizeOfVariableData - 12)
+      tinyUint(ZipVersion.Zip64), // version made by
+      tinyUint(ZipPlatform.UNIX), // platform made by
+      shortUint(ZipVersion.Utf8Encoding), // version needed
+      longUint(0), // number of this disk
+      longUint(0), // central directory start disk
+      bigUint(0x112233445566), // total entries this disk
+      bigUint(0x112233445566), // total entries on all disks
+      bigUint(0x555544443333), // size of the central directory
+      bigUint(0x665544332211), // central directory offset
+    );
+
+    assertBufferEqual(result, expected);
+  });
+});
+
+describe("writeZipTrailer", () => {
+  it("can write a 32 bit trailer", () => {
+    const directory: CentralDirectory = {
+      comment: "this is the file comment",
+      count: 123,
+      offset: 9087234,
+      size: 237489,
+    };
+
+    const result = writeZipTrailer(directory, 0x10000);
+
+    const expected = data(
+      longUint(0x06054b50), // signature
+      shortUint(0), // number of this disk
+      shortUint(0), // central directory start disk
+      shortUint(123), // total entries this disk
+      shortUint(123), // total entries on all disks
+      longUint(237489), // size of the central directory
+      longUint(9087234), // central directory offset
+      shortUint(24), // file comment length
+      cp437`this is the file comment`,
+    );
+
+    assertBufferEqual(result, expected);
+  });
+
+  it("can write a 64 bit trailer", () => {
+    const directory: CentralDirectory64 = {
+      comment: "this is the file comment",
+      count: 0x112233445566,
+      offset: 0x665544332211,
+      size: 0x555544443333,
+      zip64: {
+        platformMadeBy: ZipPlatform.UNIX,
+        versionMadeBy: ZipVersion.Zip64,
+        versionNeeded: ZipVersion.Utf8Encoding,
+      },
+    };
+
+    const result = writeZipTrailer(directory, 0x123456789abc);
+
+    const expected = data(
+      longUint(0x06064b50), // EOCDR64 signature (0x06064b50)
+      bigUint(56 - 12), // record size (SizeOfFixedFields + SizeOfVariableData - 12)
+      tinyUint(ZipVersion.Zip64), // version made by
+      tinyUint(ZipPlatform.UNIX), // platform made by
+      shortUint(ZipVersion.Utf8Encoding), // version needed
+      longUint(0), // number of this disk
+      longUint(0), // central directory start disk
+      bigUint(0x112233445566), // total entries this disk
+      bigUint(0x112233445566), // total entries on all disks
+      bigUint(0x555544443333), // size of the central directory
+      bigUint(0x665544332211), // central directory offset
+
+      longUint(0x07064b50), // EOCDL signature
+      longUint(0), // start disk of Zip64 EOCDR
+      bigUint(0x123456789abc), // offset of Zip64 EOCDR
+      longUint(1), // total number of disks
+
+      longUint(0x06054b50), // signature
+      shortUint(0xffff), // number of this disk
+      shortUint(0xffff), // central directory start disk
+      shortUint(0xffff), // total entries this disk
+      shortUint(0xffff), // total entries on all disks
+      longUint(0xffff_ffff), // size of the central directory
+      longUint(0xffff_ffff), // central directory offset
+      shortUint(24), // file comment length
+      cp437`this is the file comment`,
+    );
+
+    assertBufferEqual(result, expected);
   });
 });

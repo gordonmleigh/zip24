@@ -16,14 +16,6 @@ export function isDisposable(value: unknown): value is Disposable {
   return hasExtraProperty(value, Symbol.dispose);
 }
 
-export async function asyncDispose(value: unknown): Promise<void> {
-  if (isAsyncDisposable(value)) {
-    await value[Symbol.asyncDispose]();
-  } else if (isDisposable(value)) {
-    value[Symbol.dispose]();
-  }
-}
-
 export async function asyncDisposeOrClose(
   value: Partial<AsyncCloseable | Closeable>,
 ): Promise<void> {

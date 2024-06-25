@@ -21,6 +21,7 @@ export default [
     rules: {
       "@typescript-eslint/no-floating-promises": "off", // describe and it return promises
       "n/no-unsupported-features/node-builtins": "off", // so we can use node:test
+      "unicorn/no-abusive-eslint-disable": "off",
     },
   },
 ];

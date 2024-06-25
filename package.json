@@ -85,6 +85,12 @@
       "default": "./lib/common.js"
     }
   },
+  "imports": {
+    "#package-root": {
+      "node": "./package-root.js",
+      "types": "./package-root.d.ts"
+    }
+  },
   "scripts": {
     "clean": "rm -rf lib/",
     "compile": "tsc",
