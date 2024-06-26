@@ -5,6 +5,7 @@ import {
   type CompressionAlgorithms,
   type DataDescriptor,
 } from "../internal/compression-core.js";
+import { ZipPlatform, ZipVersion } from "../internal/constants.js";
 import { CodePage437Encoder } from "../internal/cp437.js";
 import { writeDirectoryHeader } from "../internal/directory-entry.js";
 import {
@@ -19,8 +20,6 @@ import {
 } from "../internal/entry-utils.js";
 import {
   GeneralPurposeFlags,
-  ZipPlatform,
-  ZipVersion,
   type ZipEntryInfo,
   type ZipEntryOptions,
 } from "../internal/field-types.js";

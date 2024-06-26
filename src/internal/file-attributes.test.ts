@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 import { assertInstanceOf } from "../testing/assert.js";
+import { ZipPlatform } from "./constants.js";
 import { ZipFormatError } from "./errors.js";
-import { ZipPlatform } from "./field-types.js";
 import {
   DosFileAttributes,
   UnixFileAttributes,

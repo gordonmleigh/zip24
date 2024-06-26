@@ -18,8 +18,8 @@ import {
   writeZip64Eocdr,
   writeZipTrailer,
 } from "./central-directory.js";
+import { ZipPlatform, ZipVersion } from "./constants.js";
 import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
-import { ZipPlatform, ZipVersion } from "./field-types.js";
 import type { CentralDirectory, CentralDirectory64 } from "./records.js";
 
 describe("readZipTrailer", () => {

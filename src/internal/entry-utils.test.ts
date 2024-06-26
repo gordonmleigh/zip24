@@ -1,12 +1,12 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
+import { ZipVersion } from "./constants.js";
 import {
   minimumVersion,
   needs64bit,
   needsDataDescriptor,
   needsUtf8,
 } from "./entry-utils.js";
-import { ZipVersion } from "./field-types.js";
 
 describe("entry-utils", () => {
   describe("minimumVersion", () => {

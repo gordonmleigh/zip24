@@ -2,7 +2,7 @@ import assert from "node:assert";
 import { describe, it, mock } from "node:test";
 import { ZipEntryReader } from "../base/entry-reader.js";
 import { CompressionMethod } from "../internal/compression-core.js";
-import { ZipPlatform, ZipVersion } from "../internal/field-types.js";
+import { ZipPlatform, ZipVersion } from "../internal/constants.js";
 import { UnixFileAttributes } from "../internal/file-attributes.js";
 import { EmptyZip32, Zip32WithThreeEntries } from "../testing/fixtures.js";
 import { ZipBufferReader } from "./buffer.js";

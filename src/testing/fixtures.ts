@@ -2,8 +2,8 @@ import { PackageRoot } from "#package-root";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CompressionMethod } from "../internal/compression-core.js";
+import { ZipVersion } from "../internal/constants.js";
 import { computeCrc32 } from "../internal/crc32.js";
-import { ZipVersion } from "../internal/field-types.js";
 import {
   bigUint,
   cp437,

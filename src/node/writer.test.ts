@@ -1,7 +1,8 @@
 import { buffer } from "node:stream/consumers";
 import { describe, it } from "node:test";
-import { GeneralPurposeFlags, ZipPlatform, ZipVersion } from "../common.js";
+import { GeneralPurposeFlags } from "../common.js";
 import { CompressionMethod } from "../internal/compression-core.js";
+import { ZipPlatform, ZipVersion } from "../internal/constants.js";
 import {
   DosFileAttributes,
   UnixFileAttributes,

@@ -12,8 +12,9 @@ import {
   utf8length,
 } from "../testing/data.js";
 import { CompressionMethod, type DataDescriptor } from "./compression-core.js";
+import { ZipVersion } from "./constants.js";
 import { ZipSignatureError } from "./errors.js";
-import { GeneralPurposeFlags, ZipVersion } from "./field-types.js";
+import { GeneralPurposeFlags } from "./field-types.js";
 import {
   readLocalHeaderSize,
   writeDataDescriptor32,

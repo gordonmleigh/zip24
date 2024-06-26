@@ -1,9 +1,6 @@
 import { CompressionMethod } from "../internal/compression-core.js";
-import {
-  GeneralPurposeFlags,
-  ZipPlatform,
-  ZipVersion,
-} from "../internal/field-types.js";
+import { ZipPlatform, ZipVersion } from "../internal/constants.js";
+import { GeneralPurposeFlags } from "../internal/field-types.js";
 import {
   DosFileAttributes,
   type FileAttributes,

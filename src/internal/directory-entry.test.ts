@@ -13,6 +13,7 @@ import {
   utf8length,
 } from "../testing/data.js";
 import { CompressionMethod } from "./compression-core.js";
+import { ZipPlatform, ZipVersion } from "./constants.js";
 import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
@@ -20,12 +21,7 @@ import {
   writeDirectoryHeader,
 } from "./directory-entry.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
-import {
-  DosDate,
-  GeneralPurposeFlags,
-  ZipPlatform,
-  ZipVersion,
-} from "./field-types.js";
+import { DosDate, GeneralPurposeFlags } from "./field-types.js";
 import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.js";
 import type { CentralHeaderLengthFields, RawCentralHeader } from "./records.js";
 

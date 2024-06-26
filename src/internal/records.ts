@@ -1,9 +1,6 @@
 import type { CompressionMethod } from "./compression-core.js";
-import type {
-  GeneralPurposeFlags,
-  ZipPlatform,
-  ZipVersion,
-} from "./field-types.js";
+import type { ZipPlatform, ZipVersion } from "./constants.js";
+import type { GeneralPurposeFlags } from "./field-types.js";
 import type { FileAttributes } from "./file-attributes.js";
 
 export type LocalHeaderBase = {

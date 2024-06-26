@@ -1,7 +1,7 @@
 import { assert } from "./assert.js";
 import { BitField } from "./binary.js";
+import { ZipPlatform } from "./constants.js";
 import { ZipFormatError } from "./errors.js";
-import { ZipPlatform } from "./field-types.js";
 
 export type CommonAttributes = {
   isReadOnly: boolean;
