@@ -1,8 +1,8 @@
 import { BufferView, type BufferLike } from "./binary.js";
 import type { DataDescriptor } from "./compression-core.js";
+import { DosDate } from "./dos-date.js";
 import { ZipSignatureError } from "./errors.js";
 import { writeZip64ExtraField } from "./extra-fields.js";
-import { DosDate } from "./field-types.js";
 import type { RawLocalHeader } from "./records.js";
 import { DataDescriptorSignature, LocalHeaderSignature } from "./signatures.js";
 

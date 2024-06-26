@@ -1,8 +1,9 @@
 import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
+import { DosDate } from "./dos-date.js";
 import { ZipSignatureError } from "./errors.js";
 import { readExtraFields, writeZip64ExtraField } from "./extra-fields.js";
-import { DosDate, GeneralPurposeFlags } from "./field-types.js";
+import { GeneralPurposeFlags } from "./field-types.js";
 import {
   isPlatformAttributes,
   makePlatformAttributes,
