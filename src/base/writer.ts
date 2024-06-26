@@ -19,7 +19,6 @@ import {
   getAttributesPlatform,
   makePlatformAttributes,
   type CompressionAlgorithms,
-  type ZipEntryData,
   type ZipEntryInfo,
   type ZipEntryOptions,
 } from "../internal/field-types.js";
@@ -36,6 +35,7 @@ import type {
   RawLocalHeader,
 } from "../internal/records.js";
 import { Semaphore } from "../internal/semaphore.js";
+import type { DataSource } from "../internal/streams.js";
 import { defaultCompressors } from "./compression.js";
 
 type ZipEntryInternalOptions = ZipEntryOptions & {
@@ -71,7 +71,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   }
 
   public readonly addFile = this.bufferSemaphore.synchronize(
-    (file: ZipEntryInfo, content?: ZipEntryData) =>
+    (file: ZipEntryInfo, content?: DataSource) =>
       this.writeFileEntry(file, content),
   );
 
@@ -85,7 +85,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
 
   private async writeFileEntry(
     file: ZipEntryInfo,
-    content?: ZipEntryData,
+    content?: DataSource,
   ): Promise<void> {
     const localHeaderOffset = this.startingOffset + this.buffer.written;
 
@@ -184,7 +184,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   private async writeFileData(
     compressionMethod: CompressionMethod,
     checkValues: Partial<DataDescriptor> = {},
-    content: ZipEntryData | undefined,
+    content: DataSource | undefined,
     options: ZipEntryInternalOptions,
   ): Promise<DataDescriptor> {
     const descriptor: DataDescriptor = {

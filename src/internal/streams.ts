@@ -31,6 +31,16 @@ export type RandomAccessReaderSourceOptions = {
   position?: number;
 };
 
+export type DataSource =
+  | Uint8Array
+  | string
+  | AsyncIterable<string>
+  | AsyncIterable<Uint8Array>
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
+  | ReadableStream<string>
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
+  | ReadableStream<Uint8Array>;
+
 export function randomAccessReaderFromBuffer(
   source: Uint8Array,
 ): RandomAccessReader {
@@ -107,6 +117,29 @@ export async function* iterableFromRandomAccessReader(
     } else {
       return;
     }
+  }
+}
+
+export async function* normalizeDataSource(
+  data: DataSource | undefined,
+): AsyncIterable<Uint8Array> {
+  if (data === undefined) {
+    return;
+  }
+  if (typeof data === "string") {
+    yield new TextEncoder().encode(data);
+  } else if (data instanceof Uint8Array) {
+    yield data;
+  } else {
+    const iterable = isAsyncIterable(data)
+      ? data
+      : iterableFromReadableStream<string | Uint8Array>(data);
+
+    const encoder = new TextEncoder();
+
+    yield* mapIterable(iterable, (chunk: string | Uint8Array) =>
+      typeof chunk === "string" ? encoder.encode(chunk) : chunk,
+    );
   }
 }
 

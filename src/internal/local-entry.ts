@@ -6,7 +6,6 @@ import {
   CompressionMethod,
   DosDate,
   type CompressionAlgorithms,
-  type ZipEntryData,
 } from "./field-types.js";
 import type {
   CompressionInfoFields,
@@ -16,10 +15,10 @@ import type {
 import { DataDescriptorSignature, LocalHeaderSignature } from "./signatures.js";
 import {
   identityStream,
-  isAsyncIterable,
-  iterableFromReadableStream,
   mapIterable,
+  normalizeDataSource,
   type ByteStream,
+  type DataSource,
 } from "./streams.js";
 
 export type LocalHeaderOptions = {
@@ -217,37 +216,14 @@ export function writeDataDescriptor64(entry: DataDescriptor): Uint8Array {
   return buffer.getOriginalBytes();
 }
 
-export async function* normalizeEntryData(
-  data: ZipEntryData | undefined,
-): AsyncIterable<Uint8Array> {
-  if (data === undefined) {
-    return;
-  }
-  if (typeof data === "string") {
-    yield new TextEncoder().encode(data);
-  } else if (data instanceof Uint8Array) {
-    yield data;
-  } else {
-    const iterable = isAsyncIterable(data)
-      ? data
-      : iterableFromReadableStream<string | Uint8Array>(data);
-
-    const encoder = new TextEncoder();
-
-    yield* mapIterable(iterable, (chunk: string | Uint8Array) =>
-      typeof chunk === "string" ? encoder.encode(chunk) : chunk,
-    );
-  }
-}
-
 export async function* compressEntry(
   compressionMethod: CompressionMethod,
   check: Partial<DataDescriptor> = {},
   output: DataDescriptor,
-  content: ZipEntryData | undefined,
+  content: DataSource | undefined,
   compressors: CompressionAlgorithms,
 ): AsyncGenerator<Uint8Array> {
-  const data = normalizeEntryData(content);
+  const data = normalizeDataSource(content);
 
   let compressor = compressors[compressionMethod];
   if (!compressor && compressionMethod === CompressionMethod.Stored) {

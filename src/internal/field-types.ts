@@ -38,16 +38,6 @@ export type CommonAttributes = {
   rawValue: number;
 };
 
-export type ZipEntryData =
-  | Uint8Array
-  | string
-  | AsyncIterable<string>
-  | AsyncIterable<Uint8Array>
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
-  | ReadableStream<string>
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
-  | ReadableStream<Uint8Array>;
-
 export class DosFileAttributes extends BitField implements CommonAttributes {
   public static readonly Directory = BitField.flag(4);
   public static readonly File = 0;
