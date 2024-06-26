@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import {
   DosFileAttributes,
   UnixFileAttributes,
-} from "../internal/field-types.js";
+} from "../internal/file-attributes.js";
 import { asyncIterable } from "../testing/data.js";
 import { ZipEntryReader } from "./entry-reader.js";
 

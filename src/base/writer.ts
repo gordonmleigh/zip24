@@ -21,11 +21,13 @@ import {
   GeneralPurposeFlags,
   ZipPlatform,
   ZipVersion,
-  getAttributesPlatform,
-  makePlatformAttributes,
   type ZipEntryInfo,
   type ZipEntryOptions,
 } from "../internal/field-types.js";
+import {
+  getAttributesPlatform,
+  makePlatformAttributes,
+} from "../internal/file-attributes.js";
 import {
   writeDataDescriptor32,
   writeDataDescriptor64,

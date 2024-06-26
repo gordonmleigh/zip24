@@ -2,12 +2,11 @@ import { assert } from "./assert.js";
 import { BufferView, type BufferLike } from "./binary.js";
 import { ZipSignatureError } from "./errors.js";
 import { readExtraFields, writeZip64ExtraField } from "./extra-fields.js";
+import { DosDate, GeneralPurposeFlags } from "./field-types.js";
 import {
-  DosDate,
-  GeneralPurposeFlags,
   isPlatformAttributes,
   makePlatformAttributes,
-} from "./field-types.js";
+} from "./file-attributes.js";
 import type {
   CentralHeaderDecodedVariableFields,
   CentralHeaderFixedFields,

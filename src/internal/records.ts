@@ -1,11 +1,10 @@
 import type { CompressionMethod } from "./compression-core.js";
 import type {
-  DosFileAttributes,
   GeneralPurposeFlags,
-  UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
 } from "./field-types.js";
+import type { FileAttributes } from "./file-attributes.js";
 
 export type LocalHeaderBase = {
   compressedSize: number;
@@ -39,7 +38,7 @@ export type CentralDirectory64VersionInfo = {
 };
 
 export type CentralHeaderBase = {
-  attributes: DosFileAttributes | UnixFileAttributes;
+  attributes: FileAttributes;
   flags: GeneralPurposeFlags;
   internalAttributes: number;
   lastModified: Date;

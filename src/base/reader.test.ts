@@ -2,11 +2,8 @@ import assert from "node:assert";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { CompressionMethod } from "../internal/compression-core.js";
-import {
-  UnixFileAttributes,
-  ZipPlatform,
-  ZipVersion,
-} from "../internal/field-types.js";
+import { ZipPlatform, ZipVersion } from "../internal/field-types.js";
+import { UnixFileAttributes } from "../internal/file-attributes.js";
 import {
   randomAccessReaderFromBuffer,
   type RandomAccessReader,

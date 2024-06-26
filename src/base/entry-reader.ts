@@ -1,11 +1,13 @@
 import { CompressionMethod } from "../internal/compression-core.js";
 import {
-  DosFileAttributes,
   GeneralPurposeFlags,
-  UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
 } from "../internal/field-types.js";
+import {
+  DosFileAttributes,
+  type FileAttributes,
+} from "../internal/file-attributes.js";
 import type { ZipEntryLike } from "../internal/interfaces.js";
 import {
   bufferFromIterable,
@@ -30,8 +32,7 @@ export class ZipEntryReader implements ZipEntryLike {
   public extraFieldLength = 0;
   public commentLength = 0;
   public internalAttributes = 0;
-  public attributes: DosFileAttributes | UnixFileAttributes =
-    new DosFileAttributes();
+  public attributes: FileAttributes = new DosFileAttributes();
   public localHeaderOffset = 0;
   public path = "";
   public comment = "";

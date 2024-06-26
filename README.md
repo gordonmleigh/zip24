@@ -95,7 +95,7 @@ Each entry has the following interface:
 
 ```ts
 type ZipEntryLike = AsyncIterable<Uint8Array> & {
-  readonly attributes: DosFileAttributes | UnixFileAttributes;
+  readonly attributes: FileAttributes;
   readonly flags: GeneralPurposeFlags;
   readonly internalAttributes: number;
   readonly lastModified: Date;

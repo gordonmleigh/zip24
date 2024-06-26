@@ -22,12 +22,11 @@ import {
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   DosDate,
-  DosFileAttributes,
   GeneralPurposeFlags,
-  UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
 } from "./field-types.js";
+import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.js";
 import type { CentralHeaderLengthFields, RawCentralHeader } from "./records.js";
 
 describe("readDirectoryEntry()", () => {
