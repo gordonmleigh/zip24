@@ -258,4 +258,10 @@ export function isAsyncIterable(
 
 export function isIterable(value: unknown): value is Iterable<unknown> {
   return hasExtraProperty(value, Symbol.iterator);
-}
+} /**
+ * A function which can transform data from an async iterable.
+ */
+
+export type AsyncTransform = (
+  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
+) => AsyncIterable<Uint8Array>;

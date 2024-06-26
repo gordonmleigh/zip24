@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
 import { ZipEntryReader } from "../base/entry-reader.js";
+import { CompressionMethod } from "../internal/compression-core.js";
 import {
-  CompressionMethod,
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,

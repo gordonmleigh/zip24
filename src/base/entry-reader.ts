@@ -1,5 +1,5 @@
+import { CompressionMethod } from "../internal/compression-core.js";
 import {
-  CompressionMethod,
   DosFileAttributes,
   GeneralPurposeFlags,
   UnixFileAttributes,

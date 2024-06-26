@@ -3,11 +3,6 @@ import { BitField } from "./binary.js";
 import { ZipFormatError } from "./errors.js";
 import type { DecodedCentralHeader } from "./records.js";
 
-export enum CompressionMethod {
-  Stored = 0,
-  Deflate = 8,
-}
-
 export enum ZipPlatform {
   // 4.4.2.2 The current mappings are:
   //   0 - MS-DOS and OS/2 (FAT / VFAT / FAT32 file systems)
@@ -425,20 +420,6 @@ export class DosDate extends Date {
     return this.getTime();
   }
 }
-
-/**
- * A function which can transform data from an async iterable.
- */
-export type AsyncTransform = (
-  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
-) => AsyncIterable<Uint8Array>;
-
-/**
- * A map of compression methods to compression/decompression algorithms.
- */
-export type CompressionAlgorithms = Partial<
-  Record<CompressionMethod, AsyncTransform>
->;
 
 type PublicEntryFields = Omit<
   DecodedCentralHeader,

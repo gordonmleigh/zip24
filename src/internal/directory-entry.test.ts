@@ -12,6 +12,7 @@ import {
   utf8,
   utf8length,
 } from "../testing/data.js";
+import { CompressionMethod } from "./compression-core.js";
 import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
@@ -20,7 +21,6 @@ import {
 } from "./directory-entry.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
-  CompressionMethod,
   DosDate,
   DosFileAttributes,
   GeneralPurposeFlags,

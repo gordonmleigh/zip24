@@ -1,7 +1,7 @@
 import {
   CompressionMethod,
   type CompressionAlgorithms,
-} from "../internal/field-types.js";
+} from "../internal/compression-core.js";
 import {
   iterableFromReadableStream,
   readableStreamFromIterable,

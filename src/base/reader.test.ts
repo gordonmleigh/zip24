@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
+import { CompressionMethod } from "../internal/compression-core.js";
 import {
-  CompressionMethod,
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,

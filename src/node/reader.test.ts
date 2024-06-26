@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { ZipEntryReader } from "../base/entry-reader.js";
+import { CompressionMethod } from "../internal/compression-core.js";
 import {
-  CompressionMethod,
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,

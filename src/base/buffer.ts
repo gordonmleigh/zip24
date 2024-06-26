@@ -2,15 +2,15 @@ import { assert } from "../internal/assert.js";
 import { BufferView, type BufferLike } from "../internal/binary.js";
 import { readZipTrailer } from "../internal/central-directory.js";
 import {
+  decompress,
+  type CompressionAlgorithms,
+} from "../internal/compression-core.js";
+import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
 } from "../internal/directory-entry.js";
-import type { CompressionAlgorithms } from "../internal/field-types.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
-import {
-  decompressEntry,
-  readLocalHeaderSize,
-} from "../internal/local-entry.js";
+import { readLocalHeaderSize } from "../internal/local-entry.js";
 import type { CentralDirectory } from "../internal/records.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader } from "./entry-reader.js";
@@ -74,7 +74,8 @@ export class ZipBufferReader implements ZipReaderLike {
         entry.compressedSize,
       );
 
-      entry.uncompressedData = decompressEntry(
+      entry.uncompressedData = decompress(
+        entry.compressionMethod,
         entry,
         [compressedData],
         this.decompressors,

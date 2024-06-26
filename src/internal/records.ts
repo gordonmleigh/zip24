@@ -1,5 +1,5 @@
+import type { CompressionMethod } from "./compression-core.js";
 import type {
-  CompressionMethod,
   DosFileAttributes,
   GeneralPurposeFlags,
   UnixFileAttributes,
@@ -81,19 +81,6 @@ export type DecodedCentralHeaderWithLengths = DecodedCentralHeader &
 
 export type RawCentralHeader = CentralHeaderBase &
   CentralHeaderRawVariableFields;
-
-export type CompressionInfoFields = {
-  compressedSize: number;
-  compressionMethod: CompressionMethod;
-  crc32: number;
-  uncompressedSize: number;
-};
-
-export type DataDescriptor = {
-  compressedSize: number;
-  crc32: number;
-  uncompressedSize: number;
-};
 
 export type Zip64ExtraField = {
   compressedSize: number;

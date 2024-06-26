@@ -1,4 +1,10 @@
 import { writeZipTrailer } from "../internal/central-directory.js";
+import {
+  CompressionMethod,
+  compress,
+  type CompressionAlgorithms,
+  type DataDescriptor,
+} from "../internal/compression-core.js";
 import { CodePage437Encoder } from "../internal/cp437.js";
 import { writeDirectoryHeader } from "../internal/directory-entry.js";
 import {
@@ -12,25 +18,21 @@ import {
   needsUtf8,
 } from "../internal/entry-utils.js";
 import {
-  CompressionMethod,
   GeneralPurposeFlags,
   ZipPlatform,
   ZipVersion,
   getAttributesPlatform,
   makePlatformAttributes,
-  type CompressionAlgorithms,
   type ZipEntryInfo,
   type ZipEntryOptions,
 } from "../internal/field-types.js";
 import {
-  compressEntry,
   writeDataDescriptor32,
   writeDataDescriptor64,
   writeLocalHeader,
 } from "../internal/local-entry.js";
 import type {
   CentralDirectory64VersionInfo,
-  DataDescriptor,
   RawCentralHeader,
   RawLocalHeader,
 } from "../internal/records.js";
@@ -194,7 +196,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     };
 
     await this.buffer.pipeFrom(
-      compressEntry(
+      compress(
         compressionMethod,
         checkValues,
         descriptor,

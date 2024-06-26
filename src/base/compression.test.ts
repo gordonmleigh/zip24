@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { buffer, text } from "node:stream/consumers";
 import { describe, it } from "node:test";
-import { CompressionMethod } from "../internal/field-types.js";
+import { CompressionMethod } from "../internal/compression-core.js";
 import { maxChunkSize } from "../internal/streams.js";
 import { asyncIterable, base64, base64iterable } from "../testing/data.js";
 import { defaultCompressors, defaultDecompressors } from "./compression.js";

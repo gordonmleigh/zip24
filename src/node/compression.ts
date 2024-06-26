@@ -3,7 +3,7 @@ import { createDeflateRaw, createInflateRaw } from "node:zlib";
 import {
   CompressionMethod,
   type CompressionAlgorithms,
-} from "../internal/field-types.js";
+} from "../internal/compression-core.js";
 
 /**
  * Default Node.js (zlib) compression methods.
