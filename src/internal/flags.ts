@@ -1,5 +1,4 @@
 import { BitField } from "./binary.js";
-import type { DecodedCentralHeader } from "./records.js";
 
 export class GeneralPurposeFlags extends BitField {
   public static readonly HasEncryption = BitField.flag(0);
@@ -33,15 +32,3 @@ export class GeneralPurposeFlags extends BitField {
     this.setBit(11, value);
   }
 }
-
-type PublicEntryFields = Omit<
-  DecodedCentralHeader,
-  "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
->;
-
-export type ZipEntryOptions = {
-  utf8?: boolean;
-  zip64?: boolean;
-};
-
-export type ZipEntryInfo = Partial<PublicEntryFields> & ZipEntryOptions;

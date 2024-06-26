@@ -1,10 +1,10 @@
 import { CompressionMethod } from "../internal/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../internal/constants.js";
-import { GeneralPurposeFlags } from "../internal/field-types.js";
 import {
   DosFileAttributes,
   type FileAttributes,
 } from "../internal/file-attributes.js";
+import { GeneralPurposeFlags } from "../internal/flags.js";
 import type { ZipEntryLike } from "../internal/interfaces.js";
 import {
   bufferFromIterable,

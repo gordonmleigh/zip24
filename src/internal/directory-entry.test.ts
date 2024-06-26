@@ -22,8 +22,8 @@ import {
 } from "./directory-entry.js";
 import { DosDate } from "./dos-date.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
-import { GeneralPurposeFlags } from "./field-types.js";
 import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.js";
+import { GeneralPurposeFlags } from "./flags.js";
 import type { CentralHeaderLengthFields, RawCentralHeader } from "./records.js";
 
 describe("readDirectoryEntry()", () => {

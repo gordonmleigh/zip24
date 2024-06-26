@@ -19,14 +19,10 @@ import {
   needsUtf8,
 } from "../internal/entry-utils.js";
 import {
-  GeneralPurposeFlags,
-  type ZipEntryInfo,
-  type ZipEntryOptions,
-} from "../internal/field-types.js";
-import {
   getAttributesPlatform,
   makePlatformAttributes,
 } from "../internal/file-attributes.js";
+import { GeneralPurposeFlags } from "../internal/flags.js";
 import {
   writeDataDescriptor32,
   writeDataDescriptor64,
@@ -36,6 +32,8 @@ import type {
   CentralDirectory64VersionInfo,
   RawCentralHeader,
   RawLocalHeader,
+  ZipEntryInfo,
+  ZipEntryOptions,
 } from "../internal/records.js";
 import { Semaphore } from "../internal/semaphore.js";
 import type { DataSource } from "../internal/streams.js";

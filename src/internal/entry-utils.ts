@@ -1,8 +1,11 @@
 import type { DataDescriptor } from "./compression-core.js";
 import { ZipVersion } from "./constants.js";
 import { canBeCodePage437Encoded } from "./cp437.js";
-import type { ZipEntryInfo, ZipEntryOptions } from "./field-types.js";
-import type { Zip64ExtraField } from "./records.js";
+import type {
+  Zip64ExtraField,
+  ZipEntryInfo,
+  ZipEntryOptions,
+} from "./records.js";
 
 export function minimumVersion(
   options: ZipEntryOptions,

@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { GeneralPurposeFlags } from "./field-types.js";
+import { GeneralPurposeFlags } from "./flags.js";
 
 describe("GeneralPurposeFlags", () => {
   describe("hasEncryption", () => {

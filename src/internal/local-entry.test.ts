@@ -14,7 +14,7 @@ import {
 import { CompressionMethod, type DataDescriptor } from "./compression-core.js";
 import { ZipVersion } from "./constants.js";
 import { ZipSignatureError } from "./errors.js";
-import { GeneralPurposeFlags } from "./field-types.js";
+import { GeneralPurposeFlags } from "./flags.js";
 import {
   readLocalHeaderSize,
   writeDataDescriptor32,

@@ -1,7 +1,7 @@
 import type { CompressionMethod } from "./compression-core.js";
 import type { ZipPlatform, ZipVersion } from "./constants.js";
-import type { GeneralPurposeFlags } from "./field-types.js";
 import type { FileAttributes } from "./file-attributes.js";
+import type { GeneralPurposeFlags } from "./flags.js";
 
 export type LocalHeaderBase = {
   compressedSize: number;
@@ -91,3 +91,15 @@ export enum ExtendedDataTag {
   UnicodePathField = 0x7075,
   Unix = 0x0d,
 }
+
+export type PublicEntryFields = Omit<
+  DecodedCentralHeader,
+  "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"
+>;
+
+export type ZipEntryOptions = {
+  utf8?: boolean;
+  zip64?: boolean;
+};
+
+export type ZipEntryInfo = Partial<PublicEntryFields> & ZipEntryOptions;

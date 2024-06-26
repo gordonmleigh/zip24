@@ -3,11 +3,11 @@ import { BufferView, type BufferLike } from "./binary.js";
 import { DosDate } from "./dos-date.js";
 import { ZipSignatureError } from "./errors.js";
 import { readExtraFields, writeZip64ExtraField } from "./extra-fields.js";
-import { GeneralPurposeFlags } from "./field-types.js";
 import {
   isPlatformAttributes,
   makePlatformAttributes,
 } from "./file-attributes.js";
+import { GeneralPurposeFlags } from "./flags.js";
 import type {
   CentralHeaderDecodedVariableFields,
   CentralHeaderFixedFields,
