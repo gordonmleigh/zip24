@@ -1,2 +1,2 @@
-export * from "./internal/errors.js";
-export * from "./internal/flags.js";
+export * from "./core/errors.js";
+export * from "./core/flags.js";

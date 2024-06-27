@@ -1,15 +1,15 @@
-import { readZipTrailer } from "../internal/central-directory.js";
+import { readZipTrailer } from "../core/central-directory.js";
 import {
   decompress,
   type CompressionAlgorithms,
-} from "../internal/compression-core.js";
+} from "../core/compression-core.js";
 import {
   getDirectoryHeaderLength,
   readDirectoryEntry,
-} from "../internal/directory-entry.js";
-import type { ZipReaderLike } from "../internal/interfaces.js";
-import { readLocalHeaderSize } from "../internal/local-entry.js";
-import type { CentralDirectory } from "../internal/records.js";
+} from "../core/directory-entry.js";
+import type { ZipReaderLike } from "../core/interfaces.js";
+import { readLocalHeaderSize } from "../core/local-entry.js";
+import type { CentralDirectory } from "../core/records.js";
 import { assert } from "../util/assert.js";
 import { BufferView, type BufferLike } from "../util/binary.js";
 import { defaultDecompressors } from "./compression.js";

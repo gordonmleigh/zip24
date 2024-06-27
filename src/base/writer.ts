@@ -1,35 +1,35 @@
-import { writeZipTrailer } from "../internal/central-directory.js";
+import { writeZipTrailer } from "../core/central-directory.js";
 import {
   CompressionMethod,
   compress,
   type CompressionAlgorithms,
   type DataDescriptor,
-} from "../internal/compression-core.js";
-import { ZipPlatform, ZipVersion } from "../internal/constants.js";
-import { writeDirectoryHeader } from "../internal/directory-entry.js";
+} from "../core/compression-core.js";
+import { ZipPlatform, ZipVersion } from "../core/constants.js";
+import { writeDirectoryHeader } from "../core/directory-entry.js";
 import {
   minimumVersion,
   needs64bit,
   needsDataDescriptor,
   needsUtf8,
-} from "../internal/entry-utils.js";
+} from "../core/entry-utils.js";
 import {
   getAttributesPlatform,
   makePlatformAttributes,
-} from "../internal/file-attributes.js";
-import { GeneralPurposeFlags } from "../internal/flags.js";
+} from "../core/file-attributes.js";
+import { GeneralPurposeFlags } from "../core/flags.js";
 import {
   writeDataDescriptor32,
   writeDataDescriptor64,
   writeLocalHeader,
-} from "../internal/local-entry.js";
+} from "../core/local-entry.js";
 import type {
   CentralDirectory64VersionInfo,
   RawCentralHeader,
   RawLocalHeader,
   ZipEntryInfo,
   ZipEntryOptions,
-} from "../internal/records.js";
+} from "../core/records.js";
 import { CodePage437Encoder } from "../util/cp437.js";
 import {
   ByteLengthStrategy,

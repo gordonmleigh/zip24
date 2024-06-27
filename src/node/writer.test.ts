@@ -1,12 +1,12 @@
 import { buffer } from "node:stream/consumers";
 import { describe, it } from "node:test";
 import { GeneralPurposeFlags } from "../common.js";
-import { CompressionMethod } from "../internal/compression-core.js";
-import { ZipPlatform, ZipVersion } from "../internal/constants.js";
+import { CompressionMethod } from "../core/compression-core.js";
+import { ZipPlatform, ZipVersion } from "../core/constants.js";
 import {
   DosFileAttributes,
   UnixFileAttributes,
-} from "../internal/file-attributes.js";
+} from "../core/file-attributes.js";
 import { assertBufferEqual } from "../testing/assert.js";
 import {
   bigUint,
