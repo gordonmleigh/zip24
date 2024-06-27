@@ -45,7 +45,10 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
    * Create a new instance and call open().
    */
   public static async fromReader<Instance extends ZipReader>(
-    this: Constructor<Instance>,
+    this: Constructor<
+      Instance,
+      [RandomAccessReader, number, ZipReaderOptions | undefined]
+    >,
     reader: RandomAccessReader,
     fileSize: number,
     options?: ZipReaderOptions,
