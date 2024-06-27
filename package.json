@@ -8,22 +8,6 @@
     "node": ">=18"
   },
   "exports": {
-    "./base/buffer": {
-      "types": "./lib/base/buffer.d.ts",
-      "default": "./lib/base/buffer.js"
-    },
-    "./base/compression": {
-      "types": "./lib/base/compression.d.ts",
-      "default": "./lib/base/compression.js"
-    },
-    "./base/reader": {
-      "types": "./lib/base/reader.d.ts",
-      "default": "./lib/base/reader.js"
-    },
-    "./base/writer": {
-      "types": "./lib/base/writer.d.ts",
-      "default": "./lib/base/writer.js"
-    },
     "./node/buffer": {
       "types": "./lib/node/buffer.d.ts",
       "default": "./lib/node/buffer.js"
@@ -46,8 +30,8 @@
         "default": "./lib/node/buffer.js"
       },
       "default": {
-        "types": "./lib/base/buffer.d.ts",
-        "default": "./lib/base/buffer.js"
+        "types": "./lib/web/buffer.d.ts",
+        "default": "./lib/web/buffer.js"
       }
     },
     "./compression": {
@@ -56,8 +40,8 @@
         "default": "./lib/node/compression.js"
       },
       "default": {
-        "types": "./lib/base/compression.d.ts",
-        "default": "./lib/base/compression.js"
+        "types": "./lib/web/compression.d.ts",
+        "default": "./lib/web/compression.js"
       }
     },
     "./reader": {
@@ -66,9 +50,25 @@
         "default": "./lib/node/reader.js"
       },
       "default": {
-        "types": "./lib/base/reader.d.ts",
-        "default": "./lib/base/reader.js"
+        "types": "./lib/web/reader.d.ts",
+        "default": "./lib/web/reader.js"
       }
+    },
+    "./web/buffer": {
+      "types": "./lib/web/buffer.d.ts",
+      "default": "./lib/web/buffer.js"
+    },
+    "./web/compression": {
+      "types": "./lib/web/compression.d.ts",
+      "default": "./lib/web/compression.js"
+    },
+    "./web/reader": {
+      "types": "./lib/web/reader.d.ts",
+      "default": "./lib/web/reader.js"
+    },
+    "./web/writer": {
+      "types": "./lib/web/writer.d.ts",
+      "default": "./lib/web/writer.js"
     },
     "./writer": {
       "node": {
@@ -76,8 +76,8 @@
         "default": "./lib/node/writer.js"
       },
       "default": {
-        "types": "./lib/base/writer.d.ts",
-        "default": "./lib/base/writer.js"
+        "types": "./lib/web/writer.d.ts",
+        "default": "./lib/web/writer.js"
       }
     },
     "./common": {

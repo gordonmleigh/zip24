@@ -1,7 +1,7 @@
 import {
   ZipWriter as ZipWriterBase,
   type ZipWriterOptions as ZipWriterBaseOptions,
-} from "../base/writer.js";
+} from "../web/writer.js";
 import { defaultCompressors } from "./compression.js";
 
 export type ZipWriterOptions = ZipWriterBaseOptions;

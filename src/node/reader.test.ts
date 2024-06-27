@@ -3,7 +3,6 @@ import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { ZipEntryReader } from "../base/entry-reader.js";
 import { CompressionMethod } from "../core/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../core/constants.js";
 import { UnixFileAttributes } from "../core/file-attributes.js";
@@ -14,6 +13,7 @@ import {
   getTemporaryOutputDirectory,
 } from "../test-util/fixtures.js";
 import { randomAccessReaderFromBuffer } from "../util/streams.js";
+import { ZipEntryReader } from "../web/entry-reader.js";
 import { ZipReader } from "./reader.js";
 
 describe("node/reader", () => {

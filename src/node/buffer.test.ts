@@ -1,10 +1,10 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
-import { ZipEntryReader } from "../base/entry-reader.js";
 import { CompressionMethod } from "../core/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../core/constants.js";
 import { UnixFileAttributes } from "../core/file-attributes.js";
 import { EmptyZip32, Zip32WithThreeEntries } from "../test-util/fixtures.js";
+import { ZipEntryReader } from "../web/entry-reader.js";
 import { ZipBufferReader } from "./buffer.js";
 
 describe("node/buffer", () => {

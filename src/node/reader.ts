@@ -1,9 +1,9 @@
 import { open } from "node:fs/promises";
+import type { RandomAccessReader } from "../util/streams.js";
 import {
   ZipReader as ZipReaderBase,
   type ZipReaderOptions,
-} from "../base/reader.js";
-import type { RandomAccessReader } from "../util/streams.js";
+} from "../web/reader.js";
 import { defaultDecompressors } from "./compression.js";
 
 /**
