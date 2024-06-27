@@ -39,7 +39,6 @@ export class ZipEntryReader implements ZipEntryLike {
   }
 
   public get isFile(): boolean {
-    // is indeterminate if we can't understand the attributes
     return !this.path.endsWith("/") && !!this.attributes.isFile;
   }
 
