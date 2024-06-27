@@ -1,6 +1,6 @@
-import { hasProperty } from "./assert.js";
-import { BufferView, type BufferLike } from "./binary.js";
-import { CodePage437Decoder, CodePage437Encoder } from "./cp437.js";
+import { hasProperty } from "../util/assert.js";
+import { BufferView, type BufferLike } from "../util/binary.js";
+import { CodePage437Decoder, CodePage437Encoder } from "../util/cp437.js";
 import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
 import type { CentralDirectory, CentralDirectory64 } from "./records.js";
 import {

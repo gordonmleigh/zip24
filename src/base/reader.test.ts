@@ -5,14 +5,14 @@ import { CompressionMethod } from "../internal/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../internal/constants.js";
 import { UnixFileAttributes } from "../internal/file-attributes.js";
 import {
-  randomAccessReaderFromBuffer,
-  type RandomAccessReader,
-} from "../internal/streams.js";
-import {
   EmptyZip32,
   Zip32WithThreeEntries,
   generateZip,
 } from "../testing/fixtures.js";
+import {
+  randomAccessReaderFromBuffer,
+  type RandomAccessReader,
+} from "../util/streams.js";
 import { ZipEntryReader } from "./entry-reader.js";
 import { ZipReader } from "./reader.js";
 

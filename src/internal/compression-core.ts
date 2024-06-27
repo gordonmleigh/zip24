@@ -1,5 +1,4 @@
-import { computeCrc32 } from "./crc32.js";
-import { ZipFormatError } from "./errors.js";
+import { computeCrc32 } from "../util/crc32.js";
 import {
   identityStream,
   mapIterable,
@@ -7,7 +6,8 @@ import {
   type AsyncTransform,
   type ByteStream,
   type DataSource,
-} from "./streams.js";
+} from "../util/streams.js";
+import { ZipFormatError } from "./errors.js";
 
 export enum CompressionMethod {
   Stored = 0,

@@ -1,6 +1,6 @@
+import { canBeCodePage437Encoded } from "../util/cp437.js";
 import type { DataDescriptor } from "./compression-core.js";
 import { ZipVersion } from "./constants.js";
-import { canBeCodePage437Encoded } from "./cp437.js";
 import type {
   Zip64ExtraField,
   ZipEntryInfo,

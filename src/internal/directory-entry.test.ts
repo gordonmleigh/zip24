@@ -12,6 +12,7 @@ import {
   utf8,
   utf8length,
 } from "../testing/data.js";
+import { DosDate } from "../util/dos-date.js";
 import { CompressionMethod } from "./compression-core.js";
 import { ZipPlatform, ZipVersion } from "./constants.js";
 import {
@@ -20,7 +21,6 @@ import {
   readDirectoryVariableFields,
   writeDirectoryHeader,
 } from "./directory-entry.js";
-import { DosDate } from "./dos-date.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.js";
 import { GeneralPurposeFlags } from "./flags.js";

@@ -1,5 +1,5 @@
+import type { ByteStream } from "../util/streams.js";
 import type { DecodedCentralHeader } from "./records.js";
-import type { ByteStream } from "./streams.js";
 
 /**
  * Represents an object which can read a zip file.

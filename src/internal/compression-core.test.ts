@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { asyncIterable } from "../testing/data.js";
+import { bufferFromIterable, type ByteStream } from "../util/streams.js";
 import {
   CompressionMethod,
   compress,
@@ -9,7 +10,6 @@ import {
   type DataDescriptor,
 } from "./compression-core.js";
 import { ZipFormatError } from "./errors.js";
-import { bufferFromIterable, type ByteStream } from "./streams.js";
 
 describe("compress", () => {
   it("falls back to passing through the input for CompressionMethod.Stored", async () => {

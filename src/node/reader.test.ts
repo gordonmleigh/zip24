@@ -7,13 +7,13 @@ import { ZipEntryReader } from "../base/entry-reader.js";
 import { CompressionMethod } from "../internal/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../internal/constants.js";
 import { UnixFileAttributes } from "../internal/file-attributes.js";
-import { randomAccessReaderFromBuffer } from "../internal/streams.js";
 import {
   EmptyZip32,
   Zip32WithThreeEntries,
   generateZip,
   getTemporaryOutputDirectory,
 } from "../testing/fixtures.js";
+import { randomAccessReaderFromBuffer } from "../util/streams.js";
 import { ZipReader } from "./reader.js";
 
 describe("node/reader", () => {

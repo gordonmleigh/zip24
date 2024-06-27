@@ -1,6 +1,6 @@
-import { BufferView, type BufferLike } from "./binary.js";
-import { CodePage437Encoder } from "./cp437.js";
-import { computeCrc32 } from "./crc32.js";
+import { BufferView, type BufferLike } from "../util/binary.js";
+import { CodePage437Encoder } from "../util/cp437.js";
+import { computeCrc32 } from "../util/crc32.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   ExtendedDataTag,

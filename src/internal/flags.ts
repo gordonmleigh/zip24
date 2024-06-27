@@ -1,4 +1,4 @@
-import { BitField } from "./binary.js";
+import { BitField } from "../util/binary.js";
 
 export class GeneralPurposeFlags extends BitField {
   public static readonly HasEncryption = BitField.flag(0);

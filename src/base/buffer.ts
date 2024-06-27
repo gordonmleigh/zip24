@@ -1,5 +1,3 @@
-import { assert } from "../internal/assert.js";
-import { BufferView, type BufferLike } from "../internal/binary.js";
 import { readZipTrailer } from "../internal/central-directory.js";
 import {
   decompress,
@@ -12,6 +10,8 @@ import {
 import type { ZipReaderLike } from "../internal/interfaces.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import type { CentralDirectory } from "../internal/records.js";
+import { assert } from "../util/assert.js";
+import { BufferView, type BufferLike } from "../util/binary.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader } from "./entry-reader.js";
 

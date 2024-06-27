@@ -2,7 +2,7 @@ import {
   ZipBufferReader as ZipBufferReaderBase,
   type ZipBufferReaderOptions,
 } from "../base/buffer.js";
-import type { BufferLike } from "../internal/binary.js";
+import type { BufferLike } from "../util/binary.js";
 import { defaultDecompressors } from "./compression.js";
 
 /**

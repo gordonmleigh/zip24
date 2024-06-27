@@ -1,6 +1,6 @@
-import { assert } from "./assert.js";
-import { BufferView, type BufferLike } from "./binary.js";
-import { DosDate } from "./dos-date.js";
+import { assert } from "../util/assert.js";
+import { BufferView, type BufferLike } from "../util/binary.js";
+import { DosDate } from "../util/dos-date.js";
 import { ZipSignatureError } from "./errors.js";
 import { readExtraFields, writeZip64ExtraField } from "./extra-fields.js";
 import {

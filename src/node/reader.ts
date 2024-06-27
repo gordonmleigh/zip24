@@ -3,7 +3,7 @@ import {
   ZipReader as ZipReaderBase,
   type ZipReaderOptions,
 } from "../base/reader.js";
-import type { RandomAccessReader } from "../internal/streams.js";
+import type { RandomAccessReader } from "../util/streams.js";
 import { defaultDecompressors } from "./compression.js";
 
 /**

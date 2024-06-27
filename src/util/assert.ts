@@ -1,4 +1,4 @@
-import type { RequiredBy } from "./type-utils.js";
+import type { RequiredBy } from "../util/type-utils.js";
 
 export class AssertionError extends Error {
   public constructor(message: string, options?: ErrorOptions) {

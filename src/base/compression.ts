@@ -5,7 +5,7 @@ import {
 import {
   iterableFromReadableStream,
   readableStreamFromIterable,
-} from "../internal/streams.js";
+} from "../util/streams.js";
 
 /**
  * Default Web API (CompressionStream) compression methods.

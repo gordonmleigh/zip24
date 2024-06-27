@@ -1,5 +1,5 @@
-import { assert } from "./assert.js";
-import { BitField } from "./binary.js";
+import { assert } from "../util/assert.js";
+import { BitField } from "../util/binary.js";
 import { ZipPlatform } from "./constants.js";
 import { ZipFormatError } from "./errors.js";
 

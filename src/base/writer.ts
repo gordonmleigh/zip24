@@ -6,12 +6,7 @@ import {
   type DataDescriptor,
 } from "../internal/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../internal/constants.js";
-import { CodePage437Encoder } from "../internal/cp437.js";
 import { writeDirectoryHeader } from "../internal/directory-entry.js";
-import {
-  ByteLengthStrategy,
-  DoubleEndedBuffer,
-} from "../internal/double-ended-buffer.js";
 import {
   minimumVersion,
   needs64bit,
@@ -35,8 +30,13 @@ import type {
   ZipEntryInfo,
   ZipEntryOptions,
 } from "../internal/records.js";
-import { Semaphore } from "../internal/semaphore.js";
-import type { DataSource } from "../internal/streams.js";
+import { CodePage437Encoder } from "../util/cp437.js";
+import {
+  ByteLengthStrategy,
+  DoubleEndedBuffer,
+} from "../util/double-ended-buffer.js";
+import { Semaphore } from "../util/semaphore.js";
+import type { DataSource } from "../util/streams.js";
 import { defaultCompressors } from "./compression.js";
 
 type ZipEntryInternalOptions = ZipEntryOptions & {

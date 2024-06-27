@@ -11,7 +11,7 @@ import {
   readableStreamFromIterable,
   textFromIterable,
   type ByteStream,
-} from "../internal/streams.js";
+} from "../util/streams.js";
 
 export class ZipEntryReader implements ZipEntryLike {
   private uncompressedDataInternal?: ByteStream;

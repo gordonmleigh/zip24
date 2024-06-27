@@ -1,6 +1,6 @@
-import { BufferView, type BufferLike } from "./binary.js";
+import { BufferView, type BufferLike } from "../util/binary.js";
+import { DosDate } from "../util/dos-date.js";
 import type { DataDescriptor } from "./compression-core.js";
-import { DosDate } from "./dos-date.js";
 import { ZipSignatureError } from "./errors.js";
 import { writeZip64ExtraField } from "./extra-fields.js";
 import type { RawLocalHeader } from "./records.js";

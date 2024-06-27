@@ -1,4 +1,3 @@
-import { assert } from "../internal/assert.js";
 import {
   readZip64Eocdr,
   readZipTrailer,
@@ -12,9 +11,7 @@ import {
   readDirectoryHeader,
   readDirectoryVariableFields,
 } from "../internal/directory-entry.js";
-import { asyncDisposeOrClose } from "../internal/disposable.js";
 import type { ZipReaderLike } from "../internal/interfaces.js";
-import { lazy } from "../internal/lazy.js";
 import { readLocalHeaderSize } from "../internal/local-entry.js";
 import type { CentralDirectory } from "../internal/records.js";
 import {
@@ -22,11 +19,14 @@ import {
   LocalHeaderLength,
   Zip64EocdrLength,
 } from "../internal/signatures.js";
+import { assert } from "../util/assert.js";
+import { asyncDisposeOrClose } from "../util/disposable.js";
+import { lazy } from "../util/lazy.js";
 import {
   iterableFromRandomAccessReader,
   type RandomAccessReader,
-} from "../internal/streams.js";
-import type { Constructor } from "../internal/type-utils.js";
+} from "../util/streams.js";
+import type { Constructor } from "../util/type-utils.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader } from "./entry-reader.js";
 
