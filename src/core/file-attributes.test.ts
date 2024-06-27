@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertInstanceOf } from "../testing/assert.js";
+import { assertInstanceOf } from "../test-util/assert.js";
 import { ZipPlatform } from "./constants.js";
 import { ZipFormatError } from "./errors.js";
 import {

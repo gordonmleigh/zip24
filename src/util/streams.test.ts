@@ -2,9 +2,9 @@ import assert from "node:assert";
 import { Readable } from "node:stream";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { assertBufferEqual } from "../testing/assert.js";
-import { data, utf8 } from "../testing/data.js";
-import { makeNonIterableReadableStream } from "../testing/util.js";
+import { assertBufferEqual } from "../test-util/assert.js";
+import { data, utf8 } from "../test-util/data.js";
+import { makeNonIterableReadableStream } from "../test-util/util.js";
 import {
   bufferFromIterable,
   getAsyncIterator,

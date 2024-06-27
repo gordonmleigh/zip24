@@ -5,7 +5,7 @@ import {
   DosFileAttributes,
   UnixFileAttributes,
 } from "../core/file-attributes.js";
-import { asyncIterable } from "../testing/data.js";
+import { asyncIterable } from "../test-util/data.js";
 import { ZipEntryReader } from "./entry-reader.js";
 
 describe("base/entry-reader", () => {

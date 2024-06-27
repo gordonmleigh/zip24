@@ -8,7 +8,7 @@ import {
   EmptyZip32,
   Zip32WithThreeEntries,
   generateZip,
-} from "../testing/fixtures.js";
+} from "../test-util/fixtures.js";
 import {
   randomAccessReaderFromBuffer,
   type RandomAccessReader,

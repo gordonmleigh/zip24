@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../testing/assert.js";
+import { assertBufferEqual } from "../test-util/assert.js";
 import {
   bigUint,
   cp437,
@@ -10,7 +10,7 @@ import {
   shortUint,
   utf8,
   utf8length,
-} from "../testing/data.js";
+} from "../test-util/data.js";
 import { CompressionMethod, type DataDescriptor } from "./compression-core.js";
 import { ZipVersion } from "./constants.js";
 import { ZipSignatureError } from "./errors.js";

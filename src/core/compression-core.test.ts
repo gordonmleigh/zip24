@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { asyncIterable } from "../testing/data.js";
+import { asyncIterable } from "../test-util/data.js";
 import { bufferFromIterable, type ByteStream } from "../util/streams.js";
 import {
   CompressionMethod,

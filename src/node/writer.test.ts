@@ -7,7 +7,7 @@ import {
   DosFileAttributes,
   UnixFileAttributes,
 } from "../core/file-attributes.js";
-import { assertBufferEqual } from "../testing/assert.js";
+import { assertBufferEqual } from "../test-util/assert.js";
 import {
   bigUint,
   cp437,
@@ -23,7 +23,7 @@ import {
   utf8,
   utf8length,
   utf8length32,
-} from "../testing/data.js";
+} from "../test-util/data.js";
 import { ZipWriter } from "./writer.js";
 
 describe("node/writer", () => {

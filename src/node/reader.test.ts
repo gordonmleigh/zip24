@@ -12,7 +12,7 @@ import {
   Zip32WithThreeEntries,
   generateZip,
   getTemporaryOutputDirectory,
-} from "../testing/fixtures.js";
+} from "../test-util/fixtures.js";
 import { randomAccessReaderFromBuffer } from "../util/streams.js";
 import { ZipReader } from "./reader.js";
 

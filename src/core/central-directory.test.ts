@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../testing/assert.js";
+import { assertBufferEqual } from "../test-util/assert.js";
 import {
   bigUint,
   cp437,
@@ -8,7 +8,7 @@ import {
   longUint,
   shortUint,
   tinyUint,
-} from "../testing/data.js";
+} from "../test-util/data.js";
 import {
   readEocdl,
   readEocdr,

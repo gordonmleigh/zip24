@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../testing/assert.js";
-import { data } from "../testing/data.js";
+import { assertBufferEqual } from "../test-util/assert.js";
+import { data } from "../test-util/data.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
   readExtraFields,
