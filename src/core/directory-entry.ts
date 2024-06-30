@@ -1,8 +1,14 @@
 import { assert } from "../util/assert.js";
 import { BufferView, type BufferLike } from "../util/binary.js";
+import { CodePage437Decoder } from "../util/cp437.js";
+import { computeCrc32 } from "../util/crc32.js";
 import { DosDate } from "../util/dos-date.js";
+import { ExtraFieldTag } from "./constants.js";
 import { ZipSignatureError } from "./errors.js";
-import { readExtraFields, writeZip64ExtraField } from "./extra-fields.js";
+import {
+  ExtraFieldCollection,
+  Zip64ExtraField,
+} from "./extra-field-collection.js";
 import {
   isPlatformAttributes,
   makePlatformAttributes,
@@ -124,22 +130,41 @@ export function readDirectoryVariableFields(
     throw new ZipSignatureError("central directory header", signature);
   }
 
-  const encoding = entry.flags?.hasUtf8Strings ? "utf8" : "cp437";
+  const rawPath = view.getOriginalBytes(CentralHeaderLength, entry.pathLength);
 
-  entry.path = view.readString(encoding, CentralHeaderLength, entry.pathLength);
-
-  entry.comment = view.readString(
-    encoding,
+  const rawComment = view.getOriginalBytes(
     CentralHeaderLength + entry.pathLength + entry.extraFieldLength,
     entry.commentLength,
   );
 
-  readExtraFields(
-    entry,
+  const extraFields = ExtraFieldCollection.deserialize(
     view,
     CentralHeaderLength + entry.pathLength,
     entry.extraFieldLength,
   );
+
+  const decoder = entry.flags?.hasUtf8Strings
+    ? new TextDecoder()
+    : new CodePage437Decoder();
+
+  const pathField = extraFields.getField(ExtraFieldTag.UnicodePathField);
+  if (pathField?.crc32 === computeCrc32(rawPath)) {
+    entry.path = pathField.value;
+  } else {
+    entry.path = decoder.decode(rawPath);
+  }
+
+  const commentField = extraFields.getField(ExtraFieldTag.UnicodeCommentField);
+  if (commentField?.crc32 === computeCrc32(rawComment)) {
+    entry.comment = commentField.value;
+  } else {
+    entry.comment = decoder.decode(rawComment);
+  }
+
+  const zip64 = extraFields.getField(ExtraFieldTag.Zip64ExtendedInfo);
+  if (zip64) {
+    zip64.readFields(entry);
+  }
 }
 
 export type CentralHeaderOptions = {
@@ -179,7 +204,9 @@ export function writeDirectoryHeader(
 
   let zip64ExtraField: Uint8Array | undefined;
   if (zip64) {
-    zip64ExtraField = writeZip64ExtraField(entry);
+    const zip64 = new Zip64ExtraField();
+    zip64.setValues(entry);
+    zip64ExtraField = zip64.serialize();
   }
 
   const extraFieldLength =

@@ -2,7 +2,7 @@ import { BufferView, type BufferLike } from "../util/binary.js";
 import { DosDate } from "../util/dos-date.js";
 import type { DataDescriptor } from "./compression-core.js";
 import { ZipSignatureError } from "./errors.js";
-import { writeZip64ExtraField } from "./extra-fields.js";
+import { Zip64ExtraField } from "./extra-field-collection.js";
 import type { RawLocalHeader } from "./records.js";
 import { DataDescriptorSignature, LocalHeaderSignature } from "./signatures.js";
 
@@ -74,10 +74,13 @@ export function writeLocalHeader(
     // set to ffffffff to indicate they're in the zip64 field, and the zip64
     // values are zeroed to indicate they're in the data descriptor, and in this
     // case the data descriptor values will be 64-bit
-    zip64ExtraField = writeZip64ExtraField({
+    const field = new Zip64ExtraField();
+    field.setValues({
       compressedSize: hasDataDescriptor ? 0 : entry.compressedSize,
       uncompressedSize: hasDataDescriptor ? 0 : entry.uncompressedSize,
     });
+
+    zip64ExtraField = field.serialize();
   }
 
   let sizeMask: number | undefined;

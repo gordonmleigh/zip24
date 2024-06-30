@@ -1,3 +1,4 @@
+import { assert } from "./assert.js";
 import { CodePage437Decoder } from "./cp437.js";
 
 function getUintUpperBound(bytes: number): number {
@@ -35,7 +36,17 @@ class UintBoundsError extends RangeError {
 
 export type BufferLike = ArrayBuffer | ArrayBufferView;
 
-function normalizeBuffer(
+export function makeSubUint8Array(
+  source: BufferLike,
+  byteOffset?: number,
+  byteLength?: number,
+): Uint8Array {
+  return new Uint8Array(
+    ...normalizeBufferRange(source, byteOffset, byteLength),
+  );
+}
+
+export function normalizeBufferRange(
   source: BufferLike,
   byteOffset = 0,
   byteLength = source.byteLength - byteOffset,
@@ -59,19 +70,42 @@ export class BufferView extends DataView {
     return new BufferView(new ArrayBuffer(byteLength));
   }
 
+  public static makeOrAlloc(
+    requiredLength: number,
+    buffer: BufferLike | undefined,
+    byteOffset?: number,
+    byteLength?: number,
+  ): BufferView {
+    if (buffer) {
+      assert(
+        byteLength === undefined || byteLength >= requiredLength,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        `the buffer must be at least ${requiredLength} bytes (got ${byteLength!})`,
+      );
+      return new BufferView(buffer, byteOffset, requiredLength);
+    }
+    return BufferView.alloc(requiredLength);
+  }
+
   public constructor(buffer: BufferLike, byteOffset = 0, byteLength?: number) {
-    super(...normalizeBuffer(buffer, byteOffset, byteLength));
+    super(...normalizeBufferRange(buffer, byteOffset, byteLength));
   }
 
   /**
    * Get a Uint8Array that points to the ArrayBuffer that backs this instance.
    */
   public getOriginalBytes(byteOffset = 0, byteLength?: number): Uint8Array {
-    return new Uint8Array(...normalizeBuffer(this, byteOffset, byteLength));
+    return new Uint8Array(
+      ...normalizeBufferRange(this, byteOffset, byteLength),
+    );
   }
 
   public setBytes(byteOffset: number, value: Uint8Array): void {
     this.getOriginalBytes(byteOffset, value.byteLength).set(value);
+  }
+
+  public subView(byteOffset: number, byteLength?: number): BufferView {
+    return new BufferView(this, byteOffset, byteLength);
   }
 
   public getUint64(byteOffset: number, littleEndian?: boolean): number {
@@ -115,7 +149,7 @@ export class BufferView extends DataView {
 
   public readString(
     encoding: "utf8" | "cp437",
-    byteOffset = 0,
+    byteOffset: number,
     byteLength?: number,
   ): string {
     const bytes = this.getOriginalBytes(byteOffset, byteLength);
@@ -124,38 +158,38 @@ export class BufferView extends DataView {
     return decoder.decode(bytes);
   }
 
-  public readUint8(byteOffset = 0): number {
+  public readUint8(byteOffset: number): number {
     return this.getUint8(byteOffset);
   }
-  public readUint16LE(byteOffset = 0): number {
+  public readUint16LE(byteOffset: number): number {
     return this.getUint16(byteOffset, true);
   }
-  public readUint32LE(byteOffset = 0): number {
+  public readUint32LE(byteOffset: number): number {
     return this.getUint32(byteOffset, true);
   }
-  public readUint64LE(byteOffset = 0): number {
+  public readUint64LE(byteOffset: number): number {
     return this.getUint64(byteOffset, true);
   }
 
-  public writeUint8(value: number, byteOffset = 0): void {
+  public writeUint8(value: number, byteOffset: number): void {
     if (outOfBounds(value, 1)) {
       throw new UintBoundsError(value, 1);
     }
     this.setUint8(byteOffset, value);
   }
-  public writeUint16LE(value: number, byteOffset = 0): void {
+  public writeUint16LE(value: number, byteOffset: number): void {
     if (outOfBounds(value, 2)) {
       throw new UintBoundsError(value, 2);
     }
     this.setUint16(byteOffset, value, true);
   }
-  public writeUint32LE(value: number, byteOffset = 0): void {
+  public writeUint32LE(value: number, byteOffset: number): void {
     if (outOfBounds(value, 4)) {
       throw new UintBoundsError(value, 4);
     }
     this.setUint32(byteOffset, value, true);
   }
-  public writeUint64LE(value: number, byteOffset = 0): void {
+  public writeUint64LE(value: number, byteOffset: number): void {
     if (outOfBounds(value, 8)) {
       throw new UintBoundsError(value, 8);
     }

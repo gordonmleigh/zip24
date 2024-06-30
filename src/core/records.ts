@@ -84,14 +84,6 @@ export type Zip64ExtraField = {
   uncompressedSize: number;
 };
 
-export enum ExtendedDataTag {
-  Unset = 0,
-  Zip64ExtendedInfo = 0x01,
-  UnicodeCommentField = 0x6375,
-  UnicodePathField = 0x7075,
-  Unix = 0x0d,
-}
-
 export type PublicEntryFields = Omit<
   DecodedCentralHeader,
   "flags" | "internalAttributes" | "localHeaderOffset" | "versionNeeded"

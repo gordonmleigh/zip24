@@ -14,8 +14,17 @@ export enum ZipPlatform {
   DOS = 0,
   UNIX = 3,
 }
+
 export enum ZipVersion {
   Deflate = 20,
   Zip64 = 45,
   Utf8Encoding = 63,
+}
+
+export enum ExtraFieldTag {
+  Unset = 0,
+  Zip64ExtendedInfo = 1,
+  UnicodeCommentField = 25461,
+  UnicodePathField = 28789,
+  Unix = 13,
 }
