@@ -1,9 +1,14 @@
 import assert from "node:assert";
+import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { CompressionMethod } from "../core/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../core/constants.js";
 import { UnixFileAttributes } from "../core/file-attributes.js";
-import { EmptyZip32, Zip32WithThreeEntries } from "../test-util/fixtures.js";
+import {
+  EmptyZip32,
+  Zip32WithThreeEntries,
+  generateZip,
+} from "../test-util/fixtures.js";
 import { ZipBufferReader } from "./buffer.js";
 import { ZipEntryReader } from "./entry-reader.js";
 
@@ -13,6 +18,18 @@ describe("base/buffer", () => {
       it("returns the zip file comment", () => {
         const reader = new ZipBufferReader(EmptyZip32);
         assert.strictEqual(reader.comment, "Gordon is cool");
+      });
+
+      it("returns the zip file comment for a Zip64", async () => {
+        const zip = await buffer(
+          generateZip({
+            fileCount: 0,
+            zipComment: "hello world",
+            zip64: true,
+          }),
+        );
+        const reader = new ZipBufferReader(zip);
+        assert.strictEqual(reader.comment, "hello world");
       });
     });
 

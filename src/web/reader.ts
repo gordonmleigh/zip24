@@ -1,4 +1,3 @@
-import { readZip64Eocdr, readZipTrailer } from "../core/central-directory.js";
 import {
   decompress,
   type CompressionAlgorithms,
@@ -10,12 +9,17 @@ import {
 } from "../core/directory-entry.js";
 import type { ZipReaderLike } from "../core/interfaces.js";
 import { readLocalHeaderSize } from "../core/local-entry.js";
-import type { CentralDirectory } from "../core/records.js";
 import {
   CentralHeaderLength,
   LocalHeaderLength,
   Zip64EocdrLength,
 } from "../core/signatures.js";
+import {
+  Eocdr,
+  Zip64Eocdl,
+  Zip64Eocdr,
+  ZipTrailer,
+} from "../core/zip-trailer.js";
 import { assert } from "../util/assert.js";
 import { asyncDisposeOrClose } from "../util/disposable.js";
 import { lazy } from "../util/lazy.js";
@@ -63,22 +67,22 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
   private readonly fileSize: number;
   private readonly reader: RandomAccessReader;
 
-  private directory?: CentralDirectory;
+  private trailer?: ZipTrailer;
 
   /**
    * Get the file comment, if set.
    */
   public get comment(): string {
-    assert(this.directory, `call open() first`);
-    return this.directory.comment;
+    assert(this.trailer, `call open() first`);
+    return this.trailer.comment;
   }
 
   /**
    * Get the total number of entries in the zip.
    */
   public get entryCount(): number {
-    assert(this.directory, `call open() first`);
-    return this.directory.count;
+    assert(this.trailer, `call open() first`);
+    return this.trailer.count;
   }
 
   public constructor(
@@ -125,11 +129,11 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
    */
   public async *files(): AsyncGenerator<ZipEntryReader> {
     await this.open();
-    assert(this.directory, `expected this.directory to have a value`);
+    assert(this.trailer, `expected this.directory to have a value`);
 
     const buffer = new Uint8Array(this.bufferSize);
 
-    let position = this.directory.offset;
+    let position = this.trailer.offset;
     let offset = 0;
     let bufferLength = 0;
 
@@ -187,23 +191,33 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
     const readResult = await this.reader.read({ buffer, position });
     assert(readResult.bytesRead === bufferSize, `unexpected end of file`);
 
-    const result = readZipTrailer(buffer, position);
-    this.directory = result.directory;
+    const eocdrOffset = Eocdr.findOffset(buffer);
+    const eocdr = Eocdr.deserialize(buffer, eocdrOffset);
+    const eocdl = Zip64Eocdl.find(buffer, eocdrOffset);
 
-    if (!result.ok) {
-      // we didn't manage to read the zip64 eocdr within the original buffer
-      const readResult = await this.reader.read({
-        buffer,
-        position: result.eocdr64Offset,
-        length: Zip64EocdrLength,
-      });
+    if (eocdl) {
+      if (eocdl.eocdrOffset < position) {
+        // we didn't manage to read the zip64 eocdr within the original buffer
+        const readResult = await this.reader.read({
+          buffer,
+          position: eocdl.eocdrOffset,
+          length: Zip64Eocdr.FixedSize,
+        });
 
-      assert(
-        readResult.bytesRead === Zip64EocdrLength,
-        `unexpected end of file`,
-      );
+        assert(
+          readResult.bytesRead === Zip64EocdrLength,
+          `unexpected end of file`,
+        );
 
-      readZip64Eocdr(this.directory, buffer);
+        this.trailer = new ZipTrailer(eocdr, Zip64Eocdr.deserialize(buffer, 0));
+      } else {
+        this.trailer = new ZipTrailer(
+          eocdr,
+          Zip64Eocdr.deserialize(buffer, eocdl.eocdrOffset - position),
+        );
+      }
+    } else {
+      this.trailer = new ZipTrailer(eocdr);
     }
   });
 }

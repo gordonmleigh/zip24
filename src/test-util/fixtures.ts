@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CompressionMethod } from "../core/compression-core.js";
 import { ZipVersion } from "../core/constants.js";
+import { CodePage437Encoder } from "../util/cp437.js";
 import { computeCrc32 } from "../util/crc32.js";
 import {
   bigUint,
@@ -160,11 +161,13 @@ export const Zip32WithThreeEntries = data(
 );
 
 export type ZipGenerationOptions = {
+  fileComment?: string;
   fileCommentLength?: number;
   fileCount: number;
   fileSize?: number;
   zip64?: boolean;
   zip64ExtensibleDataLength?: number;
+  zipComment?: string;
 };
 
 // eslint-disable-next-line @typescript-eslint/require-await
@@ -177,6 +180,7 @@ export async function* generateZip(
     fileSize = 10,
     zip64 = false,
     zip64ExtensibleDataLength = 0,
+    zipComment = "the zip file comment",
   } = options;
 
   const compressionMethod = CompressionMethod.Stored;
@@ -322,6 +326,8 @@ export async function* generateZip(
     yield eocdlChunk;
   }
 
+  const zipCommentRaw = new CodePage437Encoder().encode(zipComment);
+
   yield data(
     longUint(0x06054b50), // signature
     shortUint(zip64 ? 0xffff : 0), // number of this disk
@@ -330,8 +336,8 @@ export async function* generateZip(
     shortUint(zip64 ? 0xffff : fileCount), // total entries on all disks
     longUint(zip64 ? 0xffff_ffff : centralDirectorySize), // size of the central directory
     longUint(zip64 ? 0xffff_ffff : centralDirectoryOffset), // central directory offset
-    cp437length`the zip file comment`, // .ZIP file comment length
-    cp437`the zip file comment`, // .ZIP file comment
+    shortUint(zipCommentRaw.byteLength), // .ZIP file comment length
+    zipCommentRaw, // .ZIP file comment
   );
 }
 

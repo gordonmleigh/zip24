@@ -1,4 +1,3 @@
-import { readZipTrailer } from "../core/central-directory.js";
 import {
   decompress,
   type CompressionAlgorithms,
@@ -9,8 +8,12 @@ import {
 } from "../core/directory-entry.js";
 import type { ZipReaderLike } from "../core/interfaces.js";
 import { readLocalHeaderSize } from "../core/local-entry.js";
-import type { CentralDirectory } from "../core/records.js";
-import { assert } from "../util/assert.js";
+import {
+  Eocdr,
+  Zip64Eocdl,
+  Zip64Eocdr,
+  ZipTrailer,
+} from "../core/zip-trailer.js";
 import { BufferView, type BufferLike } from "../util/binary.js";
 import { defaultDecompressors } from "./compression.js";
 import { ZipEntryReader } from "./entry-reader.js";
@@ -28,36 +31,39 @@ export type ZipBufferReaderOptions = {
 export class ZipBufferReader implements ZipReaderLike {
   private readonly buffer: BufferView;
   private readonly decompressors: CompressionAlgorithms;
-  private readonly directory: CentralDirectory;
+  private readonly trailer: ZipTrailer;
 
   /**
    * The zip file comment, if set.
    */
   public get comment(): string {
-    return this.directory.comment;
+    return this.trailer.comment;
   }
 
   /**
    * The number of file entries in the zip.
    */
   public get entryCount(): number {
-    return this.directory.count;
+    return this.trailer.count;
   }
 
   public constructor(buffer: BufferLike, options: ZipBufferReaderOptions = {}) {
     this.buffer = new BufferView(buffer);
     this.decompressors = options.decompressors ?? defaultDecompressors;
 
-    const result = readZipTrailer(buffer);
-    assert(result.ok, `expected to find EOCDR in buffer`);
-    this.directory = result.directory;
+    const eocdrOffset = Eocdr.findOffset(buffer);
+    const eocdr = Eocdr.deserialize(buffer, eocdrOffset);
+    const eocdl = Zip64Eocdl.find(buffer, eocdrOffset);
+    const eocdr64 = eocdl && Zip64Eocdr.deserialize(buffer, eocdl.eocdrOffset);
+
+    this.trailer = new ZipTrailer(eocdr, eocdr64);
   }
 
   /**
    * Iterate through the files in the zip synchronously.
    */
   public *filesSync(): Generator<ZipEntryReader> {
-    let offset = this.directory.offset;
+    let offset = this.trailer.offset;
 
     for (let index = 0; index < this.entryCount; ++index) {
       const entry = new ZipEntryReader();

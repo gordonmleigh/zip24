@@ -1,6 +1,10 @@
 import { BufferView, type BufferLike } from "../util/binary.js";
 import { EncodedString } from "../util/encoded-string.js";
-import type { Deserializer, Serializable } from "../util/serialization.js";
+import {
+  makeBuffer,
+  type Deserializer,
+  type Serializable,
+} from "../util/serialization.js";
 import type { StrictInstanceType } from "../util/type-utils.js";
 import { ExtraFieldTag } from "./constants.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
@@ -90,12 +94,7 @@ export class UnicodeExtraField implements ExtraField {
   ): Uint8Array {
     const encodedValue = new TextEncoder().encode(this.value);
 
-    const view = BufferView.makeOrAlloc(
-      this.dataSize + 4,
-      buffer,
-      byteOffset,
-      byteLength,
-    );
+    const view = makeBuffer(this.dataSize + 4, buffer, byteOffset, byteLength);
 
     view.writeUint16LE(this.tag, 0);
     view.writeUint16LE(view.byteLength - 4, 2);
@@ -136,12 +135,7 @@ export class UnknownExtraField implements ExtraField {
     byteOffset?: number,
     byteLength?: number,
   ): Uint8Array {
-    const view = BufferView.makeOrAlloc(
-      this.dataSize + 4,
-      buffer,
-      byteOffset,
-      byteLength,
-    );
+    const view = makeBuffer(this.dataSize + 4, buffer, byteOffset, byteLength);
     view.writeUint16LE(this.tag, 0);
     view.writeUint16LE(view.byteLength - 4, 2);
     view.setBytes(4, this.data);
@@ -239,7 +233,7 @@ export class Zip64ExtraField implements ExtraField {
     byteOffset?: number,
     byteLength?: number,
   ): Uint8Array {
-    const view = BufferView.makeOrAlloc(
+    const view = makeBuffer(
       4 + 8 * this.values.length,
       buffer,
       byteOffset,
@@ -353,12 +347,7 @@ export class ExtraFieldCollection
       0,
     );
 
-    const view = BufferView.makeOrAlloc(
-      requiredLength,
-      buffer,
-      byteOffset,
-      byteLength,
-    );
+    const view = makeBuffer(requiredLength, buffer, byteOffset, byteLength);
     let offset = 0;
 
     for (const field of this.fields) {

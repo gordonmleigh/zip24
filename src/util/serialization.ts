@@ -1,4 +1,4 @@
-import type { BufferLike } from "./binary.js";
+import { BufferView, type BufferLike } from "./binary.js";
 
 export type Deserializer<T> = {
   deserialize: (
@@ -15,3 +15,20 @@ export type Serializable = {
     byteLength?: number,
   ) => Uint8Array;
 };
+
+export function makeBuffer(
+  requiredLength: number,
+  buffer: BufferLike | undefined,
+  byteOffset?: number,
+  byteLength?: number,
+): BufferView {
+  if (buffer) {
+    if (byteLength !== undefined && byteLength < requiredLength) {
+      throw new RangeError(
+        `the buffer must be at least ${requiredLength} bytes (got ${byteLength})`,
+      );
+    }
+    return new BufferView(buffer, byteOffset, requiredLength);
+  }
+  return BufferView.alloc(requiredLength);
+}

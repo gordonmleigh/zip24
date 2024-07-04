@@ -1,4 +1,3 @@
-import { writeZipTrailer } from "../core/central-directory.js";
 import {
   CompressionMethod,
   compress,
@@ -24,12 +23,12 @@ import {
   writeLocalHeader,
 } from "../core/local-entry.js";
 import type {
-  CentralDirectory64VersionInfo,
   RawCentralHeader,
   RawLocalHeader,
   ZipEntryInfo,
   ZipEntryOptions,
 } from "../core/records.js";
+import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.js";
 import { CodePage437Encoder } from "../util/cp437.js";
 import {
   ByteLengthStrategy,
@@ -158,28 +157,31 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     const directorySize = trailerOffset - directoryOffset;
     useZip64 ||= trailerOffset >= 0xffff_ffff;
 
-    let zip64: CentralDirectory64VersionInfo | undefined;
-
     if (useZip64) {
-      zip64 = {
+      const eocdr64 = new Zip64Eocdr({
+        count: this.directory.length,
+        offset: directoryOffset,
+        size: directorySize,
         platformMadeBy: ZipPlatform.UNIX,
         versionMadeBy: versionNeeded,
         versionNeeded,
-      };
+      });
+
+      await this.buffer.write(eocdr64.serialize());
+      await this.buffer.write(new Zip64Eocdl(trailerOffset).serialize());
     }
 
-    await this.buffer.write(
-      writeZipTrailer(
-        {
-          comment: fileComment ?? "",
-          count: this.directory.length,
-          offset: directoryOffset,
-          size: directorySize,
-          zip64,
-        },
-        trailerOffset,
-      ),
+    const eocdr = new Eocdr(
+      {
+        comment: fileComment ?? "",
+        count: this.directory.length,
+        offset: directoryOffset,
+        size: directorySize,
+      },
+      useZip64,
     );
+
+    await this.buffer.write(eocdr.serialize());
   }
 
   private async writeFileData(

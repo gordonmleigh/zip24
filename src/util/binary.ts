@@ -1,4 +1,3 @@
-import { assert } from "./assert.js";
 import { CodePage437Decoder } from "./cp437.js";
 
 function getUintUpperBound(bytes: number): number {
@@ -70,23 +69,6 @@ export class BufferView extends DataView {
     return new BufferView(new ArrayBuffer(byteLength));
   }
 
-  public static makeOrAlloc(
-    requiredLength: number,
-    buffer: BufferLike | undefined,
-    byteOffset?: number,
-    byteLength?: number,
-  ): BufferView {
-    if (buffer) {
-      assert(
-        byteLength === undefined || byteLength >= requiredLength,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        `the buffer must be at least ${requiredLength} bytes (got ${byteLength!})`,
-      );
-      return new BufferView(buffer, byteOffset, requiredLength);
-    }
-    return BufferView.alloc(requiredLength);
-  }
-
   public constructor(buffer: BufferLike, byteOffset = 0, byteLength?: number) {
     super(...normalizeBufferRange(buffer, byteOffset, byteLength));
   }
@@ -102,10 +84,6 @@ export class BufferView extends DataView {
 
   public setBytes(byteOffset: number, value: Uint8Array): void {
     this.getOriginalBytes(byteOffset, value.byteLength).set(value);
-  }
-
-  public subView(byteOffset: number, byteLength?: number): BufferView {
-    return new BufferView(this, byteOffset, byteLength);
   }
 
   public getUint64(byteOffset: number, littleEndian?: boolean): number {

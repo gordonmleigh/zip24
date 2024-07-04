@@ -1,5 +1,3 @@
-import type { RequiredBy } from "../util/type-utils.js";
-
 export class AssertionError extends Error {
   public constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -31,11 +29,4 @@ export function hasExtraProperty<T, K extends PropertyKey>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
     (object as any)[key] !== undefined
   );
-}
-
-export function hasProperty<T, K extends keyof T>(
-  object: T,
-  key: K,
-): object is RequiredBy<T, K> {
-  return hasExtraProperty(object, key);
 }

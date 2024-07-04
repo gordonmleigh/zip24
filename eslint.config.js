@@ -6,6 +6,8 @@ export default [
   {
     rules: {
       "@typescript-eslint/no-unnecessary-condition": "off", // annoying
+      "unicorn/no-array-callback-reference": "off", // false positives
+      "unicorn/no-array-method-this-argument": "off", // false positives
       "unicorn/no-nested-ternary": "off", // fights with prettier
       "unicorn/number-literal-case": "off", // fights with prettier
       "unicorn/numeric-separators-style": "off", // annoying

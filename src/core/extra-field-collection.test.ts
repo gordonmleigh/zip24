@@ -19,8 +19,8 @@ import {
   type Zip64SizeFields,
 } from "./extra-field-collection.js";
 
-describe("internal/extra-field-collection", () => {
-  describe("UnicodeExtraField", () => {
+describe("core/extra-field-collection", () => {
+  describe("class UnicodeExtraField", () => {
     describe(".deserialize()", () => {
       it("can read a unicode comment field", () => {
         const buffer = data(
@@ -138,7 +138,7 @@ describe("internal/extra-field-collection", () => {
     });
   });
 
-  describe("UnknownExtraField", () => {
+  describe("class UnknownExtraField", () => {
     describe(".deserialize()", () => {
       it("can deserialize a field", () => {
         const buffer = data(
@@ -174,7 +174,7 @@ describe("internal/extra-field-collection", () => {
     });
   });
 
-  describe("Zip64ExtraField", () => {
+  describe("class Zip64ExtraField", () => {
     describe(".deserialize()", () => {
       it("can read two values from a Zip64 extended info field", () => {
         const buffer = data(
@@ -375,7 +375,7 @@ describe("internal/extra-field-collection", () => {
     });
   });
 
-  describe("ExtraFieldCollection", () => {
+  describe("class ExtraFieldCollection", () => {
     describe(".deserialize", () => {
       it("can read four fields together", () => {
         const buffer = data(

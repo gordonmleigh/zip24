@@ -36,10 +36,10 @@ export class EncodedString {
     return this.rawValue.byteLength;
   }
 
-  public constructor(encoding: StringEncoding, value: string);
+  public constructor(encoding: StringEncoding, value: string | BufferLike);
   public constructor(
     encoding: StringEncoding,
-    bufferOrString: BufferLike,
+    buffer: BufferLike,
     byteOffset?: number,
     byteLength?: number,
   );
