@@ -24,10 +24,11 @@ import {
   utf8length,
   utf8length32,
 } from "../test-util/data.js";
+import { computeCrc32 } from "../util/crc32.js";
 import { ZipWriter } from "./writer.js";
 
-describe("base/writer", () => {
-  describe("ZipWriter", () => {
+describe("web/writer", () => {
+  describe("class ZipWriter", () => {
     it("produces the correct data", async () => {
       const writer = new ZipWriter();
       const output = buffer(writer);
@@ -423,6 +424,205 @@ describe("base/writer", () => {
         cp437length`file comment`, // .ZIP file comment length
 
         cp437`file comment`,
+      );
+
+      assertBufferEqual(await output, expected);
+    });
+
+    it("defaults to CompressionMethod.Stored when content is empty", async () => {
+      const writer = new ZipWriter();
+      const output = buffer(writer);
+
+      await writer.addFile(
+        {
+          path: "one.txt",
+          lastModified: new Date(`2023-04-05T11:22:34Z`),
+        },
+        "",
+      );
+
+      await writer.addFile({
+        path: "two.txt",
+        lastModified: new Date(`1994-03-02T22:44:08Z`),
+      });
+
+      await writer.finalize();
+
+      const expected = data(
+        //// +0000 LOCAL ENTRY 1 HEADER (30+7+0 = 37 bytes)
+        longUint(0x04034b50), // local header signature
+        shortUint(ZipVersion.Deflate), // version needed
+        shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+        shortUint(CompressionMethod.Stored), // compression method
+        dosDate`2023-04-05T11:22:34Z`, // last modified
+        longUint(0), // crc32
+        longUint(0), // compressed size
+        longUint(0), // uncompressed size
+        cp437length`one.txt`, // file name length
+        shortUint(0), // extra field length
+        cp437`one.txt`, // file name
+        "", // extra field
+
+        //// +0037 LOCAL ENTRY 1 CONTENT (0 bytes)
+
+        //// +0037 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
+        longUint(0x08074b50), // data descriptor signature
+        longUint(0), // crc32
+        longUint(0), // compressed size
+        longUint(0), // uncompressed size
+
+        //// +0053 LOCAL ENTRY 2 HEADER (30+7+0 = 37 bytes)
+        longUint(0x04034b50), // local header signature
+        shortUint(ZipVersion.Deflate), // version needed
+        shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+        shortUint(CompressionMethod.Stored), // compression method
+        dosDate`1994-03-02T22:44:08Z`, // last modified
+        longUint(0), // crc32
+        longUint(0), // compressed size
+        longUint(0), // uncompressed size
+        cp437length`two.txt`, // file name length
+        shortUint(0), // extra field length
+        cp437`two.txt`, // file name
+        "", // extra field
+
+        //// +0090 LOCAL ENTRY 2 CONTENT (0 bytes)
+
+        //// +0090 LOCAL ENTRY 2 DATA DESCRIPTOR (16 bytes)
+        longUint(0x08074b50), // data descriptor signature
+        longUint(0), // crc32
+        longUint(0), // compressed size
+        longUint(0), // uncompressed size
+
+        //// +0106 DIRECTORY ENTRY 1 (46+7+0+0 = 53 bytes)
+        longUint(0x02014b50), // central directory header signature
+        tinyUint(ZipVersion.Deflate), // version made by
+        tinyUint(ZipPlatform.DOS), // platform made by
+        shortUint(ZipVersion.Deflate), // version needed
+        shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+        shortUint(CompressionMethod.Stored), // compression method
+        dosDate`2023-04-05T11:22:34Z`, // last modified
+        longUint(0), // crc32
+        longUint(0), // compressed size
+        longUint(0), // uncompressed size
+        cp437length`one.txt`, // file name length
+        shortUint(0), // extra field length
+        shortUint(0), // file comment length
+        shortUint(0), // disk number start
+        shortUint(0), // internal file attributes
+        longUint(0), // external file attributes
+        longUint(0), // relative offset of local header
+        cp437`one.txt`, // file name
+        "", // extra field
+        "", // the comment
+
+        //// +0159 DIRECTORY ENTRY 2 (46+7+0+0 = 53 bytes)
+        longUint(0x02014b50), // central directory header signature
+        tinyUint(ZipVersion.Deflate), // version made by
+        tinyUint(ZipPlatform.DOS), // platform made by
+        shortUint(ZipVersion.Deflate), // version needed
+        shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+        shortUint(CompressionMethod.Stored), // compression method
+        dosDate`1994-03-02T22:44:08Z`, // last modified
+        longUint(0), // crc32
+        longUint(0), // compressed size
+        longUint(0), // uncompressed size
+        cp437length`two.txt`, // file name length
+        shortUint(0), // extra field length
+        shortUint(0), // file comment length
+        shortUint(0), // disk number start
+        shortUint(0), // internal file attributes
+        longUint(0), // external file attributes
+        longUint(53), // relative offset of local header
+        cp437`two.txt`, // file name
+        "", // extra field
+        "", // the comment
+
+        //// +0212 End of Central Directory Record
+        longUint(0x06054b50), // EOCDR signature
+        shortUint(0), // number of this disk
+        shortUint(0), // central directory start disk
+        shortUint(2), // total entries this disk
+        shortUint(2), // total entries all disks
+        longUint(212 - 106), // size of the central directory
+        longUint(106), // central directory offset
+        shortUint(0), // .ZIP file comment length
+        "", // .ZIP file comment
+      );
+
+      assertBufferEqual(await output, expected);
+    });
+
+    it("skips the data descriptor when sizes and crc32 are given", async () => {
+      const writer = new ZipWriter();
+      const output = buffer(writer);
+
+      const content = Buffer.from("hello world");
+      const crc32 = computeCrc32(content);
+
+      await writer.addFile(
+        {
+          path: "one.txt",
+          lastModified: new Date(`2023-04-05T11:22:34Z`),
+          crc32,
+          compressedSize: content.byteLength,
+          uncompressedSize: content.byteLength,
+          compressionMethod: CompressionMethod.Stored,
+        },
+        content,
+      );
+
+      await writer.finalize();
+
+      const expected = data(
+        //// +0000 LOCAL ENTRY 1 HEADER (30+7+0 = 37 bytes)
+        longUint(0x04034b50), // local header signature
+        shortUint(ZipVersion.Deflate), // version needed
+        shortUint(0), // flags
+        shortUint(CompressionMethod.Stored), // compression method
+        dosDate`2023-04-05T11:22:34Z`, // last modified
+        longUint(crc32), // crc32
+        longUint(11), // compressed size
+        longUint(11), // uncompressed size
+        cp437length`one.txt`, // file name length
+        shortUint(0), // extra field length
+        cp437`one.txt`, // file name
+        "", // extra field
+
+        //// +0037 LOCAL ENTRY 1 CONTENT (11 bytes)
+        utf8`hello world`,
+
+        //// +0048 DIRECTORY ENTRY 1 (46+7+0+0 = 53 bytes)
+        longUint(0x02014b50), // central directory header signature
+        tinyUint(ZipVersion.Deflate), // version made by
+        tinyUint(ZipPlatform.DOS), // platform made by
+        shortUint(ZipVersion.Deflate), // version needed
+        shortUint(0), // flags
+        shortUint(CompressionMethod.Stored), // compression method
+        dosDate`2023-04-05T11:22:34Z`, // last modified
+        longUint(crc32), // crc32
+        longUint(11), // compressed size
+        longUint(11), // uncompressed size
+        cp437length`one.txt`, // file name length
+        shortUint(0), // extra field length
+        shortUint(0), // file comment length
+        shortUint(0), // disk number start
+        shortUint(0), // internal file attributes
+        longUint(0), // external file attributes
+        longUint(0), // relative offset of local header
+        cp437`one.txt`, // file name
+        "", // extra field
+        "", // the comment
+
+        //// +0101 End of Central Directory Record
+        longUint(0x06054b50), // EOCDR signature
+        shortUint(0), // number of this disk
+        shortUint(0), // central directory start disk
+        shortUint(1), // total entries this disk
+        shortUint(1), // total entries all disks
+        longUint(101 - 48), // size of the central directory
+        longUint(48), // central directory offset
+        shortUint(0), // .ZIP file comment length
+        "", // .ZIP file comment
       );
 
       assertBufferEqual(await output, expected);

@@ -1,3 +1,4 @@
+/* c8 ignore start */
 export class AssertionError extends Error {
   public constructor(message: string, options?: ErrorOptions) {
     super(message, options);

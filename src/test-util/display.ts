@@ -44,8 +44,8 @@ export function hexDiff(
   const offset = brightBlack;
   const unchanged = brightWhite;
 
-  const leftBlockOptions = { chunkSize, changed: green, unchanged };
-  const rightBlockOptions = { chunkSize, changed: red, unchanged };
+  const leftBlockOptions = { chunkSize, changed: red, unchanged };
+  const rightBlockOptions = { chunkSize, changed: green, unchanged };
   const leftPadding = "".padStart(rowOffsetWidth + 4);
 
   // print column headers if supplied

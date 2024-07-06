@@ -1,19 +1,10 @@
+import { CentralDirectoryHeader } from "../core/central-directory-header.js";
 import {
   decompress,
   type CompressionAlgorithms,
 } from "../core/compression-core.js";
-import {
-  getDirectoryHeaderLength,
-  readDirectoryHeader,
-  readDirectoryVariableFields,
-} from "../core/directory-entry.js";
-import type { ZipReaderLike } from "../core/interfaces.js";
-import { readLocalHeaderSize } from "../core/local-entry.js";
-import {
-  CentralHeaderLength,
-  LocalHeaderLength,
-  Zip64EocdrLength,
-} from "../core/signatures.js";
+import { LocalFileHeader } from "../core/local-file-header.js";
+import { ZipEntry } from "../core/zip-entry.js";
 import {
   Eocdr,
   Zip64Eocdl,
@@ -29,7 +20,6 @@ import {
 } from "../util/streams.js";
 import type { Constructor } from "../util/type-utils.js";
 import { defaultDecompressors } from "./compression.js";
-import { ZipEntryReader } from "./entry-reader.js";
 
 const DefaultBufferSize = 1024 ** 2;
 
@@ -44,7 +34,9 @@ export type ZipReaderOptions = {
 /**
  * An object which can read a zip file from a {@link RandomAccessReader}.
  */
-export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
+export class ZipReader
+  implements AsyncDisposable, AsyncIterable<ZipEntry>, Disposable
+{
   /**
    * Create a new instance and call open().
    */
@@ -99,7 +91,7 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
   /**
    * Get an iterator which iterates over the file entries in the zip.
    */
-  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader> {
+  public [Symbol.asyncIterator](): AsyncIterator<ZipEntry> {
     return this.files();
   }
 
@@ -127,7 +119,7 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
   /**
    * Get an iterator which iterates over the file entries in the zip.
    */
-  public async *files(): AsyncGenerator<ZipEntryReader> {
+  public async *files(): AsyncGenerator<ZipEntry> {
     await this.open();
     assert(this.trailer, `expected this.directory to have a value`);
 
@@ -158,17 +150,31 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
 
     // read the central directory a chunk at a time
     for (let index = 0; index < this.entryCount; ++index) {
-      const entry = new ZipEntryReader();
-
-      await ensureBuffer(CentralHeaderLength);
-      readDirectoryHeader(entry, buffer, offset);
-
-      const headerLength = getDirectoryHeaderLength(entry);
-
+      await ensureBuffer(CentralDirectoryHeader.FixedSize);
+      const headerLength = CentralDirectoryHeader.readTotalSize(buffer, offset);
       await ensureBuffer(headerLength);
-      readDirectoryVariableFields(entry, buffer, offset);
 
-      entry.uncompressedData = getData(entry, this.reader, this.decompressors);
+      const header = CentralDirectoryHeader.deserialize(buffer, offset);
+
+      const entry = new ZipEntry({
+        attributes: header.attributes,
+        comment: header.comment,
+        compressedSize: header.compressedSize,
+        compressionMethod: header.compressionMethod,
+        crc32: header.crc32,
+        extraField: header.extraField,
+        flags: header.flags,
+        lastModified: header.lastModified,
+        localHeaderOffset: header.localHeaderOffset,
+        path: header.path,
+        uncompressedSize: header.uncompressedSize,
+        versionMadeBy: header.versionMadeBy,
+        versionNeeded: header.versionNeeded,
+
+        uncompressedData: getData(header, this.reader, this.decompressors),
+
+        noValidateVersion: true,
+      });
 
       offset += headerLength;
       yield entry;
@@ -205,7 +211,7 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
         });
 
         assert(
-          readResult.bytesRead === Zip64EocdrLength,
+          readResult.bytesRead === Zip64Eocdr.FixedSize,
           `unexpected end of file`,
         );
 
@@ -223,20 +229,23 @@ export class ZipReader implements ZipReaderLike, AsyncDisposable, Disposable {
 }
 
 function getData(
-  entry: ZipEntryReader,
+  entry: CentralDirectoryHeader,
   reader: RandomAccessReader,
   decompressors: CompressionAlgorithms,
 ): AsyncIterable<Uint8Array> {
   const getDataOffset = lazy(async () => {
-    const buffer = new Uint8Array(LocalHeaderLength);
+    const buffer = new Uint8Array(LocalFileHeader.FixedSize);
 
     const result = await reader.read({
       buffer,
       position: entry.localHeaderOffset,
     });
 
-    assert(result.bytesRead === LocalHeaderLength, `unexpected end of file`);
-    return entry.localHeaderOffset + readLocalHeaderSize(buffer, 0);
+    assert(
+      result.bytesRead === LocalFileHeader.FixedSize,
+      `unexpected end of file`,
+    );
+    return entry.localHeaderOffset + LocalFileHeader.readTotalSize(buffer);
   });
 
   return {

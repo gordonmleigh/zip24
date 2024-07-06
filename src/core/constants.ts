@@ -24,7 +24,7 @@ export enum ZipVersion {
 export enum ExtraFieldTag {
   Unset = 0,
   Zip64ExtendedInfo = 1,
-  UnicodeCommentField = 25461,
-  UnicodePathField = 28789,
+  UnicodeCommentField = 0x6375,
+  UnicodePathField = 0x7075,
   Unix = 13,
 }

@@ -1,15 +1,190 @@
 import assert from "node:assert";
+import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
+import { asyncIterable } from "../test-util/data.js";
 import { ZipVersion } from "./constants.js";
+import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.js";
 import {
+  ZipEntry,
   minimumVersion,
   needs64bit,
   needsDataDescriptor,
   needsUtf8,
-} from "./entry-utils.js";
+} from "./zip-entry.js";
 
-describe("entry-utils", () => {
-  describe("minimumVersion", () => {
+describe("core/zip-entry", () => {
+  describe("class ZipEntry", () => {
+    describe("#constructor()", () => {
+      describe("when noValidateVersion is set", () => {
+        it("sets whatever value is present for versionMadeBy", () => {
+          const entry = new ZipEntry({
+            noValidateVersion: true,
+            versionMadeBy: ZipVersion.Deflate,
+            zip64: true,
+          });
+
+          assert.strictEqual(entry.versionMadeBy, ZipVersion.Deflate);
+        });
+
+        it("defaults to Utf8Encoding for versionMadeBy", () => {
+          const entry = new ZipEntry({
+            noValidateVersion: true,
+            zip64: true,
+          });
+
+          assert.strictEqual(entry.versionMadeBy, ZipVersion.Utf8Encoding);
+        });
+      });
+    });
+
+    describe("#isDirectory", () => {
+      it("returns true if the entry is a unix directory", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new UnixFileAttributes();
+        entry.attributes.isDirectory = true;
+
+        assert.strictEqual(entry.isDirectory, true);
+      });
+
+      it("returns false if the entry is a unix file", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new UnixFileAttributes();
+        entry.attributes.isFile = true;
+
+        assert.strictEqual(entry.isDirectory, false);
+      });
+
+      it("returns true if the entry is a dos directory", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new DosFileAttributes();
+        entry.attributes.isDirectory = true;
+
+        assert.strictEqual(entry.isDirectory, true);
+      });
+
+      it("returns false if the entry is a dos file", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new DosFileAttributes();
+        entry.attributes.isFile = true;
+
+        assert.strictEqual(entry.isDirectory, false);
+      });
+
+      it("returns true if the entry path ends with a slash", () => {
+        const entry = new ZipEntry();
+        entry.path = "directory/";
+
+        assert.strictEqual(entry.isDirectory, true);
+      });
+    });
+
+    describe("#isFile", () => {
+      it("returns false if the entry is a unix directory", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new UnixFileAttributes();
+        entry.attributes.isDirectory = true;
+
+        assert.strictEqual(entry.isFile, false);
+      });
+
+      it("returns true if the entry is a unix file", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new UnixFileAttributes();
+        entry.attributes.isFile = true;
+
+        assert.strictEqual(entry.isFile, true);
+      });
+
+      it("returns false if the entry is a dos directory", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new DosFileAttributes();
+        entry.attributes.isDirectory = true;
+
+        assert.strictEqual(entry.isFile, false);
+      });
+
+      it("returns true if the entry is a dos file", () => {
+        const entry = new ZipEntry();
+        entry.attributes = new DosFileAttributes();
+        entry.attributes.isFile = true;
+
+        assert.strictEqual(entry.isFile, true);
+      });
+
+      it("returns false if the entry path ends with a slash", () => {
+        const entry = new ZipEntry();
+        entry.path = "directory/";
+
+        assert.strictEqual(entry.isFile, false);
+      });
+    });
+
+    describe("toBuffer()", () => {
+      it("returns a UInt8Array for the uncompressedData", async () => {
+        const entry = new ZipEntry();
+        entry.uncompressedData = asyncIterable`Hallo, Welt!`;
+
+        const buffer = await entry.toBuffer();
+
+        const result = Buffer.from(buffer).toString();
+        assert.strictEqual(result, "Hallo, Welt!");
+      });
+    });
+
+    describe("toReadableStream()", () => {
+      it("returns a ReadableStream for the uncompressedData", async () => {
+        const entry = new ZipEntry();
+        entry.uncompressedData = asyncIterable`Bonjour le monde !`;
+
+        const readableStream = entry.toReadableStream();
+        assert(readableStream instanceof ReadableStream);
+
+        const result = await text(readableStream);
+        assert.strictEqual(result, "Bonjour le monde !");
+      });
+    });
+
+    describe("toText()", () => {
+      it("returns a decoded string for the uncompressedData", async () => {
+        const entry = new ZipEntry();
+        entry.uncompressedData = asyncIterable`¡Hola Mundo! 🥺`;
+
+        const result = await entry.toText();
+        assert.strictEqual(result, "¡Hola Mundo! 🥺");
+      });
+    });
+
+    describe("[Symbol.asyncIterator]()", () => {
+      it("returns an iterator for the uncompressedData", async () => {
+        const entry = new ZipEntry();
+        entry.uncompressedData = asyncIterable`one ${1} two ${2}`;
+
+        const iterator = entry[Symbol.asyncIterator]();
+
+        const result1 = await iterator.next();
+        assert(!result1.done);
+        assert.strictEqual(result1.value.toString(), "one ");
+
+        const result2 = await iterator.next();
+        assert(!result2.done);
+        assert.strictEqual(result2.value.toString(), "1");
+
+        const result3 = await iterator.next();
+        assert(!result3.done);
+        assert.strictEqual(result3.value.toString(), " two ");
+
+        const result4 = await iterator.next();
+        assert(!result4.done);
+        assert.strictEqual(result4.value.toString(), "2");
+
+        const result5 = await iterator.next();
+        assert.strictEqual(result5.done, true);
+        assert.strictEqual(result5.value, undefined);
+      });
+    });
+  });
+
+  describe("minimumVersion()", () => {
     it("returns the correct version for features", () => {
       assert.strictEqual(minimumVersion({}), ZipVersion.Deflate);
 
@@ -70,7 +245,7 @@ describe("entry-utils", () => {
     });
   });
 
-  describe("needs64bit", () => {
+  describe("needs64bit()", () => {
     it("returns false if all values fit in 32bit", () => {
       const result = needs64bit({
         compressedSize: 0xffff_ffff,
@@ -159,7 +334,7 @@ describe("entry-utils", () => {
     });
   });
 
-  describe("needsDataDescriptor", () => {
+  describe("needsDataDescriptor()", () => {
     it("returns false if all values are provided", () => {
       const result = needsDataDescriptor({
         compressedSize: 0,
@@ -194,7 +369,7 @@ describe("entry-utils", () => {
     });
   });
 
-  describe("needsUtf8", () => {
+  describe("needsUtf8()", () => {
     it("returns false if values are cp437 encodable", () => {
       const result = needsUtf8({
         comment: "hello",

@@ -35,16 +35,6 @@ class UintBoundsError extends RangeError {
 
 export type BufferLike = ArrayBuffer | ArrayBufferView;
 
-export function makeSubUint8Array(
-  source: BufferLike,
-  byteOffset?: number,
-  byteLength?: number,
-): Uint8Array {
-  return new Uint8Array(
-    ...normalizeBufferRange(source, byteOffset, byteLength),
-  );
-}
-
 export function normalizeBufferRange(
   source: BufferLike,
   byteOffset = 0,

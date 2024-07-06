@@ -4,6 +4,7 @@ import { describe, it, mock } from "node:test";
 import { CompressionMethod } from "../core/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../core/constants.js";
 import { UnixFileAttributes } from "../core/file-attributes.js";
+import { ZipEntry } from "../core/zip-entry.js";
 import {
   EmptyZip32,
   Zip32WithThreeEntries,
@@ -13,7 +14,6 @@ import {
   randomAccessReaderFromBuffer,
   type RandomAccessReader,
 } from "../util/streams.js";
-import { ZipEntryReader } from "./entry-reader.js";
 import { ZipReader } from "./reader.js";
 
 describe("base/reader", () => {
@@ -140,7 +140,7 @@ describe("base/reader", () => {
           Zip32WithThreeEntries.byteLength,
         );
 
-        const files: ZipEntryReader[] = [];
+        const files: ZipEntry[] = [];
         for await (const file of reader.files()) {
           files.push(file);
         }
@@ -250,13 +250,13 @@ describe("base/reader", () => {
           randomAccessReaderFromBuffer(Zip32WithThreeEntries),
           Zip32WithThreeEntries.byteLength,
         );
-        const files = [new ZipEntryReader(), new ZipEntryReader()];
+        const files = [new ZipEntry(), new ZipEntry()];
 
         const filesMock = mock.method(
           reader,
           "files",
           // eslint-disable-next-line @typescript-eslint/require-await
-          async function* (): AsyncGenerator<ZipEntryReader> {
+          async function* (): AsyncGenerator<ZipEntry> {
             for (const file of files) {
               yield file;
             }

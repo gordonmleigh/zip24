@@ -10,24 +10,24 @@ describe("util/encoded-string", () => {
       describe("with cp437 encoding", () => {
         it("sets the value if given as string", () => {
           const encoded = new EncodedString("cp437", "♥♦♣♠");
-          assertBufferEqual(encoded.rawValue, data("03040506"));
+          assertBufferEqual(encoded, data("03040506"));
         });
 
         it("sets the value if given as bytes", () => {
           const encoded = new EncodedString("cp437", data("fbfcfdfe"));
-          assert.strictEqual(encoded.value, "√ⁿ²■");
+          assert.strictEqual(encoded.toString(), "√ⁿ²■");
         });
       });
 
       describe("with utf8 encoding", () => {
         it("sets the value if given as string", () => {
           const encoded = new EncodedString("utf8", "1️⃣");
-          assertBufferEqual(encoded.rawValue, data("31efb88fe283a3"));
+          assertBufferEqual(encoded, data("31efb88fe283a3"));
         });
 
         it("sets the value if given as bytes", () => {
           const encoded = new EncodedString("utf8", data("f09f9982"));
-          assert.strictEqual(encoded.value, "🙂");
+          assert.strictEqual(encoded.toString(), "🙂");
         });
       });
 

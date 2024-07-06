@@ -9,6 +9,8 @@ import {
   tinyUint,
   utf8,
 } from "../test-util/data.js";
+import { computeCrc32 } from "../util/crc32.js";
+import { EncodedString } from "../util/encoded-string.js";
 import { ExtraFieldTag } from "./constants.js";
 import { ZipFormatError, ZipSignatureError } from "./errors.js";
 import {
@@ -97,6 +99,58 @@ describe("core/extra-field-collection", () => {
             error instanceof ZipFormatError &&
             error.message === "expected version 1 of unicode field, got 2",
         );
+      });
+    });
+
+    describe("#fallbackUnicode()", () => {
+      it("returns the original if there is no matching field", () => {
+        const original = new EncodedString("cp437", "hello");
+        const fields = new ExtraFieldCollection();
+
+        const result = fields.fallbackUnicode(
+          original,
+          ExtraFieldTag.UnicodePathField,
+        );
+
+        assert.strictEqual(result, "hello");
+      });
+
+      it("returns the original if the crc32 doesn't match", () => {
+        const original = new EncodedString("cp437", "hello");
+
+        const fields = new ExtraFieldCollection([
+          new UnicodeExtraField(
+            ExtraFieldTag.UnicodePathField,
+            0x12345678,
+            "world",
+          ),
+        ]);
+
+        const result = fields.fallbackUnicode(
+          original,
+          ExtraFieldTag.UnicodePathField,
+        );
+
+        assert.strictEqual(result, "hello");
+      });
+
+      it("returns the extra field value if the crc32 does match", () => {
+        const original = new EncodedString("cp437", "hello");
+
+        const fields = new ExtraFieldCollection([
+          new UnicodeExtraField(
+            ExtraFieldTag.UnicodePathField,
+            computeCrc32(Buffer.from("hello")),
+            "world",
+          ),
+        ]);
+
+        const result = fields.fallbackUnicode(
+          original,
+          ExtraFieldTag.UnicodePathField,
+        );
+
+        assert.strictEqual(result, "world");
       });
     });
 
@@ -241,6 +295,18 @@ describe("core/extra-field-collection", () => {
             error.message ===
               "invalid signature for Zip64 extended information extra field (2)",
         );
+      });
+    });
+
+    describe(".from", () => {
+      it("sets the fields in order", () => {
+        const field = Zip64ExtraField.from({
+          uncompressedSize: 1,
+          compressedSize: 2,
+          localHeaderOffset: 3,
+        });
+
+        assert.deepStrictEqual(field.values, [1, 2, 3]);
       });
     });
 

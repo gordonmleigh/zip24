@@ -161,7 +161,6 @@ export const Zip32WithThreeEntries = data(
 );
 
 export type ZipGenerationOptions = {
-  fileComment?: string;
   fileCommentLength?: number;
   fileCount: number;
   fileSize?: number;

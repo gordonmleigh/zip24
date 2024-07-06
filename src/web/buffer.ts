@@ -1,13 +1,10 @@
+import { CentralDirectoryHeader } from "../core/central-directory-header.js";
 import {
   decompress,
   type CompressionAlgorithms,
 } from "../core/compression-core.js";
-import {
-  getDirectoryHeaderLength,
-  readDirectoryEntry,
-} from "../core/directory-entry.js";
-import type { ZipReaderLike } from "../core/interfaces.js";
-import { readLocalHeaderSize } from "../core/local-entry.js";
+import { LocalFileHeader } from "../core/local-file-header.js";
+import { ZipEntry } from "../core/zip-entry.js";
 import {
   Eocdr,
   Zip64Eocdl,
@@ -16,7 +13,6 @@ import {
 } from "../core/zip-trailer.js";
 import { BufferView, type BufferLike } from "../util/binary.js";
 import { defaultDecompressors } from "./compression.js";
-import { ZipEntryReader } from "./entry-reader.js";
 
 /**
  * Options for {@link ZipBufferEntryReader}.
@@ -28,7 +24,7 @@ export type ZipBufferReaderOptions = {
 /**
  * An object which can read zip data from a buffer.
  */
-export class ZipBufferReader implements ZipReaderLike {
+export class ZipBufferReader {
   private readonly buffer: BufferView;
   private readonly decompressors: CompressionAlgorithms;
   private readonly trailer: ZipTrailer;
@@ -62,30 +58,47 @@ export class ZipBufferReader implements ZipReaderLike {
   /**
    * Iterate through the files in the zip synchronously.
    */
-  public *filesSync(): Generator<ZipEntryReader> {
+  public *filesSync(): Generator<ZipEntry> {
     let offset = this.trailer.offset;
 
     for (let index = 0; index < this.entryCount; ++index) {
-      const entry = new ZipEntryReader();
-      readDirectoryEntry(entry, this.buffer, offset);
-      offset += getDirectoryHeaderLength(entry);
+      const header = CentralDirectoryHeader.deserialize(this.buffer, offset);
+      offset += header.totalSize;
 
-      const localHeaderSize = readLocalHeaderSize(
+      const localHeaderSize = LocalFileHeader.readTotalSize(
         this.buffer,
-        entry.localHeaderOffset,
+        header.localHeaderOffset,
       );
 
       const compressedData = this.buffer.getOriginalBytes(
-        entry.localHeaderOffset + localHeaderSize,
-        entry.compressedSize,
+        header.localHeaderOffset + localHeaderSize,
+        header.compressedSize,
       );
 
-      entry.uncompressedData = decompress(
-        entry.compressionMethod,
-        entry,
-        [compressedData],
-        this.decompressors,
-      );
+      const entry = new ZipEntry({
+        attributes: header.attributes,
+        comment: header.comment,
+        compressedSize: header.compressedSize,
+        compressionMethod: header.compressionMethod,
+        crc32: header.crc32,
+        extraField: header.extraField,
+        flags: header.flags,
+        lastModified: header.lastModified,
+        localHeaderOffset: header.localHeaderOffset,
+        path: header.path,
+        uncompressedSize: header.uncompressedSize,
+        versionMadeBy: header.versionMadeBy,
+        versionNeeded: header.versionNeeded,
+
+        uncompressedData: decompress(
+          header.compressionMethod,
+          header,
+          [compressedData],
+          this.decompressors,
+        ),
+
+        noValidateVersion: true,
+      });
 
       yield entry;
     }
@@ -95,15 +108,15 @@ export class ZipBufferReader implements ZipReaderLike {
    * Iterate through the files in the zip.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- interface
-  public async *files(): AsyncGenerator<ZipEntryReader> {
+  public async *files(): AsyncGenerator<ZipEntry> {
     yield* this.filesSync();
   }
 
-  public [Symbol.iterator](): Iterator<ZipEntryReader> {
+  public [Symbol.iterator](): Iterator<ZipEntry> {
     return this.filesSync();
   }
 
-  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader> {
+  public [Symbol.asyncIterator](): AsyncIterator<ZipEntry> {
     return this.files();
   }
 }

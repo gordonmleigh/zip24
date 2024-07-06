@@ -1,35 +1,14 @@
+import { CentralDirectoryHeader } from "../core/central-directory-header.js";
 import {
   CompressionMethod,
   compress,
   type CompressionAlgorithms,
-  type DataDescriptor,
 } from "../core/compression-core.js";
 import { ZipPlatform, ZipVersion } from "../core/constants.js";
-import { writeDirectoryHeader } from "../core/directory-entry.js";
-import {
-  minimumVersion,
-  needs64bit,
-  needsDataDescriptor,
-  needsUtf8,
-} from "../core/entry-utils.js";
-import {
-  getAttributesPlatform,
-  makePlatformAttributes,
-} from "../core/file-attributes.js";
-import { GeneralPurposeFlags } from "../core/flags.js";
-import {
-  writeDataDescriptor32,
-  writeDataDescriptor64,
-  writeLocalHeader,
-} from "../core/local-entry.js";
-import type {
-  RawCentralHeader,
-  RawLocalHeader,
-  ZipEntryInfo,
-  ZipEntryOptions,
-} from "../core/records.js";
+import { DataDescriptor } from "../core/data-descriptor.js";
+import { LocalFileHeader } from "../core/local-file-header.js";
+import { ZipEntry, type ZipEntryInfo } from "../core/zip-entry.js";
 import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.js";
-import { CodePage437Encoder } from "../util/cp437.js";
 import {
   ByteLengthStrategy,
   DoubleEndedBuffer,
@@ -37,12 +16,6 @@ import {
 import { Semaphore } from "../util/semaphore.js";
 import type { DataSource } from "../util/streams.js";
 import { defaultCompressors } from "./compression.js";
-
-type ZipEntryInternalOptions = ZipEntryOptions & {
-  hasDataDescriptor?: boolean;
-};
-
-type InternalHeader = RawCentralHeader & { zip64?: boolean };
 
 export type ZipWriterOptions = {
   compressors?: CompressionAlgorithms;
@@ -54,7 +27,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   private readonly buffer: DoubleEndedBuffer<Uint8Array>;
   private readonly bufferSemaphore = new Semaphore(1);
   private readonly compressors: CompressionAlgorithms;
-  private readonly directory: InternalHeader[] = [];
+  private readonly directory: CentralDirectoryHeader[] = [];
   private readonly startingOffset: number;
 
   public constructor(options: ZipWriterOptions = {}) {
@@ -90,56 +63,67 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     const localHeaderOffset = this.startingOffset + this.buffer.written;
 
     // normalize the options
-    const attributes =
-      file.attributes ??
-      makePlatformAttributes(file.platformMadeBy ?? ZipPlatform.DOS);
-    const platform = getAttributesPlatform(attributes);
-    const hasDataDescriptor = needsDataDescriptor(file);
-    const utf8 = !!file.utf8 || needsUtf8(file);
-    const zip64 = !!file.zip64 || needs64bit({ ...file, localHeaderOffset });
-    const options = { hasDataDescriptor, utf8, zip64 };
-    const version = minimumVersion(options, file.versionMadeBy);
+    const entry = new ZipEntry({
+      ...file,
+      compressionMethod:
+        file.compressionMethod ??
+        (content === undefined || content === ""
+          ? CompressionMethod.Stored
+          : CompressionMethod.Deflate),
+      localHeaderOffset,
+      uncompressedData: content,
+    });
 
-    const flags = new GeneralPurposeFlags();
-    flags.hasDataDescriptor = hasDataDescriptor;
-    flags.hasUtf8Strings = utf8;
+    const hasDataDescriptor = entry.flags.hasDataDescriptor;
 
-    const encoder = utf8 ? new TextEncoder() : new CodePage437Encoder();
+    const localHeader = new LocalFileHeader({
+      compressedSize: hasDataDescriptor ? 0 : entry.compressedSize,
+      compressionMethod: entry.compressionMethod,
+      crc32: hasDataDescriptor ? 0 : entry.crc32,
+      extraField: entry.extraField,
+      flags: entry.flags,
+      lastModified: entry.lastModified,
+      path: entry.path,
+      uncompressedSize: hasDataDescriptor ? 0 : entry.uncompressedSize,
+      versionNeeded: entry.versionNeeded,
+      zip64: entry.zip64,
+    });
 
-    const localHeader: RawLocalHeader = {
-      compressedSize: file.compressedSize ?? 0,
-      compressionMethod: file.compressionMethod ?? CompressionMethod.Deflate,
-      crc32: file.crc32 ?? 0,
-      flags,
-      lastModified: file.lastModified ?? new Date(),
-      path: encoder.encode(file.path),
-      uncompressedSize: file.uncompressedSize ?? 0,
-      versionNeeded: version,
-    };
+    const dataDescriptor = new DataDescriptor(undefined, entry.zip64);
+    await this.buffer.write(localHeader.serialize());
 
-    await this.buffer.write(writeLocalHeader(localHeader, { zip64 }));
-
-    const dataDescriptor = await this.writeFileData(
-      localHeader.compressionMethod,
-      file,
-      content,
-      options,
+    await this.buffer.pipeFrom(
+      compress(
+        entry.compressionMethod,
+        file,
+        dataDescriptor,
+        content,
+        this.compressors,
+      ),
     );
 
-    const directoryHeader: InternalHeader = {
-      ...localHeader,
-      ...dataDescriptor,
-      ...options,
-      attributes,
-      comment: encoder.encode(file.comment),
-      localHeaderOffset,
-      internalAttributes: 0,
-      platformMadeBy: platform,
-      versionMadeBy: version,
-      zip64,
-    };
+    if (hasDataDescriptor) {
+      await this.buffer.write(dataDescriptor.serialize());
+    }
 
-    this.directory.push(directoryHeader);
+    this.directory.push(
+      new CentralDirectoryHeader({
+        attributes: entry.attributes,
+        comment: entry.comment,
+        compressedSize: dataDescriptor.compressedSize,
+        compressionMethod: entry.compressionMethod,
+        crc32: dataDescriptor.crc32,
+        extraField: entry.extraField,
+        flags: entry.flags,
+        lastModified: entry.lastModified,
+        localHeaderOffset,
+        path: entry.path,
+        uncompressedSize: dataDescriptor.uncompressedSize,
+        versionMadeBy: entry.versionMadeBy,
+        versionNeeded: entry.versionNeeded,
+        zip64: entry.zip64,
+      }),
+    );
   }
 
   private async writeCentralDirectory(fileComment?: string): Promise<void> {
@@ -147,10 +131,10 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     let useZip64 = this.directory.length > 0xffff;
     let versionNeeded = ZipVersion.Deflate;
 
-    for (const { zip64, ...entry } of this.directory) {
-      useZip64 ||= !!zip64;
-      versionNeeded = Math.max(versionNeeded, entry.versionNeeded);
-      await this.buffer.write(writeDirectoryHeader(entry, { zip64 }));
+    for (const header of this.directory) {
+      useZip64 ||= !!header.zip64;
+      versionNeeded = Math.max(versionNeeded, header.versionNeeded);
+      await this.buffer.write(header.serialize());
     }
 
     const trailerOffset = this.startingOffset + this.buffer.written;
@@ -182,38 +166,5 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     );
 
     await this.buffer.write(eocdr.serialize());
-  }
-
-  private async writeFileData(
-    compressionMethod: CompressionMethod,
-    checkValues: Partial<DataDescriptor> = {},
-    content: DataSource | undefined,
-    options: ZipEntryInternalOptions,
-  ): Promise<DataDescriptor> {
-    const descriptor: DataDescriptor = {
-      compressedSize: 0,
-      crc32: 0,
-      uncompressedSize: 0,
-    };
-
-    await this.buffer.pipeFrom(
-      compress(
-        compressionMethod,
-        checkValues,
-        descriptor,
-        content,
-        this.compressors,
-      ),
-    );
-
-    if (options.hasDataDescriptor) {
-      if (options.zip64) {
-        await this.buffer.write(writeDataDescriptor64(descriptor));
-      } else {
-        await this.buffer.write(writeDataDescriptor32(descriptor));
-      }
-    }
-
-    return descriptor;
   }
 }

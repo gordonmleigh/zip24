@@ -1,4 +1,5 @@
 import { BufferView, type BufferLike } from "../util/binary.js";
+import { computeCrc32 } from "../util/crc32.js";
 import { EncodedString } from "../util/encoded-string.js";
 import {
   makeBuffer,
@@ -71,7 +72,7 @@ export class UnicodeExtraField implements ExtraField {
   }
 
   public get value(): string {
-    return this.rawValueInternal.value;
+    return this.rawValueInternal.toString();
   }
   public set value(value: string) {
     this.rawValueInternal = new EncodedString("utf8", value);
@@ -187,6 +188,12 @@ export class Zip64ExtraField implements ExtraField {
       offset += 8;
     }
 
+    return field;
+  }
+
+  public static from(fields: Zip64SizeFields): Zip64ExtraField {
+    const field = new Zip64ExtraField();
+    field.setValues(fields);
     return field;
   }
 
@@ -333,8 +340,23 @@ export class ExtraFieldCollection
 
   public fields: ExtraField[];
 
+  public get byteLength(): number {
+    return this.fields.reduce((total, field) => total + field.dataSize + 4, 0);
+  }
+
   public constructor(fields: Iterable<ExtraField> = []) {
     this.fields = [...fields];
+  }
+
+  public fallbackUnicode(
+    original: Uint8Array,
+    tag: UnicodeExtraFieldTag,
+  ): string {
+    const field = this.getField(tag);
+    if (field && field.crc32 === computeCrc32(original)) {
+      return field.value;
+    }
+    return original.toString();
   }
 
   public serialize(
@@ -342,12 +364,7 @@ export class ExtraFieldCollection
     byteOffset?: number,
     byteLength?: number,
   ): Uint8Array {
-    const requiredLength = this.fields.reduce(
-      (total, field) => total + field.dataSize + 4,
-      0,
-    );
-
-    const view = makeBuffer(requiredLength, buffer, byteOffset, byteLength);
+    const view = makeBuffer(this.byteLength, buffer, byteOffset, byteLength);
     let offset = 0;
 
     for (const field of this.fields) {
