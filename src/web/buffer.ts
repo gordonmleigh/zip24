@@ -24,7 +24,9 @@ export type ZipBufferReaderOptions = {
 /**
  * An object which can read zip data from a buffer.
  */
-export class ZipBufferReader {
+export class ZipBufferReader
+  implements AsyncIterable<ZipEntry>, Iterable<ZipEntry>
+{
   private readonly buffer: BufferView;
   private readonly decompressors: CompressionAlgorithms;
   private readonly trailer: ZipTrailer;
