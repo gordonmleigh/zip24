@@ -7,4 +7,4 @@ export * from "./core/errors.js";
 export * from "./core/extra-field-collection.js";
 export * from "./core/file-attributes.js";
 export * from "./core/flags.js";
-export * from "./core/zip-entry.js";
+export { ZipEntry } from "./core/zip-entry.js";
