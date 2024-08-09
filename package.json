@@ -2,8 +2,23 @@
   "name": "zip24",
   "version": "0.1.0",
   "description": "A zip package for the modern age",
-  "main": "lib/index.js",
   "type": "module",
+  "author": "Gordon Leigh",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gordonmleigh/zip24/issues"
+  },
+  "homepage": "https://github.com/gordonmleigh/zip24#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/gordonmleigh/zip24.git"
+  },
+  "keywords": [
+    "unzip",
+    "zip",
+    "archive",
+    "stream"
+  ],
   "engines": {
     "node": ">=18"
   },
@@ -101,19 +116,6 @@
     "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
     "watch:test": "node --import @swc-node/register/esm-register --enable-source-maps --watch --test 'src/**/*.test.*'"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/gordonmleigh/zip24.git"
-  },
-  "keywords": [
-    "zip"
-  ],
-  "author": "Gordon Leigh",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/gordonmleigh/zip24/issues"
-  },
-  "homepage": "https://github.com/gordonmleigh/zip24#readme",
   "devDependencies": {
     "@awboost/eslint-config": "^0.1.2",
     "@swc-node/register": "^1.9.1",
