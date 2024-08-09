@@ -9,58 +9,85 @@ import { DataDescriptor } from "../core/data-descriptor.js";
 import { LocalFileHeader } from "../core/local-file-header.js";
 import { ZipEntry, type ZipEntryInfo } from "../core/zip-entry.js";
 import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.js";
-import {
-  ByteLengthStrategy,
-  DoubleEndedBuffer,
-} from "../util/double-ended-buffer.js";
-import { Semaphore } from "../util/semaphore.js";
-import type { DataSource } from "../util/streams.js";
+import { assert } from "../util/assert.js";
+import { DoubleEndedBuffer } from "../util/double-ended-buffer.js";
+import { Mutex } from "../util/mutex.js";
+import type { ByteSink, DataSource } from "../util/streams.js";
 import { defaultCompressors } from "./compression.js";
 
 export type ZipWriterOptions = {
   compressors?: CompressionAlgorithms;
   highWaterMark?: number;
+  sink?: ByteSink;
   startingOffset?: number;
 };
 
 export class ZipWriter implements AsyncIterable<Uint8Array> {
-  private readonly buffer: DoubleEndedBuffer<Uint8Array>;
-  private readonly bufferSemaphore = new Semaphore(1);
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
+  public static fromWritableStream(stream: WritableStream): ZipWriter {
+    return new this({ sink: stream.getWriter() });
+  }
+
+  private readonly buffer?: DoubleEndedBuffer;
   private readonly compressors: CompressionAlgorithms;
   private readonly directory: CentralDirectoryHeader[] = [];
+  private readonly sink: ByteSink;
   private readonly startingOffset: number;
+  private readonly writeLock = new Mutex();
+
+  private writtenBytes = 0;
 
   public constructor(options: ZipWriterOptions = {}) {
-    const { compressors, highWaterMark = 0xa000, startingOffset = 0 } = options;
+    const {
+      compressors,
+      highWaterMark = 0xa000,
+      sink,
+      startingOffset = 0,
+    } = options;
 
-    // the buffer stores outgoing data chunks
-    this.buffer = new DoubleEndedBuffer(new ByteLengthStrategy(highWaterMark));
+    if (sink) {
+      this.sink = sink;
+    } else {
+      this.buffer = new DoubleEndedBuffer({ highWaterMark });
+      this.sink = this.buffer;
+    }
+
     this.compressors = compressors ?? defaultCompressors;
     this.startingOffset = startingOffset;
   }
 
   public async *[Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
+    if (!this.buffer) {
+      throw new TypeError(
+        `reading is not supported when initialized with sink`,
+      );
+    }
     yield* this.buffer;
   }
 
-  public readonly addFile = this.bufferSemaphore.synchronize(
+  public readonly addFile = this.writeLock.synchronize(
     (file: ZipEntryInfo, content?: DataSource) =>
       this.writeFileEntry(file, content),
   );
 
-  public readonly finalize = this.bufferSemaphore.synchronize(
+  public readonly finalize = this.writeLock.synchronize(
     async (fileComment?: string) => {
       await this.writeCentralDirectory(fileComment);
-      this.buffer.end();
-      await this.buffer.ended;
+      await this.sink.close?.();
     },
   );
+
+  private async write(chunk: Uint8Array): Promise<void> {
+    assert(this.sink.write, `expected sink to have a write method`);
+    await this.sink.write(chunk);
+    this.writtenBytes += chunk.byteLength;
+  }
 
   private async writeFileEntry(
     file: ZipEntryInfo,
     content?: DataSource,
   ): Promise<void> {
-    const localHeaderOffset = this.startingOffset + this.buffer.written;
+    const localHeaderOffset = this.startingOffset + this.writtenBytes;
 
     // normalize the options
     const entry = new ZipEntry({
@@ -90,20 +117,21 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
     });
 
     const dataDescriptor = new DataDescriptor(undefined, entry.zip64);
-    await this.buffer.write(localHeader.serialize());
+    await this.write(localHeader.serialize());
 
-    await this.buffer.pipeFrom(
-      compress(
-        entry.compressionMethod,
-        file,
-        dataDescriptor,
-        content,
-        this.compressors,
-      ),
+    const compressedData = compress(
+      entry.compressionMethod,
+      file,
+      dataDescriptor,
+      content,
+      this.compressors,
     );
+    for await (const chunk of compressedData) {
+      await this.write(chunk);
+    }
 
     if (hasDataDescriptor) {
-      await this.buffer.write(dataDescriptor.serialize());
+      await this.write(dataDescriptor.serialize());
     }
 
     this.directory.push(
@@ -127,17 +155,17 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   }
 
   private async writeCentralDirectory(fileComment?: string): Promise<void> {
-    const directoryOffset = this.startingOffset + this.buffer.written;
+    const directoryOffset = this.startingOffset + this.writtenBytes;
     let useZip64 = this.directory.length > 0xffff;
     let versionNeeded = ZipVersion.Deflate;
 
     for (const header of this.directory) {
       useZip64 ||= !!header.zip64;
       versionNeeded = Math.max(versionNeeded, header.versionNeeded);
-      await this.buffer.write(header.serialize());
+      await this.write(header.serialize());
     }
 
-    const trailerOffset = this.startingOffset + this.buffer.written;
+    const trailerOffset = this.startingOffset + this.writtenBytes;
     const directorySize = trailerOffset - directoryOffset;
     useZip64 ||= trailerOffset >= 0xffff_ffff;
 
@@ -151,8 +179,8 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
         versionNeeded,
       });
 
-      await this.buffer.write(eocdr64.serialize());
-      await this.buffer.write(new Zip64Eocdl(trailerOffset).serialize());
+      await this.write(eocdr64.serialize());
+      await this.write(new Zip64Eocdl(trailerOffset).serialize());
     }
 
     const eocdr = new Eocdr(
@@ -165,6 +193,6 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
       useZip64,
     );
 
-    await this.buffer.write(eocdr.serialize());
+    await this.write(eocdr.serialize());
   }
 }

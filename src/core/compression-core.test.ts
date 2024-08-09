@@ -2,7 +2,7 @@ import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { asyncIterable } from "../test-util/data.js";
-import { bufferFromIterable, type ByteStream } from "../util/streams.js";
+import { bufferFromIterable, type ByteSource } from "../util/streams.js";
 import {
   CompressionMethod,
   compress,
@@ -38,7 +38,7 @@ describe("compress", () => {
       uncompressedSize: 0,
     };
 
-    const algorithm = mock.fn(async function* (input: ByteStream) {
+    const algorithm = mock.fn(async function* (input: ByteSource) {
       // `compressEntry` expects the algorithm to consume the input
       await bufferFromIterable(input);
       yield Buffer.from("hello fred");
@@ -66,7 +66,7 @@ describe("compress", () => {
       uncompressedSize: 0,
     };
 
-    const algorithm = mock.fn(async function* (input: ByteStream) {
+    const algorithm = mock.fn(async function* (input: ByteSource) {
       // `compressEntry` expects the algorithm to consume the input
       await bufferFromIterable(input);
       yield Buffer.from("hello fred");
@@ -198,7 +198,7 @@ describe("decompress", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-    const algorithm = mock.fn(async function* (input: ByteStream) {
+    const algorithm = mock.fn(async function* (input: ByteSource) {
       yield Buffer.from("hello world");
     });
 
@@ -220,7 +220,7 @@ describe("decompress", () => {
     };
 
     // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-    const algorithm = mock.fn(async function* (input: ByteStream) {
+    const algorithm = mock.fn(async function* (input: ByteSource) {
       yield Buffer.from("hello world");
     });
 

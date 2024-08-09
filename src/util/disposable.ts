@@ -27,3 +27,10 @@ export async function asyncDisposeOrClose(
     await value.close();
   }
 }
+
+export class DisposedError extends Error {
+  public constructor() {
+    super("the instance was disposed");
+    this.name = "DisposedError";
+  }
+}

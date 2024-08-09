@@ -4,7 +4,12 @@ import { hasExtraProperty } from "./assert.js";
 const DefaultChunkSize = 1024 ** 2; // 1 MB
 
 export type AnyIterable<T> = AsyncIterable<T> | Iterable<T>;
-export type ByteStream = AnyIterable<Uint8Array>;
+export type ByteSource = AnyIterable<Uint8Array>;
+
+export type ByteSink = {
+  close: () => PromiseLike<void> | void;
+  write: (chunk: Uint8Array) => PromiseLike<void>;
+};
 
 export type RandomAccessReadOptions = {
   buffer: Uint8Array;
@@ -144,7 +149,7 @@ export async function* normalizeDataSource(
 }
 
 export function readableStreamFromIterable(
-  input: ByteStream,
+  input: ByteSource,
 ): ReadableStream<Uint8Array> {
   const inputIterator = getAsyncIterator(input);
 
@@ -167,7 +172,7 @@ export function readableStreamFromIterable(
 }
 
 export async function bufferFromIterable(
-  input: ByteStream,
+  input: ByteSource,
 ): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let byteLength = 0;
@@ -189,7 +194,7 @@ export async function bufferFromIterable(
 }
 
 export async function textFromIterable(
-  input: ByteStream,
+  input: ByteSource,
   encoding?: string,
 ): Promise<string> {
   const decoder = new TextDecoder(encoding);
@@ -213,9 +218,9 @@ export async function* mapIterable<Input, Output>(
 }
 
 export async function* maxChunkSize(
-  input: ByteStream,
+  input: ByteSource,
   chunkSize: number,
-): ByteStream {
+): ByteSource {
   for await (const originalChunk of input) {
     for (
       let offset = 0;

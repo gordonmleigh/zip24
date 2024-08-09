@@ -4,7 +4,7 @@ import {
   mapIterable,
   normalizeDataSource,
   type AsyncTransform,
-  type ByteStream,
+  type ByteSource,
   type DataSource,
 } from "../util/streams.js";
 import { ZipFormatError } from "./errors.js";
@@ -80,11 +80,11 @@ export async function* compress(
 export async function* decompress(
   compressionMethod: CompressionMethod,
   descriptor: DataDescriptor,
-  input: ByteStream,
+  input: ByteSource,
   decompressors: CompressionAlgorithms,
 ): AsyncGenerator<Uint8Array> {
   const decompressor = decompressors[compressionMethod];
-  let output: ByteStream;
+  let output: ByteSource;
 
   if (decompressor) {
     output = decompressor(input);

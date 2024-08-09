@@ -7,7 +7,7 @@ import {
   normalizeDataSource,
   readableStreamFromIterable,
   textFromIterable,
-  type ByteStream,
+  type ByteSource,
   type DataSource,
 } from "../util/streams.js";
 import { ExtraFieldCollection } from "./extra-field-collection.js";
@@ -49,7 +49,7 @@ export class ZipEntry implements AsyncIterable<Uint8Array> {
   public lastModified: Date;
   public localHeaderOffset: number;
   public path: string;
-  public uncompressedData: ByteStream;
+  public uncompressedData: ByteSource;
   public uncompressedSize: number;
   public versionMadeBy: ZipVersion;
   public versionNeeded: ZipVersion;

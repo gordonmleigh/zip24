@@ -3,7 +3,6 @@ import { assert } from "./assert.js";
 /**
  * An extension to the {@link Date} class to support DOS-encoded values.
  */
-
 export class DosDate extends Date {
   /**
    * Create a new instance from the given date and time values. Each value

@@ -1,140 +1,200 @@
-import { Deferred } from "./deferred.js";
-import { Semaphore } from "./semaphore.js";
-import type { AnyIterable } from "./streams.js";
+import { addAbortListener } from "./abort.js";
+import { DisposedError } from "./disposable.js";
 
-type MeasuredItem<T> = {
-  size: number;
-  value: T;
-};
+type StateEvent = "ended" | "readable" | "writable";
+type FlowState = "drained" | "ended" | "flowing" | "paused" | "starved";
 
-export type DoubleEndedBufferOptions<T> = {
+type Listener = () => void;
+
+export type DoubleEndedBufferOptions = {
   readonly highWaterMark?: number;
-  readonly size?: (value: T) => number;
 };
 
-export class ByteLengthStrategy<T extends ArrayBuffer | ArrayBufferView>
-  implements Required<DoubleEndedBufferOptions<T>>
-{
-  public constructor(public readonly highWaterMark = 0x1000) {}
-
-  public size(value: T): number {
-    return value.byteLength;
-  }
-}
-export class DoubleEndedBuffer<T> implements AsyncIterable<T> {
+export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {
   private readonly abortController = new AbortController();
-  private readonly buffer: MeasuredItem<T>[] = [];
-  private readonly endedInternal = new Deferred<void>();
-  private readonly getSize: (value: T) => number;
-  private readonly highWaterMark: number;
-  private readonly readableItems: Semaphore;
-  private readonly writableCapacity: Semaphore;
+  private readonly buffer: Uint8Array[] = [];
+  private readonly highWaterMark;
 
-  private isEndedInternal = false;
-  private writtenInternal = 0;
+  private readonly stateListeners: Record<StateEvent, Listener[]> = {
+    ended: [],
+    readable: [],
+    writable: [],
+  };
 
-  public get ended(): PromiseLike<void> {
-    return this.endedInternal.promise;
+  private bufferSize = 0;
+  private isClosed = false;
+  private waitForDrain = false;
+
+  public constructor(options: DoubleEndedBufferOptions = {}) {
+    this.highWaterMark = options.highWaterMark ?? 0x10000;
   }
 
-  public get error(): Error | undefined {
-    return this.signal.reason as Error;
-  }
-
-  public get isEnded(): boolean {
-    return this.isEndedInternal;
-  }
-
-  public get signal(): AbortSignal {
-    return this.abortController.signal;
-  }
-
-  public get written(): number {
-    return this.writtenInternal;
-  }
-
-  public constructor(options: DoubleEndedBufferOptions<T> = {}) {
-    const { highWaterMark = 10, size = () => 1 } = options;
-
-    // this semaphore signals available items in the buffer for readers
-    this.readableItems = new Semaphore(0, { signal: this.signal });
-    // this semaphore signals available capacity in the buffer for writers
-    this.writableCapacity = new Semaphore(highWaterMark, {
-      signal: this.signal,
-    });
-
-    this.getSize = size;
-    this.highWaterMark = highWaterMark;
-  }
-
-  public async *[Symbol.asyncIterator](): AsyncIterator<T> {
+  public async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
     for (;;) {
       const chunk = await this.read();
       if (chunk === undefined) {
-        break;
+        return;
       }
       yield chunk;
     }
   }
 
-  public abort(error?: Error): void {
-    this.abortController.abort(error);
+  public async [Symbol.asyncDispose](): Promise<void> {
+    await this.dispose();
   }
 
-  public end(): void {
-    this.isEndedInternal = true;
+  public close(): void {
+    if (this.isClosed) {
+      return;
+    }
+    this.isClosed = true;
 
+    if (!this.abortController.signal.aborted) {
+      this.updateState();
+    }
+  }
+
+  public async dispose(): Promise<void> {
+    this.close();
+
+    const pendingReads = this.stateListeners.readable.length > 0;
+    const pendingWrites = this.stateListeners.writable.length > 0;
+
+    if (pendingWrites && !pendingReads) {
+      this.abortController.abort(new DisposedError());
+    } else {
+      await this.waitForState("ended");
+    }
+  }
+
+  public async done(): Promise<void> {
+    await this.waitForState("ended");
+  }
+
+  public async read(): Promise<Uint8Array | undefined> {
+    await this.waitForState("readable");
+    const result = this.buffer.shift();
+
+    // result is undefined if the buffer is ending
+    if (result !== undefined) {
+      this.bufferSize -= result.byteLength;
+      this.updateState();
+    }
+
+    return result;
+  }
+
+  public async write(chunk: Uint8Array): Promise<void> {
+    if (this.isClosed) {
+      throw new Error(`can't add data to an closed buffer`);
+    }
+
+    await this.waitForState("writable");
+
+    this.buffer.push(chunk);
+    this.bufferSize += chunk.byteLength;
+
+    this.updateState();
+  }
+
+  private emitState(state: StateEvent): void {
+    if (state === "ended") {
+      if (!this.abortController.signal.aborted) {
+        // release all pending reads
+        const readers = this.stateListeners.readable;
+        this.stateListeners.readable = [];
+
+        for (const reader of readers) {
+          reader();
+        }
+      }
+
+      // release all 'ended' listeners
+      const listeners = this.stateListeners.ended;
+      this.stateListeners.ended = [];
+
+      for (const listener of listeners) {
+        listener();
+      }
+    } else {
+      // just release a single listener
+      this.stateListeners[state].shift()?.();
+    }
+  }
+
+  private getFlowState(): FlowState {
+    this.abortController.signal.throwIfAborted();
+
+    const pendingReads = this.stateListeners.readable.length > 0;
+    const pendingWrites = this.stateListeners.writable.length > 0;
+    const ended = this.isClosed && !pendingWrites && this.buffer.length === 0;
+
+    if (ended) {
+      return "ended";
+    }
     if (this.buffer.length === 0) {
-      // signal phantom buffer item to let readers drain
-      this.readableItems.release();
-      this.endedInternal.resolve();
+      return pendingReads ? "starved" : "drained";
+    }
+    if (this.waitForDrain || this.bufferSize >= this.highWaterMark) {
+      return "paused";
+    }
+    return "flowing";
+  }
+
+  private isState(state: StateEvent, flowState = this.getFlowState()): boolean {
+    switch (state) {
+      case "ended":
+        return flowState === "ended";
+      case "readable":
+        return (
+          flowState === "flowing" ||
+          flowState === "ended" ||
+          flowState === "paused"
+        );
+      case "writable":
+        return (
+          flowState === "flowing" ||
+          flowState === "starved" ||
+          (this.highWaterMark > 0 && flowState === "drained")
+        );
     }
   }
 
-  public async pipeFrom(source: AnyIterable<T>): Promise<number> {
-    const start = this.written;
+  private updateState(): void {
+    const flowState = this.getFlowState();
 
-    for await (const chunk of source) {
-      await this.write(chunk);
+    if (flowState === "ended") {
+      this.emitState("ended");
+      return;
+    }
+    if (flowState === "paused") {
+      this.waitForDrain = true;
+    }
+    if (flowState === "drained") {
+      this.waitForDrain = false;
     }
 
-    return this.written - start;
+    if (this.isState("readable", flowState)) {
+      this.emitState("readable");
+    }
+    if (this.isState("writable", flowState)) {
+      this.emitState("writable");
+    }
   }
 
-  public async read(): Promise<T | undefined> {
-    if (this.isEndedInternal && this.buffer.length === 0) {
-      // short circuit if buffer is empty and stream is empty
+  private async waitForState(state: StateEvent): Promise<void> {
+    if (this.isState(state) && this.stateListeners[state].length === 0) {
+      // we already have this state and there's no-one else waiting
       return;
     }
 
-    await this.readableItems.acquire();
-    const item = this.buffer.shift();
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = addAbortListener(this.abortController.signal, reject);
 
-    if (this.buffer.length === 0 && this.isEndedInternal) {
-      // nothing left to read
-      this.endedInternal.resolve();
-      // release the next reader so that reader list can drain
-      this.readableItems.release();
-    }
-
-    if (item) {
-      this.writableCapacity.release(Math.min(this.highWaterMark, item.size));
-      return item.value;
-    }
-  }
-
-  public async write(value: T): Promise<void> {
-    if (this.isEndedInternal) {
-      throw new Error(`can't add data to an ended buffer`);
-    }
-
-    const size = this.getSize(value);
-    this.writtenInternal += size;
-
-    // push the chunk before acquiring so that we can always read even if the
-    // chunk is bigger than the highWaterMark
-    this.buffer.push({ size, value });
-    await this.writableCapacity.acquire(size);
-    this.readableItems.release();
+      this.stateListeners[state].push(() => {
+        cleanup();
+        resolve();
+      });
+    });
   }
 }

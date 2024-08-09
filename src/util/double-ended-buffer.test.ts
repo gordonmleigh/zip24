@@ -1,137 +1,109 @@
 import assert from "node:assert";
-import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
-import {
-  ByteLengthStrategy,
-  DoubleEndedBuffer,
-} from "./double-ended-buffer.js";
+import { DisposedError } from "./disposable.js";
+import { DoubleEndedBuffer } from "./double-ended-buffer.js";
+import { textFromIterable } from "./streams.js";
 
-describe("DoubleEndedBuffer", () => {
-  it("buffers chunks up to the high water mark", async () => {
-    const buffer = new DoubleEndedBuffer(new ByteLengthStrategy(10));
+describe("util/double-ended-buffer", () => {
+  describe("class DoubleEndedBuffer", () => {
+    describe("#write()", () => {
+      it("buffers chunks up to the high water mark", async () => {
+        const buffer = new DoubleEndedBuffer({ highWaterMark: 10 });
 
-    await buffer.write(Buffer.from("01234"));
-    await buffer.write(Buffer.from("56789"));
+        await buffer.write(Buffer.from("01234"));
+        await buffer.write(Buffer.from("56789"));
 
-    assert.strictEqual(buffer.written, 10);
+        const writer = buffer.write(Buffer.from("1"));
 
-    const promise = buffer.write(Buffer.from("1"));
+        await Promise.all([
+          buffer.dispose(),
+          assert.rejects(writer, (error) => error instanceof DisposedError),
+        ]);
+      });
 
-    promise.then(
-      () => {
-        assert(false, "expected promise not to resolve");
-      },
-      () => {
-        assert(false, "expected promise not to reject");
-      },
-    );
-  });
+      it("forwards all chunks to the reader", async () => {
+        const data = [
+          Buffer.from("hello"),
+          Buffer.from(" "),
+          Buffer.from("world"),
+        ];
+        await using buffer = new DoubleEndedBuffer();
 
-  it("forwards all chunks to the reader", async () => {
-    const data = [Symbol(), Symbol(), Symbol(), Symbol()];
-    const buffer = new DoubleEndedBuffer();
+        void Promise.all(data.map((x) => buffer.write(x)));
+        buffer.close();
 
-    const writers = Promise.all(data.map((x) => buffer.write(x)));
-    buffer.end();
-    assert.strictEqual(buffer.isEnded, true);
+        const result = await textFromIterable(buffer);
 
-    const read: unknown[] = [];
-    for await (const chunk of buffer) {
-      read.push(chunk);
-    }
+        assert.strictEqual(result, "hello world");
+      });
 
-    await writers;
-    await buffer.ended;
-    assert.deepStrictEqual(read, data);
-  });
+      it("throws if called after close()", async () => {
+        await using buffer = new DoubleEndedBuffer();
+        buffer.close();
 
-  it("throws if write() is called after end()", async () => {
-    const buffer = new DoubleEndedBuffer();
-    buffer.end();
-    assert.strictEqual(buffer.isEnded, true);
-
-    // also throws before end is signalled
-    await assert.rejects(buffer.write(1));
-    await buffer.ended;
-    await assert.rejects(buffer.write(1));
-  });
-
-  it("rejects pending reads if the buffer is aborted", async () => {
-    const buffer = new DoubleEndedBuffer();
-    const error = new Error("bang!");
-    const reader = buffer.read();
-
-    buffer.abort(error);
-
-    await assert.rejects(reader, (cause) => {
-      assert.strictEqual(cause, error);
-      return true;
+        await assert.rejects(buffer.write(Buffer.from("one")));
+      });
     });
 
-    assert.strictEqual(buffer.error, error);
-  });
+    describe("#close()", () => {
+      it("resolves pending reads", async () => {
+        await using buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
 
-  it("rejects new reads if the buffer is aborted", async () => {
-    const buffer = new DoubleEndedBuffer();
-    const error = new Error("bang!");
-    buffer.abort(error);
+        const reader1 = buffer.read();
+        const reader2 = buffer.read();
+        buffer.close();
 
-    await assert.rejects(buffer.read(), (cause) => {
-      assert.strictEqual(cause, error);
-      return true;
+        assert.strictEqual(await reader1, undefined);
+        assert.strictEqual(await reader2, undefined);
+      });
     });
 
-    assert.strictEqual(buffer.error, error);
-  });
+    describe("#done()", () => {
+      it("resolves when the buffer is closed", async () => {
+        const buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
+        const done = buffer.done();
 
-  it("rejects pending writes if the buffer is aborted", async () => {
-    const buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
-    const error = new Error("bang!");
-    const writer = buffer.write(1);
+        buffer.close();
+        await done;
+      });
 
-    buffer.abort(error);
+      it("rejects when dispose() is called with pending writes", async () => {
+        const buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
+        const write = buffer.write(Buffer.from("hello"));
+        const dispose = buffer.dispose();
+        const done = buffer.done();
 
-    await assert.rejects(writer, (cause) => {
-      assert.strictEqual(cause, error);
-      return true;
+        await Promise.all([
+          assert.rejects(write, (cause) => cause instanceof DisposedError),
+          assert.rejects(done, (cause) => cause instanceof DisposedError),
+          assert.doesNotReject(dispose),
+        ]);
+      });
     });
 
-    assert.strictEqual(buffer.error, error);
-  });
+    describe("#dispose()", () => {
+      it("resolves pending reads with undefined", async () => {
+        const buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
 
-  it("rejects new writes if the buffer is aborted", async () => {
-    const buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
-    const error = new Error("bang!");
-    buffer.abort(error);
+        const reader1 = buffer.read();
+        const reader2 = buffer.read();
 
-    await assert.rejects(buffer.write(1), (cause) => {
-      assert.strictEqual(cause, error);
-      return true;
-    });
+        await buffer.dispose();
 
-    assert.strictEqual(buffer.error, error);
-  });
+        assert.strictEqual(await reader1, undefined);
+        assert.strictEqual(await reader2, undefined);
+      });
 
-  describe("pipeFrom()", () => {
-    it("writes all chunks from the source", async () => {
-      const buffer = new DoubleEndedBuffer(new ByteLengthStrategy(10));
-      const outputPromise = text(buffer);
+      it("rejects pending writes and resolves successfully", async () => {
+        const buffer = new DoubleEndedBuffer({ highWaterMark: 0 });
+        const write = buffer.write(Buffer.from("hello"));
+        const dispose = buffer.dispose();
 
-      // write this first to help prove that the correct value is returned by
-      // pipeFrom
-      await buffer.write(Buffer.from("01234"));
-
-      const result = await buffer.pipeFrom([
-        Buffer.from("hello"),
-        Buffer.from("world"),
-      ]);
-      assert.strictEqual(result, 10);
-      assert.strictEqual(buffer.written, 15);
-
-      buffer.end();
-      const output = await outputPromise;
-
-      assert.strictEqual(output, "01234helloworld");
+        await Promise.all([
+          assert.rejects(write, (cause) => cause instanceof DisposedError),
+          assert.doesNotReject(dispose),
+        ]);
+      });
     });
   });
 });
