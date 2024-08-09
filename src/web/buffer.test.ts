@@ -12,7 +12,7 @@ import {
 } from "../test-util/fixtures.js";
 import { ZipBufferReader } from "./buffer.js";
 
-describe("base/buffer", () => {
+describe("web/buffer", () => {
   describe("ZipBufferReader", () => {
     describe("comment", () => {
       it("returns the zip file comment", () => {

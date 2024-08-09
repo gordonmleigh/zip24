@@ -6,7 +6,7 @@ import { asyncIterable, base64, base64iterable } from "../test-util/data.js";
 import { maxChunkSize } from "../util/streams.js";
 import { defaultCompressors, defaultDecompressors } from "./compression.js";
 
-describe("base/compression", () => {
+describe("web/compression", () => {
   describe("defaultCompressors", () => {
     it("can compress a stream using DEFLATE", async () => {
       // https://hipsum.co/

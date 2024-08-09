@@ -16,7 +16,7 @@ import {
 } from "../util/streams.js";
 import { ZipReader } from "./reader.js";
 
-describe("base/reader", () => {
+describe("web/reader", () => {
   describe("ZipReader", () => {
     it("can read a very large zip", async () => {
       // 12 MB file with 100 files of 100 kB each + roughly 2 MB central dir
