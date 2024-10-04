@@ -107,11 +107,12 @@
     }
   },
   "scripts": {
+    "build": "npm run clean && npm run test && npm run compile && npm run lint",
     "clean": "rm -rf lib/",
     "compile": "tsc",
     "coverage": "c8 --src src/ --all -r text -r lcovonly node --import=@swc-node/register/esm-register --test-reporter=dot --test 'src/**/*.test.ts'",
     "lint": "eslint src",
-    "test": "node --import @swc-node/register/esm-register --enable-source-maps --test 'src/**/*.test.*'",
+    "test": "c8 --100 --src src/ --all -r text -r lcovonly node --import @swc-node/register/esm-register --enable-source-maps --test 'src/**/*.test.*'",
     "watch:compile": "tsc -w",
     "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
     "watch:test": "node --import @swc-node/register/esm-register --enable-source-maps --watch --test 'src/**/*.test.*'"
