@@ -73,7 +73,7 @@ export class ZipWriter implements AsyncIterable<Uint8Array> {
   public readonly finalize = this.writeLock.synchronize(
     async (fileComment?: string) => {
       await this.writeCentralDirectory(fileComment);
-      await this.sink.close?.();
+      await this.sink.close();
     },
   );
 

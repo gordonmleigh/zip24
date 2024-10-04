@@ -16,7 +16,7 @@ export class ZipReader extends ZipReaderBase {
   ): Promise<ZipReader> {
     const file = await open(path);
     const { size } = await file.stat();
-    return this.fromReader(file, size, options);
+    return await this.fromReader(file, size, options);
   }
 
   public constructor(

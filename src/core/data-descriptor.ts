@@ -47,9 +47,9 @@ export class DataDescriptor implements DataDescriptorFields, Serializable {
   }
 
   public serialize(
-    buffer?: BufferLike | undefined,
-    byteOffset?: number | undefined,
-    byteLength?: number | undefined,
+    buffer?: BufferLike,
+    byteOffset?: number,
+    byteLength?: number,
   ): Uint8Array {
     const view = makeBuffer(
       this.is64bit ? DataDescriptor.FixedSize64 : DataDescriptor.FixedSize32,

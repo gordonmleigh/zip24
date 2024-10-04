@@ -58,7 +58,6 @@ describe("util/disposable", () => {
       const disposable = {
         [Symbol.asyncDispose]: asyncDispose,
         close,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       };
 
       await asyncDisposeOrClose(disposable);

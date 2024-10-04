@@ -147,9 +147,9 @@ export class LocalFileHeader implements Serializable {
   }
 
   public serialize(
-    buffer?: BufferLike | undefined,
-    byteOffset?: number | undefined,
-    byteLength?: number | undefined,
+    buffer?: BufferLike,
+    byteOffset?: number,
+    byteLength?: number,
   ): Uint8Array {
     const extraField = new ExtraFieldCollection(
       this.extraField.fields.filter(

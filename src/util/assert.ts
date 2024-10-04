@@ -24,6 +24,7 @@ export function hasExtraProperty<T, K extends PropertyKey>(
   // and we might end up passing an undefined key if a well-known symbol isn't
   // defined on the platform
   return (
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- exhaustive
     key !== undefined &&
     object !== null &&
     object !== undefined &&

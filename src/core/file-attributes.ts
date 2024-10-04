@@ -224,6 +224,7 @@ export function makePlatformAttributes(
   rawValue?: number,
 ): PlatformAttributes[ZipPlatform] {
   const ctor = PlatformAttributes[platform];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- exhaustive
   if (!ctor) {
     throw new ZipFormatError(`unknown platform ${platform}`);
   }
@@ -256,6 +257,7 @@ export function isPlatformAttributes<P extends ZipPlatform>(
   attributes: unknown,
 ): attributes is PlatformAttributes[P] {
   const ctor = PlatformAttributes[platform];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- exhaustive
   if (!ctor) {
     throw new ZipFormatError(`unknown platform ${platform}`);
   }

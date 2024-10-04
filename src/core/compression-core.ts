@@ -99,6 +99,7 @@ export async function* decompress(
   let checkCrc32 = 0;
   let bytesRead = 0;
 
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const chunk of output) {
     checkCrc32 = computeCrc32(chunk, checkCrc32);
     bytesRead += chunk.byteLength;

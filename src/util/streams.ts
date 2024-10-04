@@ -41,9 +41,7 @@ export type DataSource =
   | string
   | AsyncIterable<string>
   | AsyncIterable<Uint8Array>
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   | ReadableStream<string>
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   | ReadableStream<Uint8Array>;
 
 export function randomAccessReaderFromBuffer(
@@ -153,7 +151,6 @@ export function readableStreamFromIterable(
 ): ReadableStream<Uint8Array> {
   const inputIterator = getAsyncIterator(input);
 
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   return new ReadableStream({
     pull: async (controller) => {
       const result = await inputIterator.next();
@@ -177,6 +174,7 @@ export async function bufferFromIterable(
   const chunks: Uint8Array[] = [];
   let byteLength = 0;
 
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const chunk of input) {
     chunks.push(chunk);
     byteLength += chunk.byteLength;
@@ -200,6 +198,7 @@ export async function textFromIterable(
   const decoder = new TextDecoder(encoding);
   let output = "";
 
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const chunk of input) {
     output += decoder.decode(chunk, { stream: true });
   }
@@ -212,6 +211,7 @@ export async function* mapIterable<Input, Output>(
   input: AnyIterable<Input>,
   map: (input: Input) => Output | PromiseLike<Output>,
 ): AsyncGenerator<Output> {
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const element of input) {
     yield await map(element);
   }
@@ -221,6 +221,7 @@ export async function* maxChunkSize(
   input: ByteSource,
   chunkSize: number,
 ): ByteSource {
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const originalChunk of input) {
     for (
       let offset = 0;
@@ -238,6 +239,7 @@ export async function* maxChunkSize(
 export async function* identityStream<Input>(
   input: AnyIterable<Input>,
 ): AsyncGenerator<Input> {
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const element of input) {
     yield element;
   }

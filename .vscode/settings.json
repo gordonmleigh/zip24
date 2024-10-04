@@ -4,7 +4,7 @@
       "source.organizeImports": "explicit"
     }
   },
-  "eslint.experimental.useFlatConfig": true,
+  "eslint.useFlatConfig": true,
   "typescript.tsdk": "node_modules/typescript/lib",
   "cSpell.words": ["decompressors"],
   "code-coverage-lcov.path.searchPath": "coverage/lcov.info"
