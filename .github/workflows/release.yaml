@@ -5,7 +5,9 @@ on:
       - main
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
   issues: write
   pull-requests: write
 
@@ -49,3 +51,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
