@@ -1,6 +1,6 @@
 {
   "name": "zip24",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A zip package for the modern age",
   "type": "module",
   "author": "Gordon Leigh",
@@ -112,11 +112,11 @@
     "compile": "tsc",
     "coverage": "c8 --src src/ --all -r text -r lcovonly node --import=@swc-node/register/esm-register --test-reporter=dot --test 'src/**/*.test.ts'",
     "lint": "eslint src",
-    "test": "c8 --100 --src src/ --all -r text -r lcovonly node --import @swc-node/register/esm-register --enable-source-maps --test 'src/**/*.test.*'",
+    "release": "release-it -VV",
+    "test": "c8 --100 --src src/ --all -r text -r lcovonly node --import @swc-node/register/esm-register --test-reporter=spec --enable-source-maps --test 'src/**/*.test.*'",
     "watch:compile": "tsc -w",
     "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
-    "watch:test": "node --import @swc-node/register/esm-register --enable-source-maps --watch --test 'src/**/*.test.*'",
-    "release": "release-it"
+    "watch:test": "node --import @swc-node/register/esm-register --enable-source-maps --watch --test 'src/**/*.test.*'"
   },
   "dependencies": {
     "crc-32": "^1.2.2"
@@ -143,16 +143,17 @@
   "release-it": {
     "$schema": "https://unpkg.com/release-it/schema/release-it.json",
     "git": {
-      "requiredBranch": "main"
+      "requireCommits": true,
+      "requireBranch": "main"
     },
     "github": {
       "release": true
     },
     "hooks": {
-      "commitMessage": "chore: release v${version}"
+      "commitMessage": "Chore: release v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "plugins": {
       "@release-it/conventional-changelog": {
