@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/gordonmleigh/zip24/compare/v0.1.3...v0.1.4) (2024-10-04)
+
+
+### Build
+
+* publish provenance attestations ([18c38c0](https://github.com/gordonmleigh/zip24/commit/18c38c078ed2ae5abe4a59d0352e1dd69192b1d3))
+* publish to npm automatically ([3e1949c](https://github.com/gordonmleigh/zip24/commit/3e1949cf2e1cc978c97f97ce1cfe2472ba12e217))
+
 ## [0.1.3](https://github.com/gordonmleigh/zip24/compare/v0.1.0...v0.1.3) (2024-10-04)
 
 
