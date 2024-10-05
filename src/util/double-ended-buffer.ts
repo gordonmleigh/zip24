@@ -13,7 +13,7 @@ export type DoubleEndedBufferOptions = {
 export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {
   private readonly abortController = new AbortController();
   private readonly buffer: Uint8Array[] = [];
-  private readonly highWaterMark;
+  private readonly highWaterMark: number | undefined;
 
   private readonly stateListeners: Record<StateEvent, Listener[]> = {
     ended: [],
@@ -25,8 +25,14 @@ export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {
   private isClosed = false;
   private waitForDrain = false;
 
+  private get isBufferWritable(): boolean {
+    return (
+      this.highWaterMark === undefined || this.bufferSize < this.highWaterMark
+    );
+  }
+
   public constructor(options: DoubleEndedBufferOptions = {}) {
-    this.highWaterMark = options.highWaterMark ?? 0x10000;
+    this.highWaterMark = options.highWaterMark;
   }
 
   public async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
@@ -118,6 +124,7 @@ export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {
       }
     } else {
       // just release a single listener
+      /* c8 ignore next */
       this.stateListeners[state].shift()?.();
     }
   }
@@ -135,7 +142,7 @@ export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {
     if (this.buffer.length === 0) {
       return pendingReads ? "starved" : "drained";
     }
-    if (this.waitForDrain || this.bufferSize >= this.highWaterMark) {
+    if (this.waitForDrain || !this.isBufferWritable) {
       return "paused";
     }
     return "flowing";
@@ -155,7 +162,7 @@ export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {
         return (
           flowState === "flowing" ||
           flowState === "starved" ||
-          (this.highWaterMark > 0 && flowState === "drained")
+          (this.isBufferWritable && flowState === "drained")
         );
     }
   }
