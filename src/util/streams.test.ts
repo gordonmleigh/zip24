@@ -264,6 +264,40 @@ describe("util/streams", () => {
 
       assert.deepStrictEqual(chunks, ["UNO", "DOS", "TRES"]);
     });
+
+    it("calls final after all chunks have been processed, if given", async () => {
+      let inputFinished = false;
+      const map = mock.fn((x: string) => x.toUpperCase());
+
+      const final = mock.fn(() => {
+        assert(inputFinished);
+      });
+
+      const source = (async function* () {
+        const chunks = ["uno", "dos", "tres"];
+        for (const chunk of chunks) {
+          await Promise.resolve();
+          yield chunk;
+        }
+        inputFinished = true;
+      })();
+
+      const iterable = mapIterable(source, map, final);
+
+      const chunks: string[] = [];
+      for await (const chunk of iterable) {
+        chunks.push(chunk);
+      }
+
+      assert.strictEqual(map.mock.callCount(), 3);
+      assert.strictEqual(map.mock.calls[0]?.arguments[0], "uno");
+      assert.strictEqual(map.mock.calls[1]?.arguments[0], "dos");
+      assert.strictEqual(map.mock.calls[2]?.arguments[0], "tres");
+
+      assert.deepStrictEqual(chunks, ["UNO", "DOS", "TRES"]);
+
+      assert.strictEqual(final.mock.callCount(), 1);
+    });
   });
 
   describe("identityIterable", () => {

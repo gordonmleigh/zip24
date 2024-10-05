@@ -210,10 +210,14 @@ export async function textFromIterable(
 export async function* mapIterable<Input, Output>(
   input: AnyIterable<Input>,
   map: (input: Input) => Output | PromiseLike<Output>,
+  final?: () => void | PromiseLike<void>,
 ): AsyncGenerator<Output> {
   // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const element of input) {
     yield await map(element);
+  }
+  if (final) {
+    await final();
   }
 }
 
@@ -266,6 +270,9 @@ export function isAsyncIterable(
 export function isIterable(value: unknown): value is Iterable<unknown> {
   return hasExtraProperty(value, Symbol.iterator);
 } /**
+}
+
+/**
  * A function which can transform data from an async iterable.
  */
 

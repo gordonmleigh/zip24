@@ -1,7 +1,9 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
+import { assertInstanceOf } from "../test-util/assert.js";
 import { asyncIterable } from "../test-util/data.js";
+import { AssertionError } from "../util/assert.js";
 import { bufferFromIterable, type ByteSource } from "../util/streams.js";
 import {
   CompressionMethod,
@@ -173,6 +175,38 @@ describe("core/compression-core", () => {
         (error) =>
           error instanceof ZipFormatError &&
           error.message === `compressedSize was supplied but is invalid`,
+      );
+    });
+
+    it("throws if the algorithm does not consume the input", async () => {
+      const dataDescriptor: DataDescriptor = {
+        compressedSize: 0,
+        crc32: 0,
+        uncompressedSize: 0,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/require-await
+      const algorithm = mock.fn(async function* () {
+        yield Buffer.from("hello fred");
+      });
+
+      const input = asyncIterable`hello world`;
+
+      await assert.rejects(
+        () =>
+          text(
+            compress(CompressionMethod.Stored, {}, dataDescriptor, input, {
+              [CompressionMethod.Stored]: algorithm,
+            }),
+          ),
+        (error) => {
+          assertInstanceOf(error, AssertionError);
+          assert.strictEqual(
+            error.message,
+            "the compression algorithm must consume the input before terminating the output",
+          );
+          return true;
+        },
       );
     });
   });

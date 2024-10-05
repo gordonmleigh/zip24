@@ -1,3 +1,4 @@
+import { assert } from "../util/assert.js";
 import { computeCrc32 } from "../util/crc32.js";
 import {
   identityStream,
@@ -46,18 +47,31 @@ export async function* compress(
     );
   }
 
+  let inputConsumed = false;
+
   yield* mapIterable(
     compressor(
-      mapIterable(data, (chunk) => {
-        output.crc32 = computeCrc32(chunk, output.crc32);
-        output.uncompressedSize += chunk.byteLength;
-        return chunk;
-      }),
+      mapIterable(
+        data,
+        (chunk) => {
+          output.crc32 = computeCrc32(chunk, output.crc32);
+          output.uncompressedSize += chunk.byteLength;
+          return chunk;
+        },
+        () => {
+          inputConsumed = true;
+        },
+      ),
     ),
     (chunk) => {
       output.compressedSize += chunk.byteLength;
       return chunk;
     },
+  );
+
+  assert(
+    inputConsumed,
+    "the compression algorithm must consume the input before terminating the output",
   );
 
   if (check.crc32 !== undefined && output.crc32 !== check.crc32) {
