@@ -1,27 +1,30 @@
-import { WriteStream, createWriteStream } from "node:fs";
+import { createWriteStream, type WriteStream } from "node:fs";
 import type { CreateWriteStreamOptions } from "node:fs/promises";
 import type { Writable } from "node:stream";
 import { addAbortListener } from "../util/abort.js";
 import {
-  ZipWriter as ZipWriterBase,
-  type ZipWriterOptions as ZipWriterBaseOptions,
+  type ZipWriterOptionsBase as ZipWriterOptionsBaseWeb,
+  type ZipWriterOptions as ZipWriterOptionsWeb,
+  ZipWriter as ZipWriterWeb,
 } from "../web/writer.js";
 import { defaultCompressors } from "./compression.js";
 
-export type ZipWriterOptions = ZipWriterBaseOptions;
+export type ZipWriterOptions = ZipWriterOptionsWeb;
+export type ZipWriterOptionsBase = ZipWriterOptionsBaseWeb;
 
-/**
- * An object which can output a zip file.
- */
-export class ZipWriter extends ZipWriterBase {
-  public static fromWritable(stream: Writable): ZipWriter {
+export class ZipWriter extends ZipWriterWeb {
+  public static fromWritable(
+    stream: Writable,
+    options?: ZipWriterOptionsBase,
+  ): ZipWriter {
     const abort = new AbortController();
 
     stream.once("error", (cause) => {
       abort.abort(cause);
     });
 
-    return new this({
+    return new ZipWriter({
+      ...options,
       sink: {
         close: async () => {
           await awaitCallback((callback) => {
@@ -38,14 +41,18 @@ export class ZipWriter extends ZipWriterBase {
     });
   }
 
-  public static fromWriteStream(stream: WriteStream): ZipWriter {
+  public static fromWriteStream(
+    stream: WriteStream,
+    options?: ZipWriterOptionsBase,
+  ): ZipWriter {
     const abort = new AbortController();
 
     stream.once("error", (cause) => {
       abort.abort(cause);
     });
 
-    return new this({
+    return new ZipWriter({
+      ...options,
       sink: {
         close: async () => {
           await awaitCallback((callback) => {
@@ -71,10 +78,10 @@ export class ZipWriter extends ZipWriterBase {
     );
   }
 
-  public constructor(options?: ZipWriterOptions) {
+  public constructor(options: ZipWriterOptions = {}) {
     super({
-      compressors: defaultCompressors,
       ...options,
+      compressors: options.compressors ?? defaultCompressors,
     });
   }
 }

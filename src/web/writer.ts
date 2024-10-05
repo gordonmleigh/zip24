@@ -1,84 +1,113 @@
+import { ZipEntry, ZipPlatform, ZipVersion } from "../common.js";
 import { CentralDirectoryHeader } from "../core/central-directory-header.js";
 import {
-  CompressionMethod,
   compress,
+  CompressionMethod,
   type CompressionAlgorithms,
 } from "../core/compression-core.js";
-import { ZipPlatform, ZipVersion } from "../core/constants.js";
 import { DataDescriptor } from "../core/data-descriptor.js";
 import { LocalFileHeader } from "../core/local-file-header.js";
-import { ZipEntry, type ZipEntryInfo } from "../core/zip-entry.js";
+import type { ZipEntryInfo } from "../core/zip-entry.js";
 import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.js";
-import { assert } from "../util/assert.js";
-import { DoubleEndedBuffer } from "../util/double-ended-buffer.js";
+import {
+  DoubleEndedBuffer,
+  type DoubleEndedBufferOptions,
+} from "../util/double-ended-buffer.js";
 import { Mutex } from "../util/mutex.js";
 import type { ByteSink, DataSource } from "../util/streams.js";
 import { defaultCompressors } from "./compression.js";
 
-export type ZipWriterOptions = {
+export type ZipWriterOptionsBase = {
   compressors?: CompressionAlgorithms;
-  highWaterMark?: number;
-  sink?: ByteSink;
   startingOffset?: number;
 };
 
-export class ZipWriter implements AsyncIterable<Uint8Array> {
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
-  public static fromWritableStream(stream: WritableStream): ZipWriter {
-    return new this({ sink: stream.getWriter() });
+export type ZipStreamWriterOptions = ZipWriterOptionsBase & {
+  sink: ByteSink;
+};
+
+export type ZipBufferWriterOptions = ZipWriterOptionsBase &
+  DoubleEndedBufferOptions;
+
+export type ZipWriterOptions = ZipStreamWriterOptions | ZipBufferWriterOptions;
+
+export class ZipWriter implements AsyncDisposable, AsyncIterable<Uint8Array> {
+  public static fromWritableStream(
+    // eslint-disable-next-line n/no-unsupported-features/node-builtins
+    stream: WritableStream,
+    options?: ZipWriterOptionsBase,
+  ): ZipWriter {
+    return new ZipWriter({
+      ...options,
+      sink: stream.getWriter(),
+    });
   }
 
-  private readonly buffer?: DoubleEndedBuffer;
+  private readonly buffer: DoubleEndedBuffer | undefined;
   private readonly compressors: CompressionAlgorithms;
   private readonly directory: CentralDirectoryHeader[] = [];
   private readonly sink: ByteSink;
   private readonly startingOffset: number;
   private readonly writeLock = new Mutex();
 
+  private isFinalized = false;
   private writtenBytes = 0;
 
   public constructor(options: ZipWriterOptions = {}) {
     const {
-      compressors,
-      highWaterMark = 0xa000,
-      sink,
+      compressors = defaultCompressors,
+      highWaterMark,
+      sink = new DoubleEndedBuffer({ highWaterMark }),
       startingOffset = 0,
-    } = options;
+    } = options as Partial<ZipStreamWriterOptions & ZipBufferWriterOptions>;
 
-    if (sink) {
-      this.sink = sink;
-    } else {
-      this.buffer = new DoubleEndedBuffer({ highWaterMark });
-      this.sink = this.buffer;
+    if (sink instanceof DoubleEndedBuffer) {
+      this.buffer = sink;
     }
 
-    this.compressors = compressors ?? defaultCompressors;
+    this.compressors = compressors;
+    this.sink = sink;
     this.startingOffset = startingOffset;
   }
 
   public async *[Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
-    if (!this.buffer) {
-      throw new TypeError(
-        `reading is not supported when initialized with sink`,
-      );
+    if (this.buffer === undefined) {
+      throw new Error(`reading is not supported when initialized with sink`);
     }
     yield* this.buffer;
   }
 
+  public async [Symbol.asyncDispose](): Promise<void> {
+    await this.sink.close();
+  }
+
+  /**
+   * Add a file to the Zip.
+   */
   public readonly addFile = this.writeLock.synchronize(
-    (file: ZipEntryInfo, content?: DataSource) =>
-      this.writeFileEntry(file, content),
+    async (file: ZipEntryInfo, content?: DataSource) => {
+      if (this.isFinalized) {
+        throw new Error(`can't add more files after calling finalize()`);
+      }
+      await this.writeFileEntry(file, content);
+    },
   );
 
+  /**
+   * Finalize the zip with an optional comment.
+   */
   public readonly finalize = this.writeLock.synchronize(
     async (fileComment?: string) => {
+      if (this.isFinalized) {
+        throw new Error(`multiple calls to finalize()`);
+      }
+      this.isFinalized = true;
       await this.writeCentralDirectory(fileComment);
       await this.sink.close();
     },
   );
 
   private async write(chunk: Uint8Array): Promise<void> {
-    assert(this.sink.write, `expected sink to have a write method`);
     await this.sink.write(chunk);
     this.writtenBytes += chunk.byteLength;
   }

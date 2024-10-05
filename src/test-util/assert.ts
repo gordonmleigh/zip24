@@ -40,24 +40,26 @@ export class BufferAssertionError extends AssertionError {
 }
 
 export function assertBufferEqual(
-  actual: Uint8Array,
-  expected: Uint8Array,
+  actual: Uint8Array | Iterable<Uint8Array>,
+  expected: Uint8Array | Iterable<Uint8Array>,
   message?: string | AssertionErrorInfo,
 ): void {
-  assertInstanceOf(actual, Uint8Array, {
-    message: "expected `actual` to be a Uint8Array",
-    stackStartFn: assertBufferEqual,
-  });
-  assertInstanceOf(expected, Uint8Array, { stackStartFn: assertBufferEqual });
+  const actualBuffer =
+    actual instanceof Uint8Array ? actual : Buffer.concat(Array.from(actual));
 
-  if (Buffer.compare(actual, expected) !== 0) {
+  const expectedBuffer =
+    expected instanceof Uint8Array
+      ? expected
+      : Buffer.concat(Array.from(expected));
+
+  if (Buffer.compare(actualBuffer, expectedBuffer) !== 0) {
     const options = typeof message === "string" ? { message } : message;
 
     throw new BufferAssertionError({
       stackStartFn: assertBufferEqual,
       ...options,
-      actual,
-      expected,
+      actual: actualBuffer,
+      expected: expectedBuffer,
     });
   }
 }

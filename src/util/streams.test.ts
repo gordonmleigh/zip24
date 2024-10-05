@@ -434,6 +434,30 @@ describe("util/streams", () => {
       assertBufferEqual(output, expected);
     });
 
+    it("iterates an Iterable of Uint8Array", async () => {
+      const output = await buffer(
+        normalizeDataSource([
+          Buffer.from("one,"),
+          Buffer.from("two,"),
+          Buffer.from("three,"),
+        ]),
+      );
+
+      const expected = utf8`one,two,three,`;
+
+      assertBufferEqual(output, expected);
+    });
+
+    it("iterates an Iterable of string", async () => {
+      const output = await buffer(
+        normalizeDataSource(["one,", "two,", "three,"]),
+      );
+
+      const expected = utf8`one,two,three,`;
+
+      assertBufferEqual(output, expected);
+    });
+
     it("makes a stream from a buffer", async () => {
       const output = await buffer(normalizeDataSource(utf8`hello world`));
       const expected = utf8`hello world`;

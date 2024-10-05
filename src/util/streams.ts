@@ -41,6 +41,8 @@ export type DataSource =
   | string
   | AsyncIterable<string>
   | AsyncIterable<Uint8Array>
+  | Iterable<string>
+  | Iterable<Uint8Array>
   | ReadableStream<string>
   | ReadableStream<Uint8Array>;
 
@@ -134,9 +136,10 @@ export async function* normalizeDataSource(
   } else if (data instanceof Uint8Array) {
     yield data;
   } else {
-    const iterable = isAsyncIterable(data)
-      ? data
-      : iterableFromReadableStream<string | Uint8Array>(data);
+    const iterable =
+      isAsyncIterable(data) || isIterable(data)
+        ? data
+        : iterableFromReadableStream<string | Uint8Array>(data);
 
     const encoder = new TextEncoder();
 
@@ -269,7 +272,6 @@ export function isAsyncIterable(
 
 export function isIterable(value: unknown): value is Iterable<unknown> {
   return hasExtraProperty(value, Symbol.iterator);
-} /**
 }
 
 /**

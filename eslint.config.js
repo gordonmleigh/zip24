@@ -15,6 +15,8 @@ export default [
 
     rules: {
       "@typescript-eslint/no-floating-promises": "off", // `describe` and `it` return promises
+      "@typescript-eslint/no-non-null-asserted-optional-chain": "off", // easier for testing
+      "@typescript-eslint/no-non-null-assertion": "off", // easier for testing
       "n/no-unsupported-features/node-builtins": "off", // so we can use node:test
       "unicorn/no-abusive-eslint-disable": "off",
     },

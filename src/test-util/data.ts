@@ -3,6 +3,7 @@ import { deflateRawSync } from "node:zlib";
 import { CodePage437Encoder } from "../util/cp437.js";
 import { computeCrc32 } from "../util/crc32.js";
 import { DosDate } from "../util/dos-date.js";
+import { bufferFromIterable, type AsyncTransform } from "../util/streams.js";
 
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function* asyncIterable(
@@ -106,6 +107,15 @@ export function longUint(value: number): Uint8Array {
   const buffer = Buffer.alloc(4);
   buffer.writeUint32LE(value);
   return buffer;
+}
+
+export function mockAsyncTransform(
+  implementation: (input: Uint8Array) => Uint8Array | PromiseLike<Uint8Array>,
+): AsyncTransform {
+  return async function* (input) {
+    const allInput = await bufferFromIterable(input);
+    yield await implementation(allInput);
+  };
 }
 
 export function shortUint(value: number): Uint8Array {
