@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.6](https://github.com/gordonmleigh/zip24/compare/v0.1.4...v0.1.6) (2024-10-05)
+
+
+### Chore
+
+* add helpful error in core compress ([574b59d](https://github.com/gordonmleigh/zip24/commit/574b59d77834cdf4e93f88585914a0e66090179d))
+* improve tests for writers ([b2f21d8](https://github.com/gordonmleigh/zip24/commit/b2f21d88b42e66a43c0979e1fe5ac33e9c2c7407))
+* make DoubleEndedBuffer unconstrained ([d0a0c2d](https://github.com/gordonmleigh/zip24/commit/d0a0c2d23077e5aadeb789f62b405025790488c1))
+* version bump ([4556969](https://github.com/gordonmleigh/zip24/commit/4556969b31c08617a1772ad94d028b0912a6714e))
+
 ## [0.1.4](https://github.com/gordonmleigh/zip24/compare/v0.1.3...v0.1.4) (2024-10-04)
 
 
