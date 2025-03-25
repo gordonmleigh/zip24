@@ -54,7 +54,8 @@ export function normalizeBufferRange(
 /**
  * Extension of {@link DataView} with API like Node's {@link Buffer}.
  */
-export class BufferView extends DataView {
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments -- false +ve
+export class BufferView extends DataView<ArrayBufferLike> {
   public static alloc(byteLength: number): BufferView {
     return new BufferView(new ArrayBuffer(byteLength));
   }

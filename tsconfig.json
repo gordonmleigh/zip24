@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     // correctness
-    "allowJs": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
