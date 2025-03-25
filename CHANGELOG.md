@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/gordonmleigh/zip24/compare/v0.1.6...v0.1.7) (2025-03-25)
+
+
+### Fix
+
+* DataView is now generic ([a030c33](https://github.com/gordonmleigh/zip24/commit/a030c33d5d94c274421f4b1868d35acdf09ebecb))
+
 ## [0.1.6](https://github.com/gordonmleigh/zip24/compare/v0.1.4...v0.1.6) (2024-10-05)
 
 
