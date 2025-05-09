@@ -5,9 +5,9 @@ import { ZipPlatform, ZipVersion } from "./constants.js";
 import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
 
 export type Zip64VersionFields = {
-  platformMadeBy: ZipPlatform;
-  versionMadeBy: ZipVersion;
-  versionNeeded: ZipVersion;
+  platformMadeBy: number;
+  versionMadeBy: number;
+  versionNeeded: number;
 };
 
 export type ZipTrailerFields = {
@@ -207,7 +207,11 @@ export class Zip64Eocdl implements Serializable {
     }
   }
 
-  public constructor(public eocdrOffset = 0) {}
+  public eocdrOffset: number;
+
+  public constructor(eocdrOffset = 0) {
+    this.eocdrOffset = eocdrOffset;
+  }
 
   public serialize(
     buffer?: BufferLike,
@@ -228,10 +232,10 @@ export class Zip64Eocdl implements Serializable {
 export type Zip64EocdrFields = {
   count: number;
   offset: number;
-  platformMadeBy: ZipPlatform;
+  platformMadeBy: number;
   size: number;
-  versionMadeBy: ZipVersion;
-  versionNeeded: ZipVersion;
+  versionMadeBy: number;
+  versionNeeded: number;
 };
 
 export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
@@ -285,10 +289,10 @@ export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
 
   public count = 0;
   public offset = 0;
-  public platformMadeBy = ZipPlatform.DOS;
+  public platformMadeBy: number = ZipPlatform.DOS;
   public size = 0;
-  public versionMadeBy = ZipVersion.Zip64;
-  public versionNeeded = ZipVersion.Zip64;
+  public versionMadeBy: number = ZipVersion.Zip64;
+  public versionNeeded: number = ZipVersion.Zip64;
 
   public constructor(fields?: Zip64EocdrFields) {
     if (fields) {

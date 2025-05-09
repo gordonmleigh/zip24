@@ -186,7 +186,7 @@ export class ZipWriter implements AsyncDisposable, AsyncIterable<Uint8Array> {
   private async writeCentralDirectory(fileComment?: string): Promise<void> {
     const directoryOffset = this.startingOffset + this.writtenBytes;
     let useZip64 = this.directory.length > 0xffff;
-    let versionNeeded = ZipVersion.Deflate;
+    let versionNeeded: number = ZipVersion.Deflate;
 
     for (const header of this.directory) {
       useZip64 ||= !!header.zip64;

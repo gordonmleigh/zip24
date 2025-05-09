@@ -204,11 +204,11 @@ export class BitField {
     this.valueInternal = value;
   }
 
-  public constructor(
-    public readonly width = 16,
-    value = 0,
-  ) {
+  public readonly width: number;
+
+  public constructor(width = 16, value = 0) {
     BitField.validateWidth(width);
+    this.width = width;
     this.value = value;
   }
 

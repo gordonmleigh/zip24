@@ -1,4 +1,4 @@
-export enum ZipPlatform {
+export const ZipPlatform = {
   // 4.4.2.2 The current mappings are:
   //   0 - MS-DOS and OS/2 (FAT / VFAT / FAT32 file systems)
   //   1 - Amiga                     2 - OpenVMS
@@ -11,20 +11,26 @@ export enum ZipPlatform {
   // 15 - alternate MVS            16 - BeOS
   // 17 - Tandem                   18 - OS/400
   // 19 - OS X (Darwin)            20 thru 255 - unused
-  DOS = 0,
-  UNIX = 3,
-}
+  DOS: 0,
+  UNIX: 3,
+} as const;
 
-export enum ZipVersion {
-  Deflate = 20,
-  Zip64 = 45,
-  Utf8Encoding = 63,
-}
+export type ZipPlatform = (typeof ZipPlatform)[keyof typeof ZipPlatform];
 
-export enum ExtraFieldTag {
-  Unset = 0,
-  Zip64ExtendedInfo = 1,
-  UnicodeCommentField = 0x6375,
-  UnicodePathField = 0x7075,
-  Unix = 13,
-}
+export const ZipVersion = {
+  Deflate: 20,
+  Zip64: 45,
+  Utf8Encoding: 63,
+} as const;
+
+export type ZipVersion = (typeof ZipVersion)[keyof typeof ZipVersion];
+
+export const ExtraFieldTag = {
+  Unset: 0,
+  Zip64ExtendedInfo: 1,
+  UnicodeCommentField: 0x6375,
+  UnicodePathField: 0x7075,
+  Unix: 13,
+} as const;
+
+export type ExtraFieldTag = (typeof ExtraFieldTag)[keyof typeof ExtraFieldTag];

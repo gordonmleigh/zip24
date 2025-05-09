@@ -22,7 +22,7 @@ export type ZipEntryInfo = {
   attributes?: FileAttributes | undefined;
   comment?: string | undefined;
   compressedSize?: number | undefined;
-  compressionMethod?: CompressionMethod | undefined;
+  compressionMethod?: number | undefined;
   crc32?: number | undefined;
   extraField?: ExtraFieldCollection | undefined;
   flags?: GeneralPurposeFlags | undefined;
@@ -33,8 +33,8 @@ export type ZipEntryInfo = {
   uncompressedData?: DataSource | undefined;
   uncompressedSize?: number | undefined;
   utf8?: boolean | undefined;
-  versionMadeBy?: ZipVersion | undefined;
-  versionNeeded?: ZipVersion | undefined;
+  versionMadeBy?: number | undefined;
+  versionNeeded?: number | undefined;
   zip64?: boolean | undefined;
 };
 
@@ -42,7 +42,7 @@ export class ZipEntry implements AsyncIterable<Uint8Array> {
   public attributes: FileAttributes;
   public comment: string;
   public compressedSize: number;
-  public compressionMethod: CompressionMethod;
+  public compressionMethod: number;
   public crc32: number;
   public extraField: ExtraFieldCollection;
   public flags: GeneralPurposeFlags;
@@ -51,8 +51,8 @@ export class ZipEntry implements AsyncIterable<Uint8Array> {
   public path: string;
   public uncompressedData: ByteSource;
   public uncompressedSize: number;
-  public versionMadeBy: ZipVersion;
-  public versionNeeded: ZipVersion;
+  public versionMadeBy: number;
+  public versionNeeded: number;
   public zip64: boolean;
 
   public get isDirectory(): boolean {
@@ -115,7 +115,7 @@ export class ZipEntry implements AsyncIterable<Uint8Array> {
 
 export function minimumVersion(
   options: ZipEntryInfo,
-  requestedVersion?: ZipVersion,
+  requestedVersion?: number,
 ): ZipVersion {
   const utf8 = needsUtf8(options);
   const zip64 = needs64bit(options);

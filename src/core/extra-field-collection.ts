@@ -18,8 +18,8 @@ export type ExtraField = Serializable & {
 export type ExtraFieldType<T extends ExtraField> = Deserializer<T>;
 
 export type UnicodeExtraFieldTag =
-  | ExtraFieldTag.UnicodeCommentField
-  | ExtraFieldTag.UnicodePathField;
+  | typeof ExtraFieldTag.UnicodeCommentField
+  | typeof ExtraFieldTag.UnicodePathField;
 
 export class UnicodeExtraField implements ExtraField {
   // | offset | field                   | size |
@@ -65,6 +65,7 @@ export class UnicodeExtraField implements ExtraField {
 
   private rawValueInternal: EncodedString;
   public crc32: number;
+  public tag: UnicodeExtraFieldTag;
 
   public get dataSize(): number {
     // string plus crc32 and version
@@ -78,12 +79,9 @@ export class UnicodeExtraField implements ExtraField {
     this.rawValueInternal = new EncodedString("utf8", value);
   }
 
-  public constructor(
-    public tag: UnicodeExtraFieldTag,
-    crc32: number,
-    value: string,
-  ) {
+  public constructor(tag: UnicodeExtraFieldTag, crc32: number, value: string) {
     UnicodeExtraField.validateTag(tag);
+    this.tag = tag;
     this.crc32 = crc32;
     this.rawValueInternal = new EncodedString("utf8", value);
   }
@@ -302,7 +300,9 @@ function getExtraFieldTypeForTag<T extends number>(
   tag: T,
 ): ExtraFieldTypeFor<T> {
   if (tag in knownExtraFields) {
-    return knownExtraFields[tag] as ExtraFieldTypeFor<T>;
+    return knownExtraFields[
+      tag as keyof typeof knownExtraFields
+    ] as ExtraFieldTypeFor<T>;
   }
   return UnknownExtraField as ExtraFieldTypeFor<T>;
 }

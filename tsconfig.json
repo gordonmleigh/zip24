@@ -27,7 +27,7 @@
 
     // interop constraints
     "allowSyntheticDefaultImports": true,
-    //"erasableSyntaxOnly": true,
+    "erasableSyntaxOnly": true,
     //"isolatedDeclarations": true,
     "verbatimModuleSyntax": true,
 

@@ -2,8 +2,7 @@ import { BufferView, type BufferLike } from "../util/binary.js";
 import { DosDate } from "../util/dos-date.js";
 import { EncodedString } from "../util/encoded-string.js";
 import { makeBuffer, type Serializable } from "../util/serialization.js";
-import { CompressionMethod } from "./compression-core.js";
-import { ExtraFieldTag, ZipVersion } from "./constants.js";
+import { ExtraFieldTag } from "./constants.js";
 import { ZipSignatureError } from "./errors.js";
 import {
   ExtraFieldCollection,
@@ -13,14 +12,14 @@ import { GeneralPurposeFlags } from "./flags.js";
 
 export type LocalFileHeaderInit = {
   compressedSize: number;
-  compressionMethod: CompressionMethod;
+  compressionMethod: number;
   crc32: number;
   extraField: ExtraFieldCollection;
   flags: GeneralPurposeFlags;
   lastModified: Date;
   path: Uint8Array | string;
   uncompressedSize: number;
-  versionNeeded: ZipVersion;
+  versionNeeded: number;
   zip64?: boolean | undefined;
 };
 
@@ -110,7 +109,7 @@ export class LocalFileHeader implements Serializable {
   }
 
   public compressedSize: number;
-  public compressionMethod: CompressionMethod;
+  public compressionMethod: number;
   public crc32: number;
   public extraField: ExtraFieldCollection;
   public flags: GeneralPurposeFlags;
@@ -118,7 +117,7 @@ export class LocalFileHeader implements Serializable {
   public path: string;
   public rawPath: EncodedString;
   public uncompressedSize: number;
-  public versionNeeded: ZipVersion;
+  public versionNeeded: number;
   public zip64: boolean;
 
   public constructor(init: LocalFileHeaderInit) {

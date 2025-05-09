@@ -11,10 +11,13 @@ import {
 import type { DirtyPartial } from "../util/type-utils.js";
 import { ZipFormatError } from "./errors.js";
 
-export enum CompressionMethod {
-  Stored = 0,
-  Deflate = 8,
-}
+export const CompressionMethod = {
+  Stored: 0,
+  Deflate: 8,
+} as const;
+
+export type CompressionMethod =
+  (typeof CompressionMethod)[keyof typeof CompressionMethod];
 
 export type DataDescriptor = {
   compressedSize: number;
@@ -25,12 +28,10 @@ export type DataDescriptor = {
 /**
  * A map of compression methods to compression/decompression algorithms.
  */
-export type CompressionAlgorithms = Partial<
-  Record<CompressionMethod, AsyncTransform>
->;
+export type CompressionAlgorithms = Record<number, AsyncTransform | undefined>;
 
 export async function* compress(
-  compressionMethod: CompressionMethod,
+  compressionMethod: number,
   check: DirtyPartial<DataDescriptor> = {},
   output: DataDescriptor,
   content: DataSource | undefined,
@@ -93,7 +94,7 @@ export async function* compress(
 }
 
 export async function* decompress(
-  compressionMethod: CompressionMethod,
+  compressionMethod: number,
   descriptor: DataDescriptor,
   input: ByteSource,
   decompressors: CompressionAlgorithms,
@@ -107,7 +108,7 @@ export async function* decompress(
     output = input;
   } else {
     throw new ZipFormatError(
-      `unknown compression method ${(compressionMethod as number).toString(16)}`,
+      `unknown compression method ${compressionMethod.toString(16)}`,
     );
   }
 

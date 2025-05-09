@@ -1,10 +1,10 @@
 export class ZipError extends Error {
-  public constructor(
-    message: string,
-    public readonly code: string,
-  ) {
+  public readonly code: string;
+
+  public constructor(message: string, code: string) {
     super(message);
     this.name = "ZipError";
+    this.code = code;
   }
 }
 

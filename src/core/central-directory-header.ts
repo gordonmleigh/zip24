@@ -2,8 +2,7 @@ import { BufferView, type BufferLike } from "../util/binary.js";
 import { DosDate } from "../util/dos-date.js";
 import { EncodedString } from "../util/encoded-string.js";
 import { makeBuffer, type Serializable } from "../util/serialization.js";
-import { CompressionMethod } from "./compression-core.js";
-import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./constants.js";
+import { ExtraFieldTag, ZipPlatform } from "./constants.js";
 import { MultiDiskError, ZipSignatureError } from "./errors.js";
 import {
   ExtraFieldCollection,
@@ -20,7 +19,7 @@ export type CentralDirectoryHeaderInit = {
   attributes: FileAttributes;
   comment: Uint8Array | string;
   compressedSize: number;
-  compressionMethod: CompressionMethod;
+  compressionMethod: number;
   crc32: number;
   extraField: ExtraFieldCollection;
   flags: GeneralPurposeFlags;
@@ -28,8 +27,8 @@ export type CentralDirectoryHeaderInit = {
   localHeaderOffset: number;
   path: Uint8Array | string;
   uncompressedSize: number;
-  versionMadeBy: ZipVersion;
-  versionNeeded: ZipVersion;
+  versionMadeBy: number;
+  versionNeeded: number;
   zip64?: boolean | undefined;
 };
 
@@ -159,7 +158,7 @@ export class CentralDirectoryHeader implements Serializable {
   public attributes: FileAttributes;
   public comment: string;
   public compressedSize: number;
-  public compressionMethod: CompressionMethod;
+  public compressionMethod: number;
   public crc32: number;
   public extraField: ExtraFieldCollection;
   public flags: GeneralPurposeFlags;
@@ -169,8 +168,8 @@ export class CentralDirectoryHeader implements Serializable {
   public rawComment: EncodedString;
   public rawPath: EncodedString;
   public uncompressedSize: number;
-  public versionMadeBy: ZipVersion;
-  public versionNeeded: ZipVersion;
+  public versionMadeBy: number;
+  public versionNeeded: number;
   public zip64: boolean;
 
   public get totalSize(): number {
