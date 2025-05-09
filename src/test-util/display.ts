@@ -1,5 +1,5 @@
 /* c8 ignore start */
-import { fromHex } from "./data.js";
+import { fromHex } from "./data.ts";
 
 export type HexDiffOptions = {
   chunkSize?: number | undefined;

@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { computeCrc32 } from "./crc32.js";
+import { computeCrc32 } from "./crc32.ts";
 
 describe("util/crc32", () => {
   describe("computeCrc32", () => {

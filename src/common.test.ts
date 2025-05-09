@@ -1,2 +1,2 @@
 // dummy test file for coverage
-import {} from "./common.js";
+import {} from "./common.ts";

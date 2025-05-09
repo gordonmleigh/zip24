@@ -11,8 +11,8 @@ import {
   UnixFileAttributes,
   ZipPlatform,
   ZipVersion,
-} from "../common.js";
-import { assertBufferEqual, assertInstanceOf } from "../test-util/assert.js";
+} from "../common.ts";
+import { assertBufferEqual, assertInstanceOf } from "../test-util/assert.ts";
 import {
   cp437,
   cp437length,
@@ -27,10 +27,10 @@ import {
   tinyUint,
   utf8,
   utf8length32,
-} from "../test-util/data.js";
-import { getTemporaryOutputDirectory } from "../test-util/fixtures.js";
-import { defaultCompressors } from "./compression.js";
-import { ZipWriter } from "./writer.js";
+} from "../test-util/data.ts";
+import { getTemporaryOutputDirectory } from "../test-util/fixtures.ts";
+import { defaultCompressors } from "./compression.ts";
+import { ZipWriter } from "./writer.ts";
 
 describe("node/writer", () => {
   describe("class ZipWriter", () => {

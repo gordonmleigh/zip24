@@ -1,21 +1,21 @@
-import { ZipEntry, ZipPlatform, ZipVersion } from "../common.js";
-import { CentralDirectoryHeader } from "../core/central-directory-header.js";
+import { ZipEntry, ZipPlatform, ZipVersion } from "../common.ts";
+import { CentralDirectoryHeader } from "../core/central-directory-header.ts";
 import {
   compress,
   CompressionMethod,
   type CompressionAlgorithms,
-} from "../core/compression-core.js";
-import { DataDescriptor } from "../core/data-descriptor.js";
-import { LocalFileHeader } from "../core/local-file-header.js";
-import type { ZipEntryInfo } from "../core/zip-entry.js";
-import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.js";
+} from "../core/compression-core.ts";
+import { DataDescriptor } from "../core/data-descriptor.ts";
+import { LocalFileHeader } from "../core/local-file-header.ts";
+import type { ZipEntryInfo } from "../core/zip-entry.ts";
+import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.ts";
 import {
   DoubleEndedBuffer,
   type DoubleEndedBufferOptions,
-} from "../util/double-ended-buffer.js";
-import { Mutex } from "../util/mutex.js";
-import type { ByteSink, DataSource } from "../util/streams.js";
-import { defaultCompressors } from "./compression.js";
+} from "../util/double-ended-buffer.ts";
+import { Mutex } from "../util/mutex.ts";
+import type { ByteSink, DataSource } from "../util/streams.ts";
+import { defaultCompressors } from "./compression.ts";
 
 export type ZipWriterOptionsBase = {
   compressors?: CompressionAlgorithms | undefined;

@@ -1,13 +1,13 @@
 import { createWriteStream, type WriteStream } from "node:fs";
 import type { CreateWriteStreamOptions } from "node:fs/promises";
 import type { Writable } from "node:stream";
-import { addAbortListener } from "../util/abort.js";
+import { addAbortListener } from "../util/abort.ts";
 import {
   type ZipWriterOptionsBase as ZipWriterOptionsBaseWeb,
   type ZipWriterOptions as ZipWriterOptionsWeb,
   ZipWriter as ZipWriterWeb,
-} from "../web/writer.js";
-import { defaultCompressors } from "./compression.js";
+} from "../web/writer.ts";
+import { defaultCompressors } from "./compression.ts";
 
 export type ZipWriterOptions = ZipWriterOptionsWeb;
 export type ZipWriterOptionsBase = ZipWriterOptionsBaseWeb;

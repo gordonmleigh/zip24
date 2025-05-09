@@ -7,8 +7,8 @@ import {
   GeneralPurposeFlags,
   ZipPlatform,
   ZipVersion,
-} from "../common.js";
-import { assertBufferEqual } from "../test-util/assert.js";
+} from "../common.ts";
+import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -23,11 +23,11 @@ import {
   utf8,
   utf8length,
   utf8length32,
-} from "../test-util/data.js";
-import { computeCrc32 } from "../util/crc32.js";
-import type { ByteSink } from "../util/streams.js";
-import { defaultCompressors } from "./compression.js";
-import { ZipWriter } from "./writer.js";
+} from "../test-util/data.ts";
+import { computeCrc32 } from "../util/crc32.ts";
+import type { ByteSink } from "../util/streams.ts";
+import { defaultCompressors } from "./compression.ts";
+import { ZipWriter } from "./writer.ts";
 
 describe("web/writer", () => {
   describe("class ZipWriter", () => {

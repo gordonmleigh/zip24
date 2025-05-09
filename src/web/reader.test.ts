@@ -1,20 +1,20 @@
 import assert from "node:assert";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { CompressionMethod } from "../core/compression-core.js";
-import { ZipPlatform, ZipVersion } from "../core/constants.js";
-import { UnixFileAttributes } from "../core/file-attributes.js";
-import { ZipEntry } from "../core/zip-entry.js";
+import { CompressionMethod } from "../core/compression-core.ts";
+import { ZipPlatform, ZipVersion } from "../core/constants.ts";
+import { UnixFileAttributes } from "../core/file-attributes.ts";
+import { ZipEntry } from "../core/zip-entry.ts";
 import {
   EmptyZip32,
   Zip32WithThreeEntries,
   generateZip,
-} from "../test-util/fixtures.js";
+} from "../test-util/fixtures.ts";
 import {
   randomAccessReaderFromBuffer,
   type RandomAccessReader,
-} from "../util/streams.js";
-import { ZipReader } from "./reader.js";
+} from "../util/streams.ts";
+import { ZipReader } from "./reader.ts";
 
 describe("web/reader", () => {
   describe("ZipReader", () => {

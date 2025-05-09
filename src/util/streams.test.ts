@@ -2,9 +2,9 @@ import assert from "node:assert";
 import { Readable } from "node:stream";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.js";
-import { data, utf8 } from "../test-util/data.js";
-import { makeNonIterableReadableStream } from "../test-util/util.js";
+import { assertBufferEqual } from "../test-util/assert.ts";
+import { data, utf8 } from "../test-util/data.ts";
+import { makeNonIterableReadableStream } from "../test-util/util.ts";
 import {
   bufferFromIterable,
   getAsyncIterator,
@@ -18,7 +18,7 @@ import {
   textFromIterable,
   type RandomAccessReadOptions,
   type RandomAccessReadResult,
-} from "./streams.js";
+} from "./streams.ts";
 
 describe("util/streams", () => {
   describe("iterableFromReadableStream", () => {

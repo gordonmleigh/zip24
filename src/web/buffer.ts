@@ -1,18 +1,18 @@
-import { CentralDirectoryHeader } from "../core/central-directory-header.js";
+import { CentralDirectoryHeader } from "../core/central-directory-header.ts";
 import {
   decompress,
   type CompressionAlgorithms,
-} from "../core/compression-core.js";
-import { LocalFileHeader } from "../core/local-file-header.js";
-import { ZipEntry } from "../core/zip-entry.js";
+} from "../core/compression-core.ts";
+import { LocalFileHeader } from "../core/local-file-header.ts";
+import { ZipEntry } from "../core/zip-entry.ts";
 import {
   Eocdr,
   Zip64Eocdl,
   Zip64Eocdr,
   ZipTrailer,
-} from "../core/zip-trailer.js";
-import { BufferView, type BufferLike } from "../util/binary.js";
-import { defaultDecompressors } from "./compression.js";
+} from "../core/zip-trailer.ts";
+import { BufferView, type BufferLike } from "../util/binary.ts";
+import { defaultDecompressors } from "./compression.ts";
 
 /**
  * Options for {@link ZipBufferEntryReader}.

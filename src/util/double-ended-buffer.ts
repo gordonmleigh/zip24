@@ -1,5 +1,5 @@
-import { addAbortListener } from "./abort.js";
-import { DisposedError } from "./disposable.js";
+import { addAbortListener } from "./abort.ts";
+import { DisposedError } from "./disposable.ts";
 
 type StateEvent = "ended" | "readable" | "writable";
 type FlowState = "drained" | "ended" | "flowing" | "paused" | "starved";

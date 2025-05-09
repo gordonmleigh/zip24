@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
-import { lazy } from "./lazy.js";
+import { lazy } from "./lazy.ts";
 
 describe("util/lazy", () => {
   describe("lazy", () => {

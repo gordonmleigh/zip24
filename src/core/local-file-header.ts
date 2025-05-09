@@ -1,14 +1,14 @@
-import { BufferView, type BufferLike } from "../util/binary.js";
-import { DosDate } from "../util/dos-date.js";
-import { EncodedString } from "../util/encoded-string.js";
-import { makeBuffer, type Serializable } from "../util/serialization.js";
-import { ExtraFieldTag } from "./constants.js";
-import { ZipSignatureError } from "./errors.js";
+import { BufferView, type BufferLike } from "../util/binary.ts";
+import { DosDate } from "../util/dos-date.ts";
+import { EncodedString } from "../util/encoded-string.ts";
+import { makeBuffer, type Serializable } from "../util/serialization.ts";
+import { ExtraFieldTag } from "./constants.ts";
+import { ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   Zip64ExtraField,
-} from "./extra-field-collection.js";
-import { GeneralPurposeFlags } from "./flags.js";
+} from "./extra-field-collection.ts";
+import { GeneralPurposeFlags } from "./flags.ts";
 
 export type LocalFileHeaderInit = {
   compressedSize: number;

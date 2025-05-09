@@ -1,2 +1,2 @@
 // dummy test file for coverage
-import {} from "./type-utils.js";
+import {} from "./type-utils.ts";

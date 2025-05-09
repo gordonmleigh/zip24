@@ -1,4 +1,4 @@
-import { BufferView, type BufferLike } from "./binary.js";
+import { BufferView, type BufferLike } from "./binary.ts";
 
 export type Deserializer<T> = {
   deserialize: (

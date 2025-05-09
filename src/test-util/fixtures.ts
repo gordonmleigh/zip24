@@ -1,10 +1,10 @@
 import { PackageRoot } from "#package";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { CompressionMethod } from "../core/compression-core.js";
-import { ZipVersion } from "../core/constants.js";
-import { CodePage437Encoder } from "../util/cp437.js";
-import { computeCrc32 } from "../util/crc32.js";
+import { CompressionMethod } from "../core/compression-core.ts";
+import { ZipVersion } from "../core/constants.ts";
+import { CodePage437Encoder } from "../util/cp437.ts";
+import { computeCrc32 } from "../util/crc32.ts";
 import {
   bigUint,
   cp437,
@@ -19,7 +19,7 @@ import {
   utf8,
   utf8length,
   utf8length32,
-} from "./data.js";
+} from "./data.ts";
 
 export const EmptyZip32 = data(
   "504b0506", // signature (0x06054b50)

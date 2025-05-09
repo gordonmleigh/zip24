@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.js";
-import { data } from "../test-util/data.js";
-import { EncodedString } from "./encoded-string.js";
+import { assertBufferEqual } from "../test-util/assert.ts";
+import { data } from "../test-util/data.ts";
+import { EncodedString } from "./encoded-string.ts";
 
 describe("util/encoded-string", () => {
   describe("class EncodedString", () => {

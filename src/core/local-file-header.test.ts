@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.js";
+import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -12,16 +12,16 @@ import {
   tinyUint,
   utf8,
   utf8length,
-} from "../test-util/data.js";
-import { CompressionMethod } from "./compression-core.js";
-import { ExtraFieldTag, ZipVersion } from "./constants.js";
-import { ZipSignatureError } from "./errors.js";
+} from "../test-util/data.ts";
+import { CompressionMethod } from "./compression-core.ts";
+import { ExtraFieldTag, ZipVersion } from "./constants.ts";
+import { ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,
-} from "./extra-field-collection.js";
-import { GeneralPurposeFlags } from "./flags.js";
-import { LocalFileHeader } from "./local-file-header.js";
+} from "./extra-field-collection.ts";
+import { GeneralPurposeFlags } from "./flags.ts";
+import { LocalFileHeader } from "./local-file-header.ts";
 
 describe("core/local-file-header", () => {
   describe("class LocalFileHeader", () => {

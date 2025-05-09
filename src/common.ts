@@ -1,10 +1,10 @@
 export {
   CompressionMethod,
   type CompressionAlgorithms,
-} from "./core/compression-core.js";
-export * from "./core/constants.js";
-export * from "./core/errors.js";
-export * from "./core/extra-field-collection.js";
-export * from "./core/file-attributes.js";
-export * from "./core/flags.js";
-export { ZipEntry } from "./core/zip-entry.js";
+} from "./core/compression-core.ts";
+export * from "./core/constants.ts";
+export * from "./core/errors.ts";
+export * from "./core/extra-field-collection.ts";
+export * from "./core/file-attributes.ts";
+export * from "./core/flags.ts";
+export { ZipEntry } from "./core/zip-entry.ts";

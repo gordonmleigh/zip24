@@ -1,5 +1,5 @@
-import { hasExtraProperty } from "./assert.js";
-import type { DirtyPartial } from "./type-utils.js";
+import { hasExtraProperty } from "./assert.ts";
+import type { DirtyPartial } from "./type-utils.ts";
 
 export type AsyncCloseable = {
   close: () => PromiseLike<void>;

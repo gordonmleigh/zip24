@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
 import { setTimeout } from "node:timers/promises";
-import { Mutex } from "./mutex.js";
+import { Mutex } from "./mutex.ts";
 
 describe("util/mutex", () => {
   describe("class Mutex", () => {

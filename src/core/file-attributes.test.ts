@@ -1,15 +1,15 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertInstanceOf } from "../test-util/assert.js";
-import { ZipPlatform } from "./constants.js";
-import { ZipFormatError } from "./errors.js";
+import { assertInstanceOf } from "../test-util/assert.ts";
+import { ZipPlatform } from "./constants.ts";
+import { ZipFormatError } from "./errors.ts";
 import {
   DosFileAttributes,
   UnixFileAttributes,
   getAttributesPlatform,
   isPlatformAttributes,
   makePlatformAttributes,
-} from "./file-attributes.js";
+} from "./file-attributes.ts";
 
 describe("core/file-attributes", () => {
   describe("DosFileAttributes", () => {

@@ -1,25 +1,25 @@
-import { CentralDirectoryHeader } from "../core/central-directory-header.js";
+import { CentralDirectoryHeader } from "../core/central-directory-header.ts";
 import {
   decompress,
   type CompressionAlgorithms,
-} from "../core/compression-core.js";
-import { LocalFileHeader } from "../core/local-file-header.js";
-import { ZipEntry } from "../core/zip-entry.js";
+} from "../core/compression-core.ts";
+import { LocalFileHeader } from "../core/local-file-header.ts";
+import { ZipEntry } from "../core/zip-entry.ts";
 import {
   Eocdr,
   Zip64Eocdl,
   Zip64Eocdr,
   ZipTrailer,
-} from "../core/zip-trailer.js";
-import { assert } from "../util/assert.js";
-import { asyncDisposeOrClose } from "../util/disposable.js";
-import { lazy } from "../util/lazy.js";
+} from "../core/zip-trailer.ts";
+import { assert } from "../util/assert.ts";
+import { asyncDisposeOrClose } from "../util/disposable.ts";
+import { lazy } from "../util/lazy.ts";
 import {
   iterableFromRandomAccessReader,
   type RandomAccessReader,
-} from "../util/streams.js";
-import type { Constructor } from "../util/type-utils.js";
-import { defaultDecompressors } from "./compression.js";
+} from "../util/streams.ts";
+import type { Constructor } from "../util/type-utils.ts";
+import { defaultDecompressors } from "./compression.ts";
 
 const DefaultBufferSize = 1024 ** 2;
 

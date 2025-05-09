@@ -1,10 +1,10 @@
 import assert from "node:assert";
 import { buffer, text } from "node:stream/consumers";
 import { describe, it } from "node:test";
-import { CompressionMethod } from "../core/compression-core.js";
-import { asyncIterable, base64, base64iterable } from "../test-util/data.js";
-import { maxChunkSize } from "../util/streams.js";
-import { defaultCompressors, defaultDecompressors } from "./compression.js";
+import { CompressionMethod } from "../core/compression-core.ts";
+import { asyncIterable, base64, base64iterable } from "../test-util/data.ts";
+import { maxChunkSize } from "../util/streams.ts";
+import { defaultCompressors, defaultDecompressors } from "./compression.ts";
 
 describe("web/compression", () => {
   describe("defaultCompressors", () => {

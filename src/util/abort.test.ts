@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
-import { addAbortListener } from "./abort.js";
+import { addAbortListener } from "./abort.ts";
 
 describe("util/abort", () => {
   describe("addAbortListener", () => {

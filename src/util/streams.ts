@@ -1,5 +1,5 @@
 /* eslint-disable n/no-unsupported-features/node-builtins */
-import { hasExtraProperty } from "./assert.js";
+import { hasExtraProperty } from "./assert.ts";
 
 const DefaultChunkSize = 1024 ** 2; // 1 MB
 

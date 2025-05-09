@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.js";
+import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -9,10 +9,10 @@ import {
   longUint,
   shortUint,
   tinyUint,
-} from "../test-util/data.js";
-import { ZipPlatform, ZipVersion } from "./constants.js";
-import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
-import { Eocdr, Zip64Eocdl, Zip64Eocdr, ZipTrailer } from "./zip-trailer.js";
+} from "../test-util/data.ts";
+import { ZipPlatform, ZipVersion } from "./constants.ts";
+import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.ts";
+import { Eocdr, Zip64Eocdl, Zip64Eocdr, ZipTrailer } from "./zip-trailer.ts";
 
 describe("core/zip-trailer", () => {
   describe("class Eocdr", () => {

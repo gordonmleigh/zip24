@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it, mock } from "node:test";
-import { asyncDisposeOrClose } from "./disposable.js";
+import { asyncDisposeOrClose } from "./disposable.ts";
 
 describe("util/disposable", () => {
   describe("asyncDisposeOrClose", () => {

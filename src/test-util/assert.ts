@@ -1,6 +1,6 @@
 /* c8 ignore start */
 import assert, { AssertionError } from "node:assert";
-import { hexDiff } from "./display.js";
+import { hexDiff } from "./display.ts";
 
 type AssertionErrorOptions = typeof AssertionError extends new (
   options?: infer T,

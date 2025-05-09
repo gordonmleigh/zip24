@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { DisposedError } from "./disposable.js";
-import { DoubleEndedBuffer } from "./double-ended-buffer.js";
-import { textFromIterable } from "./streams.js";
+import { DisposedError } from "./disposable.ts";
+import { DoubleEndedBuffer } from "./double-ended-buffer.ts";
+import { textFromIterable } from "./streams.ts";
 
 describe("util/double-ended-buffer", () => {
   describe("class DoubleEndedBuffer", () => {

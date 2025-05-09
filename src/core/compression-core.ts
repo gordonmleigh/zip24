@@ -1,5 +1,5 @@
-import { assert } from "../util/assert.js";
-import { computeCrc32 } from "../util/crc32.js";
+import { assert } from "../util/assert.ts";
+import { computeCrc32 } from "../util/crc32.ts";
 import {
   identityStream,
   mapIterable,
@@ -7,9 +7,9 @@ import {
   type AsyncTransform,
   type ByteSource,
   type DataSource,
-} from "../util/streams.js";
-import type { DirtyPartial } from "../util/type-utils.js";
-import { ZipFormatError } from "./errors.js";
+} from "../util/streams.ts";
+import type { DirtyPartial } from "../util/type-utils.ts";
+import { ZipFormatError } from "./errors.ts";
 
 export const CompressionMethod = {
   Stored: 0,

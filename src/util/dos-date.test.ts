@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { DosDate } from "./dos-date.js";
+import { DosDate } from "./dos-date.ts";
 
 describe("util/dos-date", () => {
   describe("DosDate", () => {

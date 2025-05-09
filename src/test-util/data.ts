@@ -1,9 +1,9 @@
 import assert from "node:assert";
 import { deflateRawSync } from "node:zlib";
-import { CodePage437Encoder } from "../util/cp437.js";
-import { computeCrc32 } from "../util/crc32.js";
-import { DosDate } from "../util/dos-date.js";
-import { bufferFromIterable, type AsyncTransform } from "../util/streams.js";
+import { CodePage437Encoder } from "../util/cp437.ts";
+import { computeCrc32 } from "../util/crc32.ts";
+import { DosDate } from "../util/dos-date.ts";
+import { bufferFromIterable, type AsyncTransform } from "../util/streams.ts";
 
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function* asyncIterable(

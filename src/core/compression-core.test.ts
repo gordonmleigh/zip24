@@ -1,17 +1,17 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { assertInstanceOf } from "../test-util/assert.js";
-import { asyncIterable } from "../test-util/data.js";
-import { AssertionError } from "../util/assert.js";
-import { bufferFromIterable, type ByteSource } from "../util/streams.js";
+import { assertInstanceOf } from "../test-util/assert.ts";
+import { asyncIterable } from "../test-util/data.ts";
+import { AssertionError } from "../util/assert.ts";
+import { bufferFromIterable, type ByteSource } from "../util/streams.ts";
 import {
   CompressionMethod,
   compress,
   decompress,
   type DataDescriptor,
-} from "./compression-core.js";
-import { ZipFormatError } from "./errors.js";
+} from "./compression-core.ts";
+import { ZipFormatError } from "./errors.ts";
 
 describe("core/compression-core", () => {
   describe("compress", () => {
@@ -185,7 +185,6 @@ describe("core/compression-core", () => {
         uncompressedSize: 0,
       };
 
-       
       const algorithm = mock.fn(async function* () {
         yield Buffer.from("hello fred");
       });
@@ -234,7 +233,6 @@ describe("core/compression-core", () => {
         uncompressedSize: 11,
       };
 
-       
       const algorithm = mock.fn(async function* (input: ByteSource) {
         yield Buffer.from("hello world");
       });
@@ -256,7 +254,6 @@ describe("core/compression-core", () => {
         uncompressedSize: 11,
       };
 
-       
       const algorithm = mock.fn(async function* (input: ByteSource) {
         yield Buffer.from("hello world");
       });

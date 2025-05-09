@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { Deferred } from "./deferred.js";
+import { Deferred } from "./deferred.ts";
 
 describe("util/deferred", () => {
   describe("Deferred", () => {

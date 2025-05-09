@@ -1,16 +1,16 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
-import { asyncIterable } from "../test-util/data.js";
-import { ZipVersion } from "./constants.js";
-import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.js";
+import { asyncIterable } from "../test-util/data.ts";
+import { ZipVersion } from "./constants.ts";
+import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.ts";
 import {
   ZipEntry,
   minimumVersion,
   needs64bit,
   needsDataDescriptor,
   needsUtf8,
-} from "./zip-entry.js";
+} from "./zip-entry.ts";
 
 describe("core/zip-entry", () => {
   describe("class ZipEntry", () => {

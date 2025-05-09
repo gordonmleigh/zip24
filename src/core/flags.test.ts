@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { GeneralPurposeFlags } from "./flags.js";
+import { GeneralPurposeFlags } from "./flags.ts";
 
 describe("core/flags", () => {
   describe("GeneralPurposeFlags", () => {

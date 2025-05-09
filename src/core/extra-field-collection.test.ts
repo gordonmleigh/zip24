@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual, assertInstanceOf } from "../test-util/assert.js";
+import { assertBufferEqual, assertInstanceOf } from "../test-util/assert.ts";
 import {
   bigUint,
   data,
@@ -8,18 +8,18 @@ import {
   shortUint,
   tinyUint,
   utf8,
-} from "../test-util/data.js";
-import { computeCrc32 } from "../util/crc32.js";
-import { EncodedString } from "../util/encoded-string.js";
-import { ExtraFieldTag } from "./constants.js";
-import { ZipFormatError, ZipSignatureError } from "./errors.js";
+} from "../test-util/data.ts";
+import { computeCrc32 } from "../util/crc32.ts";
+import { EncodedString } from "../util/encoded-string.ts";
+import { ExtraFieldTag } from "./constants.ts";
+import { ZipFormatError, ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,
   UnknownExtraField,
   Zip64ExtraField,
   type Zip64SizeFields,
-} from "./extra-field-collection.js";
+} from "./extra-field-collection.ts";
 
 describe("core/extra-field-collection", () => {
   describe("class UnicodeExtraField", () => {

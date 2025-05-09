@@ -1,4 +1,4 @@
-import { CodePage437Decoder } from "./cp437.js";
+import { CodePage437Decoder } from "./cp437.ts";
 
 function getUintUpperBound(bytes: number): number {
   switch (bytes) {

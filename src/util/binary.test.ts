@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { BitField, BufferView } from "./binary.js";
+import { BitField, BufferView } from "./binary.ts";
 
 describe("util/binary", () => {
   describe("BufferView", () => {

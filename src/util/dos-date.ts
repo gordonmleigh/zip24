@@ -1,4 +1,4 @@
-import { assert } from "./assert.js";
+import { assert } from "./assert.ts";
 
 /**
  * An extension to the {@link Date} class to support DOS-encoded values.

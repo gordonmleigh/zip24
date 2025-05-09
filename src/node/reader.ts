@@ -1,10 +1,10 @@
 import { open } from "node:fs/promises";
-import type { RandomAccessReader } from "../util/streams.js";
+import type { RandomAccessReader } from "../util/streams.ts";
 import {
   ZipReader as ZipReaderBase,
   type ZipReaderOptions,
-} from "../web/reader.js";
-import { defaultDecompressors } from "./compression.js";
+} from "../web/reader.ts";
+import { defaultDecompressors } from "./compression.ts";
 
 /**
  * An object which can read a zip entry from a {@link RandomAccessReader}.

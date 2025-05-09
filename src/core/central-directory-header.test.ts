@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.js";
+import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -12,17 +12,17 @@ import {
   tinyUint,
   utf8,
   utf8length,
-} from "../test-util/data.js";
-import { CentralDirectoryHeader } from "./central-directory-header.js";
-import { CompressionMethod } from "./compression-core.js";
-import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./constants.js";
-import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.js";
+} from "../test-util/data.ts";
+import { CentralDirectoryHeader } from "./central-directory-header.ts";
+import { CompressionMethod } from "./compression-core.ts";
+import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./constants.ts";
+import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,
-} from "./extra-field-collection.js";
-import { UnixFileAttributes } from "./file-attributes.js";
-import { GeneralPurposeFlags } from "./flags.js";
+} from "./extra-field-collection.ts";
+import { UnixFileAttributes } from "./file-attributes.ts";
+import { GeneralPurposeFlags } from "./flags.ts";
 
 describe("core/central-directory-header", () => {
   describe("class CentralDirectoryHeader", () => {

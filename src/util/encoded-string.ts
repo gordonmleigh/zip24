@@ -1,5 +1,5 @@
-import { normalizeBufferRange, type BufferLike } from "./binary.js";
-import { CodePage437Decoder, CodePage437Encoder } from "./cp437.js";
+import { normalizeBufferRange, type BufferLike } from "./binary.ts";
+import { CodePage437Decoder, CodePage437Encoder } from "./cp437.ts";
 
 export type StringEncoding = "cp437" | "utf8";
 

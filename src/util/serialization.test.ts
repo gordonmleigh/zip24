@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.js";
-import { makeBuffer } from "./serialization.js";
+import { assertBufferEqual } from "../test-util/assert.ts";
+import { makeBuffer } from "./serialization.ts";
 
 describe("util/serialization", () => {
   describe("makeBuffer()", () => {
