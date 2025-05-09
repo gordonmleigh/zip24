@@ -33,13 +33,15 @@ class UintBoundsError extends RangeError {
   }
 }
 
-export type BufferLike = ArrayBuffer | ArrayBufferView;
+export type BufferLike<Buffer extends ArrayBufferLike = ArrayBufferLike> =
+  | Buffer
+  | ArrayBufferView<Buffer>;
 
-export function normalizeBufferRange(
-  source: BufferLike,
+export function normalizeBufferRange<ArrayBufferType extends ArrayBufferLike>(
+  source: BufferLike<ArrayBufferType>,
   byteOffset = 0,
   byteLength = source.byteLength - byteOffset,
-): [ArrayBuffer, number, number] {
+): [ArrayBufferType, number, number] {
   if (ArrayBuffer.isView(source)) {
     if (byteOffset + byteLength > source.byteLength) {
       throw new RangeError(

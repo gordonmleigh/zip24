@@ -29,7 +29,7 @@ function validateEncoding(
   }
 }
 
-export class EncodedString extends Uint8Array {
+export class EncodedString extends Uint8Array<ArrayBufferLike> {
   public readonly encoding: StringEncoding;
 
   public constructor(encoding: StringEncoding, value: string | BufferLike);
@@ -48,7 +48,8 @@ export class EncodedString extends Uint8Array {
     validateEncoding(encoding);
 
     if (typeof bufferOrString === "string") {
-      super(getEncoder(encoding).encode(bufferOrString));
+      const encoded = getEncoder(encoding).encode(bufferOrString);
+      super(encoded);
     } else {
       super(...normalizeBufferRange(bufferOrString, byteOffset, byteLength));
     }
