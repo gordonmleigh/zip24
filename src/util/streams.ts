@@ -13,8 +13,8 @@ export type ByteSink = {
 
 export type RandomAccessReadOptions = {
   buffer: Uint8Array;
-  offset?: number;
-  length?: number;
+  offset?: number | undefined;
+  length?: number | undefined;
   position: number;
 };
 
@@ -24,16 +24,16 @@ export type RandomAccessReadResult = {
 };
 
 export type RandomAccessReader = {
-  close?: () => void | PromiseLike<void>;
+  close?: (() => void | PromiseLike<void>) | undefined;
   read: (
     options: RandomAccessReadOptions,
   ) => PromiseLike<RandomAccessReadResult>;
 };
 
 export type RandomAccessReaderSourceOptions = {
-  byteLength?: number;
-  chunkSize?: number;
-  position?: number;
+  byteLength?: number | undefined;
+  chunkSize?: number | undefined;
+  position?: number | undefined;
 };
 
 export type DataSource =

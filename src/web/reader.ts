@@ -27,8 +27,8 @@ const DefaultBufferSize = 1024 ** 2;
  * Options for {@link ZipReader} instance.
  */
 export type ZipReaderOptions = {
-  bufferSize?: number;
-  decompressors?: CompressionAlgorithms;
+  bufferSize?: number | undefined;
+  decompressors?: CompressionAlgorithms | undefined;
 };
 
 /**

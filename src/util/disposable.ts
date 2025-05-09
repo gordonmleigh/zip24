@@ -1,4 +1,5 @@
 import { hasExtraProperty } from "./assert.js";
+import type { DirtyPartial } from "./type-utils.js";
 
 export type AsyncCloseable = {
   close: () => PromiseLike<void>;
@@ -17,7 +18,7 @@ export function isDisposable(value: unknown): value is Disposable {
 }
 
 export async function asyncDisposeOrClose(
-  value: Partial<AsyncCloseable | Closeable>,
+  value: DirtyPartial<AsyncCloseable | Closeable>,
 ): Promise<void> {
   if (isAsyncDisposable(value)) {
     await value[Symbol.asyncDispose]();

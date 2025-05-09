@@ -18,7 +18,7 @@ import { defaultDecompressors } from "./compression.js";
  * Options for {@link ZipBufferEntryReader}.
  */
 export type ZipBufferReaderOptions = {
-  decompressors?: CompressionAlgorithms;
+  decompressors?: CompressionAlgorithms | undefined;
 };
 
 /**

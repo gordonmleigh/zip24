@@ -15,7 +15,7 @@ export type ZipTrailerFields = {
   offset: number;
   comment: string;
   size: number;
-  zip64?: Zip64VersionFields;
+  zip64?: Zip64VersionFields | undefined;
 };
 
 export class ZipTrailer implements ZipTrailerFields {
@@ -23,7 +23,7 @@ export class ZipTrailer implements ZipTrailerFields {
   public count: number;
   public offset: number;
   public size: number;
-  public zip64?: Zip64VersionFields;
+  public zip64: Zip64VersionFields | undefined;
 
   public constructor(eocdr?: EocdrFields, eocdr64?: Zip64EocdrFields) {
     this.comment = eocdr?.comment ?? "";

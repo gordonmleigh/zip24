@@ -18,8 +18,8 @@ import type { ByteSink, DataSource } from "../util/streams.js";
 import { defaultCompressors } from "./compression.js";
 
 export type ZipWriterOptionsBase = {
-  compressors?: CompressionAlgorithms;
-  startingOffset?: number;
+  compressors?: CompressionAlgorithms | undefined;
+  startingOffset?: number | undefined;
 };
 
 export type ZipStreamWriterOptions = ZipWriterOptionsBase & {

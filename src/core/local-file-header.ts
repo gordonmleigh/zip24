@@ -21,7 +21,7 @@ export type LocalFileHeaderInit = {
   path: Uint8Array | string;
   uncompressedSize: number;
   versionNeeded: ZipVersion;
-  zip64?: boolean;
+  zip64?: boolean | undefined;
 };
 
 export class LocalFileHeader implements Serializable {

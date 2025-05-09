@@ -8,6 +8,7 @@ import {
   type ByteSource,
   type DataSource,
 } from "../util/streams.js";
+import type { DirtyPartial } from "../util/type-utils.js";
 import { ZipFormatError } from "./errors.js";
 
 export enum CompressionMethod {
@@ -30,7 +31,7 @@ export type CompressionAlgorithms = Partial<
 
 export async function* compress(
   compressionMethod: CompressionMethod,
-  check: Partial<DataDescriptor> = {},
+  check: DirtyPartial<DataDescriptor> = {},
   output: DataDescriptor,
   content: DataSource | undefined,
   compressors: CompressionAlgorithms,

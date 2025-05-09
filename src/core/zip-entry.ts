@@ -19,23 +19,23 @@ import {
 import { GeneralPurposeFlags } from "./flags.js";
 
 export type ZipEntryInfo = {
-  attributes?: FileAttributes;
-  comment?: string;
-  compressedSize?: number;
-  compressionMethod?: CompressionMethod;
-  crc32?: number;
-  extraField?: ExtraFieldCollection;
-  flags?: GeneralPurposeFlags;
-  lastModified?: Date;
-  localHeaderOffset?: number;
-  noValidateVersion?: boolean;
-  path?: string;
-  uncompressedData?: DataSource;
-  uncompressedSize?: number;
-  utf8?: boolean;
-  versionMadeBy?: ZipVersion;
-  versionNeeded?: ZipVersion;
-  zip64?: boolean;
+  attributes?: FileAttributes | undefined;
+  comment?: string | undefined;
+  compressedSize?: number | undefined;
+  compressionMethod?: CompressionMethod | undefined;
+  crc32?: number | undefined;
+  extraField?: ExtraFieldCollection | undefined;
+  flags?: GeneralPurposeFlags | undefined;
+  lastModified?: Date | undefined;
+  localHeaderOffset?: number | undefined;
+  noValidateVersion?: boolean | undefined;
+  path?: string | undefined;
+  uncompressedData?: DataSource | undefined;
+  uncompressedSize?: number | undefined;
+  utf8?: boolean | undefined;
+  versionMadeBy?: ZipVersion | undefined;
+  versionNeeded?: ZipVersion | undefined;
+  zip64?: boolean | undefined;
 };
 
 export class ZipEntry implements AsyncIterable<Uint8Array> {

@@ -30,7 +30,7 @@ export type CentralDirectoryHeaderInit = {
   uncompressedSize: number;
   versionMadeBy: ZipVersion;
   versionNeeded: ZipVersion;
-  zip64?: boolean;
+  zip64?: boolean | undefined;
 };
 
 export class CentralDirectoryHeader implements Serializable {

@@ -146,9 +146,9 @@ export class UnknownExtraField implements ExtraField {
 }
 
 export type Zip64SizeFields = {
-  compressedSize?: number;
-  localHeaderOffset?: number;
-  uncompressedSize?: number;
+  compressedSize?: number | undefined;
+  localHeaderOffset?: number | undefined;
+  uncompressedSize?: number | undefined;
 };
 
 export class Zip64ExtraField implements ExtraField {

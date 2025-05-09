@@ -2,11 +2,11 @@
 import { fromHex } from "./data.js";
 
 export type HexDiffOptions = {
-  chunkSize?: number;
-  colors?: boolean;
-  leftColumnHeader?: string;
-  offsetBase?: number;
-  rightColumnHeader?: string;
+  chunkSize?: number | undefined;
+  colors?: boolean | undefined;
+  leftColumnHeader?: string | undefined;
+  offsetBase?: number | undefined;
+  rightColumnHeader?: string | undefined;
 };
 
 export function hexDiff(

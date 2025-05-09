@@ -7,7 +7,7 @@ type FlowState = "drained" | "ended" | "flowing" | "paused" | "starved";
 type Listener = () => void;
 
 export type DoubleEndedBufferOptions = {
-  readonly highWaterMark?: number;
+  readonly highWaterMark?: number | undefined;
 };
 
 export class DoubleEndedBuffer implements AsyncIterable<Uint8Array> {

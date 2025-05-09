@@ -161,12 +161,12 @@ export const Zip32WithThreeEntries = data(
 );
 
 export type ZipGenerationOptions = {
-  fileCommentLength?: number;
+  fileCommentLength?: number | undefined;
   fileCount: number;
-  fileSize?: number;
-  zip64?: boolean;
-  zip64ExtensibleDataLength?: number;
-  zipComment?: string;
+  fileSize?: number | undefined;
+  zip64?: boolean | undefined;
+  zip64ExtensibleDataLength?: number | undefined;
+  zipComment?: string | undefined;
 };
 
 // eslint-disable-next-line @typescript-eslint/require-await
