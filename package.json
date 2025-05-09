@@ -101,9 +101,9 @@
     }
   },
   "imports": {
-    "#package-root": {
-      "node": "./package-root.js",
-      "types": "./package-root.d.ts"
+    "#package": {
+      "node": "./package.js",
+      "types": "./package.d.ts"
     }
   },
   "scripts": {

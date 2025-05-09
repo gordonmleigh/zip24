@@ -18,6 +18,13 @@ export default config(
         "error",
         { ignoreRestSiblings: true },
       ],
+      "@typescript-eslint/unified-signatures": [
+        "error",
+        {
+          ignoreDifferentlyNamedParameters: true,
+          ignoreOverloadsWithDifferentJSDoc: true,
+        },
+      ],
     },
   },
   {

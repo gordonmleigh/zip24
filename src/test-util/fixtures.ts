@@ -1,4 +1,4 @@
-import { PackageRoot } from "#package-root";
+import { PackageRoot } from "#package";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CompressionMethod } from "../core/compression-core.js";
