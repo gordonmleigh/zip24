@@ -67,9 +67,8 @@ export function randomAccessReaderFromBuffer(
 export async function* iterableFromReadableStream<T>(
   stream: ReadableStream<T>,
 ): AsyncGenerator<T, undefined, undefined> {
-  // prevent narrowing to `never` after this block (using `as any`)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (isAsyncIterable(stream as any)) {
+  // prevent narrowing to `never` after this block by asserting `unknown`
+  if (isAsyncIterable(stream as unknown)) {
     yield* stream;
     return;
   }
@@ -177,7 +176,6 @@ export async function bufferFromIterable(
   const chunks: Uint8Array[] = [];
   let byteLength = 0;
 
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const chunk of input) {
     chunks.push(chunk);
     byteLength += chunk.byteLength;
@@ -201,7 +199,6 @@ export async function textFromIterable(
   const decoder = new TextDecoder(encoding);
   let output = "";
 
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const chunk of input) {
     output += decoder.decode(chunk, { stream: true });
   }
@@ -215,7 +212,6 @@ export async function* mapIterable<Input, Output>(
   map: (input: Input) => Output | PromiseLike<Output>,
   final?: () => void | PromiseLike<void>,
 ): AsyncGenerator<Output> {
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const element of input) {
     yield await map(element);
   }
@@ -228,7 +224,6 @@ export async function* maxChunkSize(
   input: ByteSource,
   chunkSize: number,
 ): ByteSource {
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const originalChunk of input) {
     for (
       let offset = 0;
@@ -246,7 +241,6 @@ export async function* maxChunkSize(
 export async function* identityStream<Input>(
   input: AnyIterable<Input>,
 ): AsyncGenerator<Input> {
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- false positive
   for await (const element of input) {
     yield element;
   }

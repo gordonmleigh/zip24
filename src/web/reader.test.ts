@@ -255,7 +255,7 @@ describe("web/reader", () => {
         const filesMock = mock.method(
           reader,
           "files",
-          // eslint-disable-next-line @typescript-eslint/require-await
+
           async function* (): AsyncGenerator<ZipEntry> {
             for (const file of files) {
               yield file;
@@ -285,7 +285,6 @@ describe("web/reader", () => {
           hasWaited = true;
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
         const reader: RandomAccessReader = { close } as any;
         const zipReader = new ZipReader(reader, 0);
 
@@ -306,7 +305,6 @@ describe("web/reader", () => {
         hasWaited = true;
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
       const reader: RandomAccessReader = { close } as any;
       const zipReader = new ZipReader(reader, 0);
 
@@ -321,7 +319,6 @@ describe("web/reader", () => {
     it("closes the underlying reader", () => {
       const close = mock.fn();
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
       const reader: RandomAccessReader = { close } as any;
       const zipReader = new ZipReader(reader, 0);
 

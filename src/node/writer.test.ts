@@ -41,7 +41,6 @@ describe("node/writer", () => {
         );
         t.mock.method(
           defaultCompressors,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           CompressionMethod.Deflate.toString() as any,
           mockAsyncTransform(compressorMock),
         );
@@ -409,7 +408,6 @@ describe("node/writer", () => {
 
         await assert.rejects(
           Promise.resolve(write),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
           (cause: any) => cause?.code === "ENOENT",
         );
       });

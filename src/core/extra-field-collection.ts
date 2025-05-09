@@ -231,7 +231,6 @@ export class Zip64ExtraField implements ExtraField {
         throw new ZipFormatError("Zip64 field not long enough");
       }
       fields.localHeaderOffset = this.values[index];
-      ++index;
     }
   }
 

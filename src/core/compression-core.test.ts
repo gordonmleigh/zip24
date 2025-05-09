@@ -185,7 +185,7 @@ describe("core/compression-core", () => {
         uncompressedSize: 0,
       };
 
-      // eslint-disable-next-line @typescript-eslint/require-await
+       
       const algorithm = mock.fn(async function* () {
         yield Buffer.from("hello fred");
       });
@@ -234,7 +234,7 @@ describe("core/compression-core", () => {
         uncompressedSize: 11,
       };
 
-      // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
+       
       const algorithm = mock.fn(async function* (input: ByteSource) {
         yield Buffer.from("hello world");
       });
@@ -256,7 +256,7 @@ describe("core/compression-core", () => {
         uncompressedSize: 11,
       };
 
-      // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
+       
       const algorithm = mock.fn(async function* (input: ByteSource) {
         yield Buffer.from("hello world");
       });

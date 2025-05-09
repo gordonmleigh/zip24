@@ -34,7 +34,6 @@ describe("util/encoded-string", () => {
       describe("with an invalid encoding", () => {
         it("throws if given the value as a string", () => {
           assert.throws(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
             () => new EncodedString("blah" as any, ""),
             (error) =>
               error instanceof TypeError &&
@@ -45,7 +44,6 @@ describe("util/encoded-string", () => {
 
         it("throws if given the value as a buffer", () => {
           assert.throws(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
             () => new EncodedString("blah" as any, data("010203")),
             (error) =>
               error instanceof TypeError &&

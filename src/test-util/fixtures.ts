@@ -311,7 +311,6 @@ export async function* generateZip(
       extensibleDataSector,
     );
 
-    position += zip64EocdrChunk.byteLength;
     yield zip64EocdrChunk;
 
     const eocdlChunk = data(
@@ -321,7 +320,6 @@ export async function* generateZip(
       longUint(1), // total number of disks
     );
 
-    position += eocdlChunk.byteLength;
     yield eocdlChunk;
   }
 

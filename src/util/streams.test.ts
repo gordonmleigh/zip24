@@ -188,9 +188,8 @@ describe("util/streams", () => {
       assert.deepStrictEqual(chunks, ["fred", "george", "ron"]);
     });
 
-    it("calls iterator.return when the reader is cancelled", () => {
+    it("calls iterator.return when the reader is cancelled", async () => {
       const returnFunction = mock.fn(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         (error: unknown) => ({ done: true, value: undefined }) as const,
       );
 
@@ -203,7 +202,7 @@ describe("util/streams", () => {
 
       const reader = stream.getReader();
       const error = new Error("bang");
-      reader.cancel(error);
+      await reader.cancel(error);
 
       assert.strictEqual(returnFunction.mock.callCount(), 1);
       assert.strictEqual(returnFunction.mock.calls[0]?.arguments[0], error);
@@ -324,7 +323,6 @@ describe("util/streams", () => {
   describe("getAsyncIterator", () => {
     it("returns the async iterator for an async stream", () => {
       const iterator = Symbol();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
       const getIterator = mock.fn(() => iterator as any);
 
       const iterable = {
@@ -339,7 +337,6 @@ describe("util/streams", () => {
 
     it("returns the sync iterator for a sync stream", () => {
       const iterator = Symbol();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
       const getIterator = mock.fn(() => iterator as any);
 
       const iterable = {
@@ -355,9 +352,8 @@ describe("util/streams", () => {
     it("returns the async iterator for a dual-mode stream", () => {
       const asyncIterator = Symbol();
       const syncIterator = Symbol();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+
       const getAsyncIteratorMethod = mock.fn(() => asyncIterator as any);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
       const getSyncIteratorMethod = mock.fn(() => syncIterator as any);
 
       const iterable = {

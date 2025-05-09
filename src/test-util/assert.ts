@@ -64,10 +64,7 @@ export function assertBufferEqual(
   }
 }
 
-export function assertInstanceOf<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  T extends new (...parameters: any[]) => any,
->(
+export function assertInstanceOf<T extends new (...parameters: any[]) => any>(
   actual: unknown,
   expected: T,
   message?: string | AssertionErrorInfo,

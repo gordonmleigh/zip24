@@ -149,7 +149,6 @@ describe("web/writer", () => {
         );
         t.mock.method(
           defaultCompressors,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           CompressionMethod.Deflate.toString() as any,
           mockAsyncTransform(compressorMock),
         );
@@ -355,7 +354,7 @@ describe("web/writer", () => {
 
         await writer.addFile({ path: "folder/" });
 
-        assert.rejects(
+        await assert.rejects(
           () => buffer(writer),
           (cause) =>
             cause instanceof Error &&

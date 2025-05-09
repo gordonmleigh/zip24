@@ -297,7 +297,7 @@ describe("node/reader", () => {
         const filesMock = mock.method(
           reader,
           "files",
-          // eslint-disable-next-line @typescript-eslint/require-await
+           
           async function* (): AsyncGenerator<ZipEntry> {
             for (const file of files) {
               yield file;

@@ -28,7 +28,7 @@ export function hasExtraProperty<T, K extends PropertyKey>(
     key !== undefined &&
     object !== null &&
     object !== undefined &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     (object as any)[key] !== undefined
   );
 }
