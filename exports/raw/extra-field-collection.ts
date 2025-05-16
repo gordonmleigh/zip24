@@ -1,14 +1,14 @@
-import { BufferView, type BufferLike } from "../util/binary.ts";
-import { computeCrc32 } from "../util/crc32.ts";
-import { EncodedString } from "../util/encoded-string.ts";
+import { BufferView, type BufferLike } from "../../util/binary.ts";
+import { computeCrc32 } from "../../util/crc32.ts";
+import { EncodedString } from "../../util/encoded-string.ts";
 import {
   makeBuffer,
   type Deserializer,
   type Serializable,
-} from "../util/serialization.ts";
-import type { StrictInstanceType } from "../util/type-utils.ts";
+} from "../../util/serialization.ts";
+import type { StrictInstanceType } from "../../util/type-utils.ts";
+import { ZipFormatError, ZipSignatureError } from "../errors.ts";
 import { ExtraFieldTag } from "./constants.ts";
-import { ZipFormatError, ZipSignatureError } from "./errors.ts";
 
 export type ExtraField = Serializable & {
   tag: number;

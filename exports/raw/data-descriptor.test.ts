@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.ts";
-import { bigUint, data, longUint } from "../test-util/data.ts";
+import { assertBufferEqual } from "../../test-util/assert.ts";
+import { bigUint, data, longUint } from "../../test-util/data.ts";
 import { DataDescriptor } from "./data-descriptor.ts";
 
 describe("core/data-descriptor", () => {

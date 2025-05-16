@@ -1,8 +1,12 @@
-import { BufferView, type BufferLike } from "../util/binary.ts";
-import { CodePage437Encoder } from "../util/cp437.ts";
-import { makeBuffer, type Serializable } from "../util/serialization.ts";
+import { BufferView, type BufferLike } from "../../util/binary.ts";
+import { CodePage437Encoder } from "../../util/cp437.ts";
+import { makeBuffer, type Serializable } from "../../util/serialization.ts";
+import {
+  MultiDiskError,
+  ZipFormatError,
+  ZipSignatureError,
+} from "../errors.ts";
 import { ZipPlatform, ZipVersion } from "./constants.ts";
-import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.ts";
 
 export type Zip64VersionFields = {
   platformMadeBy: number;

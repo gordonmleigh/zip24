@@ -1,6 +1,6 @@
 import { canBeCodePage437Encoded } from "../util/cp437.ts";
-import { CompressionMethod } from "./compression-core.ts";
-import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./constants.ts";
+import { CompressionMethod } from "./raw/compression-core.ts";
+import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 
 import {
   bufferFromIterable,
@@ -10,13 +10,13 @@ import {
   type ByteSource,
   type DataSource,
 } from "../util/streams.ts";
-import { ExtraFieldCollection } from "./extra-field-collection.ts";
+import { ExtraFieldCollection } from "./raw/extra-field-collection.ts";
 import {
   DosFileAttributes,
   getAttributesPlatform,
   type FileAttributes,
-} from "./file-attributes.ts";
-import { GeneralPurposeFlags } from "./flags.ts";
+} from "./raw/file-attributes.ts";
+import { GeneralPurposeFlags } from "./raw/flags.ts";
 
 export type ZipEntryInfo = {
   attributes?: FileAttributes | undefined;

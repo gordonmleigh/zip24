@@ -1,5 +1,5 @@
-import { assert } from "../util/assert.ts";
-import { computeCrc32 } from "../util/crc32.ts";
+import { assert } from "../../util/assert.ts";
+import { computeCrc32 } from "../../util/crc32.ts";
 import {
   identityStream,
   mapIterable,
@@ -7,9 +7,9 @@ import {
   type AsyncTransform,
   type ByteSource,
   type DataSource,
-} from "../util/streams.ts";
-import type { DirtyPartial } from "../util/type-utils.ts";
-import { ZipFormatError } from "./errors.ts";
+} from "../../util/streams.ts";
+import type { DirtyPartial } from "../../util/type-utils.ts";
+import { ZipFormatError } from "../errors.ts";
 
 export const CompressionMethod = {
   Stored: 0,

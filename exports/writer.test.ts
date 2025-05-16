@@ -1,10 +1,6 @@
 import assert from "node:assert";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { CompressionMethod } from "../core/compression-core.ts";
-import { ZipPlatform, ZipVersion } from "../core/constants.ts";
-import { DosFileAttributes } from "../core/file-attributes.ts";
-import { GeneralPurposeFlags } from "../core/flags.ts";
 import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
@@ -24,6 +20,10 @@ import {
 import { computeCrc32 } from "../util/crc32.ts";
 import type { ByteSink } from "../util/streams.ts";
 import { defaultCompressors } from "./compression.ts";
+import { CompressionMethod } from "./raw/compression-core.ts";
+import { ZipPlatform, ZipVersion } from "./raw/constants.ts";
+import { DosFileAttributes } from "./raw/file-attributes.ts";
+import { GeneralPurposeFlags } from "./raw/flags.ts";
 import { ZipWriter } from "./writer.ts";
 
 describe("web/writer", () => {

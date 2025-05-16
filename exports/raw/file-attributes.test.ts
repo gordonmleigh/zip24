@@ -1,8 +1,8 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertInstanceOf } from "../test-util/assert.ts";
+import { assertInstanceOf } from "../../test-util/assert.ts";
+import { ZipFormatError } from "../errors.ts";
 import { ZipPlatform } from "./constants.ts";
-import { ZipFormatError } from "./errors.ts";
 import {
   DosFileAttributes,
   UnixFileAttributes,

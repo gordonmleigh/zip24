@@ -1,8 +1,8 @@
 import { PackageRoot } from "#package";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { CompressionMethod } from "../core/compression-core.ts";
-import { ZipVersion } from "../core/constants.ts";
+import { CompressionMethod } from "../exports/raw/compression-core.ts";
+import { ZipVersion } from "../exports/raw/constants.ts";
 import { CodePage437Encoder } from "../util/cp437.ts";
 import { computeCrc32 } from "../util/crc32.ts";
 import {

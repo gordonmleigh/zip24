@@ -1,9 +1,9 @@
-import { BufferView, type BufferLike } from "../util/binary.ts";
-import { DosDate } from "../util/dos-date.ts";
-import { EncodedString } from "../util/encoded-string.ts";
-import { makeBuffer, type Serializable } from "../util/serialization.ts";
+import { BufferView, type BufferLike } from "../../util/binary.ts";
+import { DosDate } from "../../util/dos-date.ts";
+import { EncodedString } from "../../util/encoded-string.ts";
+import { makeBuffer, type Serializable } from "../../util/serialization.ts";
+import { ZipSignatureError } from "../errors.ts";
 import { ExtraFieldTag } from "./constants.ts";
-import { ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   Zip64ExtraField,

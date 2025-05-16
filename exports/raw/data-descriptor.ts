@@ -1,5 +1,5 @@
-import type { BufferLike } from "../util/binary.ts";
-import { makeBuffer, type Serializable } from "../util/serialization.ts";
+import type { BufferLike } from "../../util/binary.ts";
+import { makeBuffer, type Serializable } from "../../util/serialization.ts";
 
 export type DataDescriptorFields = {
   compressedSize: number;

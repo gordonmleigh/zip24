@@ -1,4 +1,4 @@
-import { BitField } from "../util/binary.ts";
+import { BitField } from "../../util/binary.ts";
 
 export class GeneralPurposeFlags extends BitField {
   public static readonly HasEncryption = BitField.flag(0);

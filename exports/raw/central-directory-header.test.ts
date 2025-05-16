@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.ts";
+import { assertBufferEqual } from "../../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -12,11 +12,15 @@ import {
   tinyUint,
   utf8,
   utf8length,
-} from "../test-util/data.ts";
+} from "../../test-util/data.ts";
+import {
+  MultiDiskError,
+  ZipFormatError,
+  ZipSignatureError,
+} from "../errors.ts";
 import { CentralDirectoryHeader } from "./central-directory-header.ts";
 import { CompressionMethod } from "./compression-core.ts";
 import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./constants.ts";
-import { MultiDiskError, ZipFormatError, ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,

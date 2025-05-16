@@ -1,14 +1,3 @@
-import { CentralDirectoryHeader } from "../core/central-directory-header.ts";
-import {
-  compress,
-  CompressionMethod,
-  type CompressionAlgorithms,
-} from "../core/compression-core.ts";
-import { ZipPlatform, ZipVersion } from "../core/constants.ts";
-import { DataDescriptor } from "../core/data-descriptor.ts";
-import { LocalFileHeader } from "../core/local-file-header.ts";
-import { ZipEntry, type ZipEntryInfo } from "../core/zip-entry.ts";
-import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.ts";
 import {
   DoubleEndedBuffer,
   type DoubleEndedBufferOptions,
@@ -16,6 +5,17 @@ import {
 import { Mutex } from "../util/mutex.ts";
 import type { ByteSink, DataSource } from "../util/streams.ts";
 import { defaultCompressors } from "./compression.ts";
+import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
+import {
+  compress,
+  CompressionMethod,
+  type CompressionAlgorithms,
+} from "./raw/compression-core.ts";
+import { ZipPlatform, ZipVersion } from "./raw/constants.ts";
+import { DataDescriptor } from "./raw/data-descriptor.ts";
+import { LocalFileHeader } from "./raw/local-file-header.ts";
+import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "./raw/zip-trailer.ts";
+import { ZipEntry, type ZipEntryInfo } from "./zip-entry.ts";
 
 export type ZipWriterOptionsBase = {
   compressors?: CompressionAlgorithms | undefined;

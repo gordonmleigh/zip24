@@ -1,18 +1,18 @@
-import { CentralDirectoryHeader } from "../core/central-directory-header.ts";
+import { BufferView, type BufferLike } from "../util/binary.ts";
+import { defaultDecompressors } from "./compression.ts";
+import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
 import {
   decompress,
   type CompressionAlgorithms,
-} from "../core/compression-core.ts";
-import { LocalFileHeader } from "../core/local-file-header.ts";
-import { ZipEntry } from "../core/zip-entry.ts";
+} from "./raw/compression-core.ts";
+import { LocalFileHeader } from "./raw/local-file-header.ts";
 import {
   Eocdr,
   Zip64Eocdl,
   Zip64Eocdr,
   ZipTrailer,
-} from "../core/zip-trailer.ts";
-import { BufferView, type BufferLike } from "../util/binary.ts";
-import { defaultDecompressors } from "./compression.ts";
+} from "./raw/zip-trailer.ts";
+import { ZipEntry } from "./zip-entry.ts";
 
 /**
  * Options for {@link ZipBufferEntryReader}.

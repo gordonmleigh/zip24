@@ -2,8 +2,11 @@ import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
 import { asyncIterable } from "../test-util/data.ts";
-import { ZipVersion } from "./constants.ts";
-import { DosFileAttributes, UnixFileAttributes } from "./file-attributes.ts";
+import { ZipVersion } from "./raw/constants.ts";
+import {
+  DosFileAttributes,
+  UnixFileAttributes,
+} from "./raw/file-attributes.ts";
 import {
   ZipEntry,
   minimumVersion,

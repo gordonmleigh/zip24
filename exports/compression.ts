@@ -1,11 +1,11 @@
 import {
-  CompressionMethod,
-  type CompressionAlgorithms,
-} from "../core/compression-core.ts";
-import {
   iterableFromReadableStream,
   readableStreamFromIterable,
 } from "../util/streams.ts";
+import {
+  CompressionMethod,
+  type CompressionAlgorithms,
+} from "./raw/compression-core.ts";
 
 /**
  * Default Web API (CompressionStream) compression methods.

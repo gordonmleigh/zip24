@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual } from "../test-util/assert.ts";
+import { assertBufferEqual } from "../../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -12,10 +12,10 @@ import {
   tinyUint,
   utf8,
   utf8length,
-} from "../test-util/data.ts";
+} from "../../test-util/data.ts";
+import { ZipSignatureError } from "../errors.ts";
 import { CompressionMethod } from "./compression-core.ts";
 import { ExtraFieldTag, ZipVersion } from "./constants.ts";
-import { ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,

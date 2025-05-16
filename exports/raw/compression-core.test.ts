@@ -1,17 +1,17 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import { assertInstanceOf } from "../test-util/assert.ts";
-import { asyncIterable } from "../test-util/data.ts";
-import { AssertionError } from "../util/assert.ts";
-import { bufferFromIterable, type ByteSource } from "../util/streams.ts";
+import { assertInstanceOf } from "../../test-util/assert.ts";
+import { asyncIterable } from "../../test-util/data.ts";
+import { AssertionError } from "../../util/assert.ts";
+import { bufferFromIterable, type ByteSource } from "../../util/streams.ts";
+import { ZipFormatError } from "../errors.ts";
 import {
   CompressionMethod,
   compress,
   decompress,
   type DataDescriptor,
 } from "./compression-core.ts";
-import { ZipFormatError } from "./errors.ts";
 
 describe("core/compression-core", () => {
   describe("compress", () => {

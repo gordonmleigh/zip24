@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { assertBufferEqual, assertInstanceOf } from "../test-util/assert.ts";
+import { assertBufferEqual, assertInstanceOf } from "../../test-util/assert.ts";
 import {
   bigUint,
   data,
@@ -8,11 +8,11 @@ import {
   shortUint,
   tinyUint,
   utf8,
-} from "../test-util/data.ts";
-import { computeCrc32 } from "../util/crc32.ts";
-import { EncodedString } from "../util/encoded-string.ts";
+} from "../../test-util/data.ts";
+import { computeCrc32 } from "../../util/crc32.ts";
+import { EncodedString } from "../../util/encoded-string.ts";
+import { ZipFormatError, ZipSignatureError } from "../errors.ts";
 import { ExtraFieldTag } from "./constants.ts";
-import { ZipFormatError, ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,

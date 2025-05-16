@@ -1,9 +1,9 @@
-import { BufferView, type BufferLike } from "../util/binary.ts";
-import { DosDate } from "../util/dos-date.ts";
-import { EncodedString } from "../util/encoded-string.ts";
-import { makeBuffer, type Serializable } from "../util/serialization.ts";
+import { BufferView, type BufferLike } from "../../util/binary.ts";
+import { DosDate } from "../../util/dos-date.ts";
+import { EncodedString } from "../../util/encoded-string.ts";
+import { makeBuffer, type Serializable } from "../../util/serialization.ts";
+import { MultiDiskError, ZipSignatureError } from "../errors.ts";
 import { ExtraFieldTag, ZipPlatform } from "./constants.ts";
-import { MultiDiskError, ZipSignatureError } from "./errors.ts";
 import {
   ExtraFieldCollection,
   Zip64ExtraField,
