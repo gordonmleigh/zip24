@@ -23,25 +23,9 @@
     "node": ">=18"
   },
   "exports": {
-    "./buffer": {
-      "types": "./lib/web/buffer.d.ts",
-      "default": "./lib/web/buffer.js"
-    },
-    "./compression": {
-      "types": "./lib/web/compression.d.ts",
-      "default": "./lib/web/compression.js"
-    },
-    "./reader": {
-      "types": "./lib/web/reader.d.ts",
-      "default": "./lib/web/reader.js"
-    },
-    "./writer": {
-      "types": "./lib/web/writer.d.ts",
-      "default": "./lib/web/writer.js"
-    },
-    "./common": {
-      "types": "./lib/common.d.ts",
-      "default": "./lib/common.js"
+    "./*": {
+      "types": "./out/exports/*.d.ts",
+      "default": "./out/exports/*.js"
     }
   },
   "imports": {

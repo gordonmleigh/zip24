@@ -1,13 +1,13 @@
-import { ZipEntry, ZipPlatform, ZipVersion } from "../common.ts";
 import { CentralDirectoryHeader } from "../core/central-directory-header.ts";
 import {
   compress,
   CompressionMethod,
   type CompressionAlgorithms,
 } from "../core/compression-core.ts";
+import { ZipPlatform, ZipVersion } from "../core/constants.ts";
 import { DataDescriptor } from "../core/data-descriptor.ts";
 import { LocalFileHeader } from "../core/local-file-header.ts";
-import type { ZipEntryInfo } from "../core/zip-entry.ts";
+import { ZipEntry, type ZipEntryInfo } from "../core/zip-entry.ts";
 import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "../core/zip-trailer.ts";
 import {
   DoubleEndedBuffer,

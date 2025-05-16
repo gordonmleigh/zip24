@@ -1,13 +1,10 @@
 import assert from "node:assert";
 import { buffer } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
-import {
-  CompressionMethod,
-  DosFileAttributes,
-  GeneralPurposeFlags,
-  ZipPlatform,
-  ZipVersion,
-} from "../common.ts";
+import { CompressionMethod } from "../core/compression-core.ts";
+import { ZipPlatform, ZipVersion } from "../core/constants.ts";
+import { DosFileAttributes } from "../core/file-attributes.ts";
+import { GeneralPurposeFlags } from "../core/flags.ts";
 import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,

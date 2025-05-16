@@ -15,14 +15,14 @@
     "moduleResolution": "node16",
     "noUncheckedSideEffectImports": true,
     "rewriteRelativeImportExtensions": true,
-    "rootDir": "./src",
+    "rootDir": "./",
 
     // emit
     "declaration": true,
     "declarationMap": true,
     "importHelpers": false,
     "noEmit": true,
-    "outDir": "lib/",
+    "outDir": "out/",
     "sourceMap": true,
 
     // interop constraints
@@ -43,6 +43,6 @@
     // completeness
     "skipLibCheck": true
   },
-  "include": ["./src"],
-  "exclude": ["lib/", "node_modules/"]
+  "include": ["./"],
+  "exclude": ["out/", "node_modules/"]
 }
