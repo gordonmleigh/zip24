@@ -23,77 +23,21 @@
     "node": ">=18"
   },
   "exports": {
-    "./node/buffer": {
-      "types": "./lib/node/buffer.d.ts",
-      "default": "./lib/node/buffer.js"
-    },
-    "./node/compression": {
-      "types": "./lib/node/compression.d.ts",
-      "default": "./lib/node/compression.js"
-    },
-    "./node/reader": {
-      "types": "./lib/node/reader.d.ts",
-      "default": "./lib/node/reader.js"
-    },
-    "./node/writer": {
-      "types": "./lib/node/writer.d.ts",
-      "default": "./lib/node/writer.js"
-    },
     "./buffer": {
-      "node": {
-        "types": "./lib/node/buffer.d.ts",
-        "default": "./lib/node/buffer.js"
-      },
-      "default": {
-        "types": "./lib/web/buffer.d.ts",
-        "default": "./lib/web/buffer.js"
-      }
-    },
-    "./compression": {
-      "node": {
-        "types": "./lib/node/compression.d.ts",
-        "default": "./lib/node/compression.js"
-      },
-      "default": {
-        "types": "./lib/web/compression.d.ts",
-        "default": "./lib/web/compression.js"
-      }
-    },
-    "./reader": {
-      "node": {
-        "types": "./lib/node/reader.d.ts",
-        "default": "./lib/node/reader.js"
-      },
-      "default": {
-        "types": "./lib/web/reader.d.ts",
-        "default": "./lib/web/reader.js"
-      }
-    },
-    "./web/buffer": {
       "types": "./lib/web/buffer.d.ts",
       "default": "./lib/web/buffer.js"
     },
-    "./web/compression": {
+    "./compression": {
       "types": "./lib/web/compression.d.ts",
       "default": "./lib/web/compression.js"
     },
-    "./web/reader": {
+    "./reader": {
       "types": "./lib/web/reader.d.ts",
       "default": "./lib/web/reader.js"
     },
-    "./web/writer": {
+    "./writer": {
       "types": "./lib/web/writer.d.ts",
       "default": "./lib/web/writer.js"
-    },
-    "./writer": {
-      "node": {
-        "types": "./lib/node/writer.d.ts",
-        "default": "./lib/node/writer.js"
-      },
-      "default": {
-        "types": "./lib/web/writer.d.ts",
-        "default": "./lib/web/writer.js"
-      }
     },
     "./common": {
       "types": "./lib/common.d.ts",
