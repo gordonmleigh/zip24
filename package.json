@@ -38,13 +38,13 @@
     "build": "npm run clean && npm run test && npm run compile && npm run lint",
     "clean": "rm -rf lib/",
     "compile": "tsc",
-    "coverage": "c8 --src src/ --all -r text -r lcovonly node --test-reporter=dot --test 'src/**/*.test.ts'",
+    "coverage": "c8 --src src/ --all -r text -r lcovonly node --test-reporter=dot --test '**/*.test.ts'",
     "lint": "eslint src",
     "release": "release-it -VV",
-    "test": "c8 --100 --src src/ --all -r text -r lcovonly node --test-reporter=spec --enable-source-maps --test 'src/**/*.test.*'",
+    "test": "c8 --100 --src src/ --all -r text -r lcovonly node --test-reporter=spec --enable-source-maps --test '**/*.test.*'",
     "watch:compile": "tsc -w",
     "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
-    "watch:test": "node --watch --test 'src/**/*.test.*'"
+    "watch:test": "node --watch --test '**/*.test.*'"
   },
   "devDependencies": {
     "@propulsionworks/eslint-config": "^0.4.1",

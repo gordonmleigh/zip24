@@ -41,10 +41,9 @@ export class ZipWriter
   readonly #comment: string;
   readonly #preventClose: boolean;
   readonly #readable: ReadableStream<Uint8Array> | undefined;
-  readonly #startingOffset: number;
   readonly #writable: WritableStream<ZipEntry>;
   readonly #writer: WritableStreamDefaultWriter<Uint8Array>;
-  #writtenBytes = 0;
+  #currentOffset: number;
 
   public get readable(): ReadableStream<Uint8Array> {
     assert(
@@ -60,19 +59,13 @@ export class ZipWriter
 
   public constructor(options: ZipWriterOptions = {}) {
     this.#comment = options.comment ?? "";
-    this.#startingOffset = options.startingOffset ?? 0;
+    this.#currentOffset = options.startingOffset ?? 0;
 
     if (options.destination) {
       this.#preventClose = options.preventClose ?? false;
       this.#writer = options.destination.getWriter();
     } else {
-      const buffer = new TransformStream<Uint8Array, Uint8Array>({
-        transform: (chunk, controller) => {
-          this.#writtenBytes += chunk.byteLength;
-          controller.enqueue(chunk);
-        },
-      });
-
+      const buffer = new TransformStream<Uint8Array, Uint8Array>();
       this.#preventClose = false;
       this.#readable = buffer.readable;
       this.#writer = buffer.writable.getWriter();
@@ -120,8 +113,10 @@ export class ZipWriter
     // use the writable's built-in synchronization via the writer
     const writer = this.#writable.getWriter();
     try {
-      assert(writer.desiredSize, `the stream is closed or errored`);
-      if (writer.desiredSize < 0) {
+      // If desiredSize is null, it means the writer has errored. When we try to
+      // write after this, the error will automatically be propagated, so we
+      // carry on anyway.
+      if (writer.desiredSize !== null && writer.desiredSize < 0) {
         await writer.ready;
       }
       await writer.write(
@@ -141,16 +136,18 @@ export class ZipWriter
   }
 
   async #write(chunk: Uint8Array): Promise<void> {
-    assert(this.#writer.desiredSize !== null);
-
-    if (this.#writer.desiredSize < 0) {
+    // If desiredSize is null, it means the writer has errored. When we try to
+    // write after this, the error will automatically be propagated, so we carry
+    // on anyway.
+    if (this.#writer.desiredSize !== null && this.#writer.desiredSize < 0) {
       await this.#writer.ready;
     }
     await this.#writer.write(chunk);
+    this.#currentOffset += chunk.length;
   }
 
   async #writeCentralDirectory(): Promise<void> {
-    const directoryOffset = this.#startingOffset + this.#writtenBytes;
+    const directoryOffset = this.#currentOffset;
     let useZip64 = this.#centralDirectory.length > 0xffff;
     let versionNeeded: number = ZipVersion.Deflate;
 
@@ -160,7 +157,7 @@ export class ZipWriter
       await this.#write(entry.serialize());
     }
 
-    const trailerOffset = this.#startingOffset + this.#writtenBytes;
+    const trailerOffset = this.#currentOffset;
     const directorySize = trailerOffset - directoryOffset;
     useZip64 ||= trailerOffset >= 0xffff_ffff;
 
@@ -192,17 +189,18 @@ export class ZipWriter
   }
 
   async #writeEntry(entry: ZipEntry): Promise<void> {
+    entry.header.localHeaderOffset = this.#currentOffset;
     const localHeader = new LocalFileHeader(entry);
-    // always write data descriptor
-    localHeader.flags.hasDataDescriptor = true;
     await this.#write(localHeader.serialize());
 
     for await (const chunk of entry.compressedData) {
       await this.#write(chunk);
     }
 
-    const dataDescriptor = new DataDescriptor(entry, entry.zip64);
-    await this.#write(dataDescriptor.serialize());
+    if (localHeader.flags.hasDataDescriptor) {
+      const dataDescriptor = new DataDescriptor(entry, entry.zip64);
+      await this.#write(dataDescriptor.serialize());
+    }
 
     this.#centralDirectory.push(entry.header);
   }

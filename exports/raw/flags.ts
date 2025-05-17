@@ -6,7 +6,7 @@ export class GeneralPurposeFlags extends BitField {
   public static readonly HasUtf8Strings = BitField.flag(11);
   public static readonly HasStrongEncryption = BitField.flag(6);
 
-  public constructor(value = 0) {
+  public constructor(value: number | Record<number, boolean> = 0) {
     super(16, value);
   }
 

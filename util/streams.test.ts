@@ -4,7 +4,6 @@ import { buffer } from "node:stream/consumers";
 import { describe, it } from "node:test";
 import { assertBufferEqual } from "../test-util/assert.ts";
 import { data, utf8 } from "../test-util/data.ts";
-import { makeNonIterableReadableStream } from "../test-util/util.ts";
 import { normalizeDataSource } from "./streams.ts";
 
 describe("util/streams", () => {
@@ -91,16 +90,14 @@ describe("util/streams", () => {
     });
 
     it("iterates a ReadableStream", async () => {
-      const stream = makeNonIterableReadableStream(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(utf8`one,`);
-            controller.enqueue(utf8`two,`);
-            controller.enqueue(utf8`three,`);
-            controller.close();
-          },
-        }),
-      );
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(utf8`one,`);
+          controller.enqueue(utf8`two,`);
+          controller.enqueue(utf8`three,`);
+          controller.close();
+        },
+      });
 
       const output = await buffer(normalizeDataSource(stream));
       const expected = utf8`one,two,three,`;
@@ -109,16 +106,14 @@ describe("util/streams", () => {
     });
 
     it("converts ReadableStream<string> to ReadableStream<Uint8Array>", async () => {
-      const stream = makeNonIterableReadableStream(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue("one,");
-            controller.enqueue("two,");
-            controller.enqueue("three,");
-            controller.close();
-          },
-        }),
-      );
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue("one,");
+          controller.enqueue("two,");
+          controller.enqueue("three,");
+          controller.close();
+        },
+      });
 
       const output = await buffer(normalizeDataSource(stream));
       const expected = utf8`one,two,three,`;

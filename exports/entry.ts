@@ -1,5 +1,6 @@
 import { assert } from "../util/assert.ts";
 import { canBeCodePage437Encoded } from "../util/cp437.ts";
+import { computeCrc32 } from "../util/crc32.ts";
 import {
   CountBytesStream,
   Crc32Stream,
@@ -158,8 +159,15 @@ export class ZipEntryReader
             position,
           });
 
-          position += byteCount;
           const headerSize = LocalFileHeader.readTotalSize(buffer);
+
+          // only advance the position up to the end of the file, in case we
+          // over read
+          const validBufferSize = Math.min(
+            headerSize + header.compressedSize,
+            byteCount,
+          );
+          position += validBufferSize;
 
           dataStart = header.localHeaderOffset + headerSize;
           end = dataStart + header.compressedSize;
@@ -182,11 +190,13 @@ export class ZipEntryReader
             return;
           }
 
+          assert(remaining > 0, `remaining bytes should be >= 0`);
           const buffer = Buffer.alloc(Math.min(remaining, bufferSize));
           const byteCount = await read(reader, { position, buffer });
 
           assert(byteCount <= remaining);
           position += byteCount;
+          assert(position <= end, `we went past the end of the file`);
 
           if (byteCount === 0) {
             if (remaining - byteCount > 0) {
@@ -283,71 +293,142 @@ export class ZipEntry extends ZipEntryBase implements ZipEntryInfo {
     fields: ZipEntryInfo = {},
     uncompressedData = fields.uncompressedData,
   ) {
-    super({
-      attributes: fields.attributes ?? new DosFileAttributes(),
+    const [header, data] = normalizeEntry(
+      uncompressedData ? { ...fields, uncompressedData } : fields,
+    );
+    super(header);
+    this.#compressedData = compressData(data, this.header, fields);
+  }
+}
+
+function normalizeEntry(
+  fields: ZipEntryInfo,
+): [CentralDirectoryHeaderInit, ReadableStream<Uint8Array>] {
+  let { compressedSize, crc32, uncompressedData, uncompressedSize } = fields;
+  let compressionMethod = fields.compressionMethod ?? CompressionMethod.Deflate;
+
+  if (uncompressedData === undefined) {
+    compressionMethod = CompressionMethod.Stored;
+  }
+
+  if (typeof uncompressedData === "string") {
+    uncompressedData = new TextEncoder().encode(uncompressedData);
+  }
+  if (uncompressedData instanceof Uint8Array) {
+    const computedCrc32 = computeCrc32(uncompressedData);
+
+    if (crc32 === undefined) {
+      crc32 = computedCrc32;
+    } else {
+      assert(crc32 === computedCrc32, `crc32 mismatch`);
+    }
+    if (uncompressedSize === undefined) {
+      uncompressedSize = uncompressedData.length;
+    } else {
+      assert(uncompressedSize === uncompressedData.length, `size mismatch`);
+    }
+    if (uncompressedData.length === 0) {
+      compressionMethod = CompressionMethod.Stored;
+    }
+  }
+  if (fields.compressionMethod === CompressionMethod.Stored) {
+    if (compressedSize === undefined) {
+      compressedSize = uncompressedSize;
+    } else {
+      assert(uncompressedSize === compressedSize, `size mismatch`);
+    }
+  }
+
+  const path = fields.path ?? "";
+  const isDirectory = path.endsWith("/");
+
+  const attributes =
+    fields.attributes ??
+    new DosFileAttributes({
+      [DosFileAttributes.Directory]: isDirectory,
+      [DosFileAttributes.File]: !isDirectory,
+    });
+
+  const flags = fields.flags
+    ? new GeneralPurposeFlags(fields.flags.value)
+    : new GeneralPurposeFlags({
+        [GeneralPurposeFlags.HasUtf8Strings]: needsUtf8(fields),
+      });
+
+  if (
+    crc32 === undefined ||
+    compressedSize === undefined ||
+    uncompressedSize === undefined
+  ) {
+    flags.hasDataDescriptor = true;
+  }
+
+  return [
+    {
+      attributes,
       comment: fields.comment ?? "",
-      compressedSize: fields.compressedSize ?? 0,
-      compressionMethod: fields.compressionMethod ?? CompressionMethod.Stored,
-      crc32: fields.crc32 ?? 0,
+      compressedSize: compressedSize ?? 0,
+      compressionMethod,
+      crc32: crc32 ?? 0,
       extraField: fields.extraField ?? new ExtraFieldCollection(),
-      flags: new GeneralPurposeFlags(fields.flags?.value ?? 0),
+      flags,
       lastModified: fields.lastModified ?? new Date(),
       localHeaderOffset: fields.localHeaderOffset ?? 0,
-      path: fields.path ?? "",
-      uncompressedSize: fields.uncompressedSize ?? 0,
+      path,
+      uncompressedSize: uncompressedSize ?? 0,
       versionMadeBy: minimumVersion(fields, fields.versionMadeBy),
       versionNeeded: minimumVersion(fields, fields.versionNeeded),
       zip64: fields.zip64 ?? needs64bit(fields),
-    });
+    },
+    normalizeDataSource(uncompressedData),
+  ];
+}
 
-    let compressedData: ReadableStream<Uint8Array>;
-    if (fields.compressedData !== undefined) {
-      assert(
-        fields.uncompressedSize !== undefined && fields.crc32 !== undefined,
-        `must supply uncompressedSize and crc32 with compressedData`,
-      );
-      compressedData = normalizeDataSource(fields.compressedData);
-    } else if (uncompressedData === undefined) {
-      compressedData = normalizeDataSource(undefined);
-    } else {
-      compressedData = normalizeDataSource(uncompressedData)
-        .pipeThrough(
-          new CountBytesStream((count) => {
-            if (fields.uncompressedSize !== undefined) {
-              assert(count === fields.uncompressedSize, "data size mismatch");
-            }
-            this.header.uncompressedSize = count;
-          }),
-        )
-        .pipeThrough(
-          new Crc32Stream((result) => {
-            if (fields.crc32 !== undefined) {
-              assert(result === fields.crc32, "crc32 mismatch");
-            }
-            this.header.crc32 = result;
-          }),
-        );
-      if (this.compressionMethod === CompressionMethod.Deflate) {
-        compressedData = compressedData.pipeThrough(
-          new CompressionStream("deflate-raw"),
-        );
-      } else {
-        assert(
-          this.compressionMethod === CompressionMethod.Stored,
-          `unknown compression method ${this.compressionMethod}`,
-        );
-      }
-      compressedData = compressedData.pipeThrough(
-        new CountBytesStream((count) => {
-          if (fields.compressedSize !== undefined) {
-            assert(count === fields.compressedSize, "data size mismatch");
-          }
-          this.header.compressedSize = count;
-        }),
-      );
-    }
-    this.#compressedData = compressedData;
+function compressData(
+  data: ReadableStream<Uint8Array>,
+  header: CentralDirectoryHeader,
+  fields: ZipEntryInfo,
+): ReadableStream<Uint8Array> {
+  if (fields.compressedData !== undefined) {
+    assert(
+      fields.uncompressedSize !== undefined && fields.crc32 !== undefined,
+      `must supply uncompressedSize and crc32 with compressedData`,
+    );
+    return normalizeDataSource(fields.compressedData);
   }
+
+  const countCompressed = new CountBytesStream((count) => {
+    if (fields.compressedSize !== undefined) {
+      assert(count === fields.compressedSize, "data size mismatch");
+    }
+    header.compressedSize = count;
+  });
+  const countUncompressed = new CountBytesStream((count) => {
+    if (fields.uncompressedSize !== undefined) {
+      assert(count === fields.uncompressedSize, "data size mismatch");
+    }
+    header.uncompressedSize = count;
+  });
+  const crc32 = new Crc32Stream((result) => {
+    if (fields.crc32 !== undefined) {
+      assert(result === fields.crc32, "crc32 mismatch");
+    }
+    header.crc32 = result;
+  });
+
+  let compressedData = data.pipeThrough(countUncompressed).pipeThrough(crc32);
+  if (header.compressionMethod === CompressionMethod.Deflate) {
+    compressedData = compressedData.pipeThrough(
+      new CompressionStream("deflate-raw"),
+    );
+  } else {
+    assert(
+      header.compressionMethod === CompressionMethod.Stored,
+      `unknown compression method ${header.compressionMethod}`,
+    );
+  }
+
+  return compressedData.pipeThrough(countCompressed);
 }
 
 export function minimumVersion(

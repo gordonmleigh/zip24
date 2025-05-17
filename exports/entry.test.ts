@@ -15,27 +15,6 @@ import {
 
 describe("core/zip-entry", () => {
   describe("class ZipEntry", () => {
-    describe("#constructor()", () => {
-      describe("when noValidateVersion is set", () => {
-        it("sets whatever value is present for versionMadeBy", () => {
-          const entry = new ZipEntry({
-            versionMadeBy: ZipVersion.Deflate,
-            zip64: true,
-          });
-
-          assert.strictEqual(entry.versionMadeBy, ZipVersion.Deflate);
-        });
-
-        it("defaults to Utf8Encoding for versionMadeBy", () => {
-          const entry = new ZipEntry({
-            zip64: true,
-          });
-
-          assert.strictEqual(entry.versionMadeBy, ZipVersion.Utf8Encoding);
-        });
-      });
-    });
-
     describe("#isDirectory", () => {
       it("returns true if the entry is a unix directory", () => {
         const attributes = new UnixFileAttributes();

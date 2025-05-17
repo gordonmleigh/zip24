@@ -11,7 +11,9 @@ export function assert(
   message = "assertion failed",
 ): asserts condition {
   if (!condition) {
-    throw new AssertionError(message);
+    const error = new AssertionError(message);
+    Error.captureStackTrace(error, assert);
+    throw error;
   }
 }
 

@@ -1,6 +1,5 @@
 import assert from "node:assert";
-import { buffer } from "node:stream/consumers";
-import { describe, it } from "node:test";
+import { describe, it, mock, type Mock } from "node:test";
 import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
@@ -17,6 +16,7 @@ import {
   utf8length32,
 } from "../test-util/data.ts";
 import { computeCrc32 } from "../util/crc32.ts";
+import { normalizeDataSource } from "../util/streams.ts";
 import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { DosFileAttributes } from "./raw/file-attributes.ts";
 import { GeneralPurposeFlags } from "./raw/flags.ts";
@@ -45,10 +45,10 @@ describe("exports/writer", () => {
           "hello world",
         );
 
-        await assert.rejects(
-          Promise.resolve(write),
-          (cause) => cause === error,
-        );
+        await assert.rejects(write, (cause) => {
+          assert.strictEqual(cause, error);
+          return true;
+        });
       });
 
       it("writes the correct data to the stream", async () => {
@@ -71,15 +71,12 @@ describe("exports/writer", () => {
           //## +0000 LOCAL ENTRY 1 HEADER (30+11+0 = 41 bytes)
           longUint(0x04034b50), // local header signature
           shortUint(ZipVersion.Utf8Encoding), // version needed
-          shortUint(
-            GeneralPurposeFlags.HasDataDescriptor |
-              GeneralPurposeFlags.HasUtf8Strings,
-          ), // flags
+          shortUint(GeneralPurposeFlags.HasUtf8Strings), // flags
           shortUint(CompressionMethod.Stored), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
-          longUint(0), // crc32
-          longUint(0), // compressed size
-          longUint(0), // uncompressed size
+          crc32`hello world`, // crc
+          utf8length32`hello world`, // compressed size
+          utf8length32`hello world`, // uncompressed size
           utf8length`1️⃣.txt`, // file name length
           shortUint(0), // extra field length
           utf8`1️⃣.txt`, // file name
@@ -88,21 +85,12 @@ describe("exports/writer", () => {
           //## +0041 LOCAL ENTRY 1 CONTENT (11 bytes)
           utf8`hello world`,
 
-          //## +0052 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
-          longUint(0x08074b50), // data descriptor signature
-          crc32`hello world`, // crc
-          utf8length32`hello world`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-
-          //## +0068 DIRECTORY ENTRY 1 (46+11+0+15 = 72 bytes)
+          //## +0052 DIRECTORY ENTRY 1 (46+11+0+15 = 72 bytes)
           longUint(0x02014b50), // central directory header signature
           tinyUint(ZipVersion.Utf8Encoding), // version made by
           tinyUint(ZipPlatform.DOS), // platform made by
           shortUint(ZipVersion.Utf8Encoding), // version needed
-          shortUint(
-            GeneralPurposeFlags.HasDataDescriptor |
-              GeneralPurposeFlags.HasUtf8Strings,
-          ), // flags
+          shortUint(GeneralPurposeFlags.HasUtf8Strings), // flags
           shortUint(CompressionMethod.Stored), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
           crc32`hello world`, // crc32
@@ -119,14 +107,14 @@ describe("exports/writer", () => {
           "", // extra field
           utf8`comment 1️⃣`, // the comment
 
-          //## +0140 End of Central Directory Record
+          //## +0124 End of Central Directory Record
           longUint(0x06054b50), // EOCDR signature
           shortUint(0), // number of this disk
           shortUint(0), // central directory start disk
           shortUint(1), // total entries this disk
           shortUint(1), // total entries all disks
-          longUint(140 - 68), // size of the central directory
-          longUint(68), // central directory offset
+          longUint(124 - 52), // size of the central directory
+          longUint(52), // central directory offset
           shortUint(0), // .ZIP file comment length
         );
 
@@ -140,7 +128,6 @@ describe("exports/writer", () => {
         const sink = new MockSink();
         const writer = ZipWriter.wrap(sink);
 
-        assert.strictEqual(sink.closed, false);
         await writer[Symbol.asyncDispose]();
         assert.strictEqual(sink.closed, true);
       });
@@ -149,15 +136,14 @@ describe("exports/writer", () => {
     describe("explicit resource management behavior", () => {
       it("calls close on the sink", async () => {
         const sink = new MockSink();
+        let close: Mock<() => Promise<void>> | undefined;
 
         {
-          const sink = new MockSink();
-          const writer = ZipWriter.wrap(sink);
-
-          void writer;
-          assert.strictEqual(sink.closed, false);
+          await using writer = ZipWriter.wrap(sink);
+          close = mock.method(writer, "close");
         }
 
+        assert.strictEqual(close.mock.callCount(), 1);
         assert.strictEqual(sink.closed, true);
       });
     });
@@ -182,8 +168,9 @@ describe("exports/writer", () => {
     });
 
     describe("addFile()", () => {
-      it("outputs the correct data for an uncompressed entry", async () => {
-        const writer = new ZipWriter();
+      it("writes a data descriptor when the sizes can't be determined", async () => {
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
 
         await writer.addFile(
           {
@@ -192,7 +179,8 @@ describe("exports/writer", () => {
             lastModified: new Date(`1994-03-02T22:44:08Z`),
             path: "uncompressed.txt",
           },
-          "this will be stored as-is",
+          // convert it into a ReadableStream so that it we can't see the length
+          normalizeDataSource("this will be stored as-is"),
         );
 
         const expected = data(
@@ -220,7 +208,7 @@ describe("exports/writer", () => {
           utf8length32`this will be stored as-is`, // uncompressed size
         );
 
-        assertBufferEqual(await buffer(writer.readable), expected);
+        assertBufferEqual(sink, expected);
       });
 
       it("outputs the correct data for a compressed entry", async () => {
@@ -270,7 +258,7 @@ describe("exports/writer", () => {
           shortUint(CompressionMethod.Deflate), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
           crc32`hello world`, // crc32
-          utf8length32`compressed!`, // compressed size
+          longUint(13), // compressed size
           utf8length32`hello world`, // uncompressed size
           cp437length`hello.txt`, // file name length
           shortUint(0), // extra field length
@@ -297,6 +285,41 @@ describe("exports/writer", () => {
         assertBufferEqual(sink, expected);
       });
 
+      it("skips the data descriptor when sizes and crc32 can be determined", async () => {
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
+
+        await writer.addFile(
+          {
+            path: "one.txt",
+            lastModified: new Date(`2023-04-05T11:22:34Z`),
+            compressionMethod: CompressionMethod.Stored,
+          },
+          "hello world",
+        );
+
+        const expected = data(
+          //## +0000 LOCAL ENTRY 1 HEADER (30+7+0 = 37 bytes)
+          longUint(0x04034b50), // local header signature
+          shortUint(ZipVersion.Deflate), // version needed
+          shortUint(0), // flags
+          shortUint(CompressionMethod.Stored), // compression method
+          dosDate`2023-04-05T11:22:34Z`, // last modified
+          crc32`hello world`, // crc32
+          longUint(11), // compressed size
+          longUint(11), // uncompressed size
+          cp437length`one.txt`, // file name length
+          shortUint(0), // extra field length
+          cp437`one.txt`, // file name
+          "", // extra field
+
+          //## +0037 LOCAL ENTRY 1 CONTENT (11 bytes)
+          utf8`hello world`,
+        );
+
+        assertBufferEqual(sink, expected);
+      });
+
       it("skips the data descriptor when sizes and crc32 are given", async () => {
         const sink = new MockSink();
         const writer = ZipWriter.wrap(sink);
@@ -313,7 +336,8 @@ describe("exports/writer", () => {
             uncompressedSize: content.byteLength,
             compressionMethod: CompressionMethod.Stored,
           },
-          content,
+          // convert to readable so we can't see the size
+          normalizeDataSource(content),
         );
 
         const expected = data(
@@ -339,7 +363,8 @@ describe("exports/writer", () => {
       });
 
       it("throws if close() has already been called", async () => {
-        const writer = new ZipWriter();
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
 
         await writer.close();
 
@@ -348,15 +373,17 @@ describe("exports/writer", () => {
             await writer.addFile({ path: "dir/" });
           },
           (error) =>
-            error instanceof Error &&
-            error.message === `can't add more files after calling finalize()`,
+            error instanceof TypeError &&
+            "code" in error &&
+            error.code === "ERR_INVALID_STATE",
         );
       });
     });
 
     describe("close()", () => {
       it("throws if it has already been called", async () => {
-        const writer = new ZipWriter();
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
 
         await writer.close();
 
@@ -371,8 +398,9 @@ describe("exports/writer", () => {
         );
       });
 
-      it("writes the trailer", async () => {
-        const writer = new ZipWriter({ comment: "Gordon is cool" });
+      it("writes the trailer including the comment", async () => {
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink, { comment: "Gordon is cool" });
 
         await writer.addFile(
           {
@@ -381,7 +409,7 @@ describe("exports/writer", () => {
             lastModified: new Date(`1994-03-02T22:44:08Z`),
             path: "uncompressed.txt",
           },
-          "this will be stored as-is",
+          normalizeDataSource("this will be stored as-is"),
         );
 
         await writer.close();
@@ -444,7 +472,7 @@ describe("exports/writer", () => {
           cp437`Gordon is cool`, // .ZIP file comment
         );
 
-        assertBufferEqual(await buffer(writer.readable), expected);
+        assertBufferEqual(sink, expected);
       });
     });
 
@@ -470,12 +498,12 @@ describe("exports/writer", () => {
           //## +0000 LOCAL ENTRY 1 HEADER (30+9+0 = 39 bytes)
           longUint(0x04034b50), // local header signature
           shortUint(ZipVersion.Deflate), // version needed
-          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+          shortUint(0), // flags
           shortUint(CompressionMethod.Stored), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
-          longUint(0), // crc32
-          longUint(0), // compressed size
-          longUint(0), // uncompressed size
+          crc32`hello world`, // crc32
+          utf8length32`hello world`, // compressed size
+          utf8length32`hello world`, // uncompressed size
           cp437length`hello.txt`, // file name length
           shortUint(0), // extra field length
           cp437`hello.txt`, // file name
@@ -484,18 +512,12 @@ describe("exports/writer", () => {
           //## +0039 LOCAL ENTRY 1 CONTENT (11 bytes)
           utf8`hello world`,
 
-          //## +0050 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
-          longUint(0x08074b50), // data descriptor signature
-          crc32`hello world`, // crc
-          utf8length32`hello world`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-
-          //## +0066 DIRECTORY ENTRY 1 (46+9+0+0 = 55 bytes)
+          //## +0050 DIRECTORY ENTRY 1 (46+9+0+0 = 55 bytes)
           longUint(0x02014b50), // central directory header signature
           tinyUint(ZipVersion.Deflate), // version made by
           tinyUint(ZipPlatform.DOS), // platform made by
           shortUint(ZipVersion.Deflate), // version needed
-          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+          shortUint(0), // flags
           shortUint(CompressionMethod.Stored), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
           crc32`hello world`, // crc32
@@ -512,14 +534,14 @@ describe("exports/writer", () => {
           "", // extra field
           "", // the comment
 
-          //## +0121 End of Central Directory Record
+          //## +0105 End of Central Directory Record
           longUint(0x06054b50), // EOCDR signature
           shortUint(0), // number of this disk
           shortUint(0), // central directory start disk
           shortUint(1), // total entries this disk
           shortUint(1), // total entries all disks
-          longUint(121 - 66), // size of the central directory
-          longUint(66), // central directory offset
+          longUint(105 - 50), // size of the central directory
+          longUint(50), // central directory offset
           shortUint(0), // .ZIP file comment length
         );
 
@@ -546,15 +568,12 @@ describe("exports/writer", () => {
           //## +0000 LOCAL ENTRY 1 HEADER (30+11+0 = 41 bytes)
           longUint(0x04034b50), // local header signature
           shortUint(ZipVersion.Utf8Encoding), // version needed
-          shortUint(
-            GeneralPurposeFlags.HasDataDescriptor |
-              GeneralPurposeFlags.HasUtf8Strings,
-          ), // flags
+          shortUint(GeneralPurposeFlags.HasUtf8Strings), // flags
           shortUint(CompressionMethod.Stored), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
-          longUint(0), // crc32
-          longUint(0), // compressed size
-          longUint(0), // uncompressed size
+          crc32`hello world`, // crc32
+          utf8length32`hello world`, // compressed size
+          utf8length32`hello world`, // uncompressed size
           utf8length`1️⃣.txt`, // file name length
           shortUint(0), // extra field length
           utf8`1️⃣.txt`, // file name
@@ -563,21 +582,12 @@ describe("exports/writer", () => {
           //## +0041 LOCAL ENTRY 1 CONTENT (11 bytes)
           utf8`hello world`,
 
-          //## +0052 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
-          longUint(0x08074b50), // data descriptor signature
-          crc32`hello world`, // crc
-          utf8length32`hello world`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-
-          //## +0068 DIRECTORY ENTRY 1 (46+11+0+15 = 72 bytes)
+          //## +0052 DIRECTORY ENTRY 1 (46+11+0+15 = 72 bytes)
           longUint(0x02014b50), // central directory header signature
           tinyUint(ZipVersion.Utf8Encoding), // version made by
           tinyUint(ZipPlatform.DOS), // platform made by
           shortUint(ZipVersion.Utf8Encoding), // version needed
-          shortUint(
-            GeneralPurposeFlags.HasDataDescriptor |
-              GeneralPurposeFlags.HasUtf8Strings,
-          ), // flags
+          shortUint(GeneralPurposeFlags.HasUtf8Strings), // flags
           shortUint(CompressionMethod.Stored), // compression method
           dosDate`2005-03-09T12:55:15Z`, // last modified
           crc32`hello world`, // crc32
@@ -594,14 +604,14 @@ describe("exports/writer", () => {
           "", // extra field
           utf8`comment 1️⃣`, // the comment
 
-          //## +0140 End of Central Directory Record
+          //## +0124 End of Central Directory Record
           longUint(0x06054b50), // EOCDR signature
           shortUint(0), // number of this disk
           shortUint(0), // central directory start disk
           shortUint(1), // total entries this disk
           shortUint(1), // total entries all disks
-          longUint(140 - 68), // size of the central directory
-          longUint(68), // central directory offset
+          longUint(124 - 52), // size of the central directory
+          longUint(52), // central directory offset
           shortUint(0), // .ZIP file comment length
         );
 
@@ -619,7 +629,7 @@ describe("exports/writer", () => {
             lastModified: new Date("2005-03-09T12:55:15Z"),
             compressionMethod: CompressionMethod.Stored,
           },
-          "hello world",
+          normalizeDataSource("hello world"),
         );
 
         await writer.close();

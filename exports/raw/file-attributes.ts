@@ -18,7 +18,7 @@ export class DosFileAttributes extends BitField implements CommonAttributes {
   public static readonly System = BitField.flag(2);
 
   // https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
-  public constructor(value = 0) {
+  public constructor(value: Record<number, boolean> | number = 0) {
     super(8, value);
   }
 

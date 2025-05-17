@@ -180,6 +180,12 @@ export class BitField {
     return (1 << bit) >>> 0;
   }
 
+  public static flags(flags: Record<number, boolean>): number {
+    return Object.entries(flags)
+      .filter(([, v]) => v)
+      .reduce((a, [x]) => a | +x, 0);
+  }
+
   private static validateWidth(width: number): void {
     if (!Number.isInteger(width)) {
       throw new TypeError(`width must be an integer`);
@@ -206,10 +212,10 @@ export class BitField {
 
   public readonly width: number;
 
-  public constructor(width = 16, value = 0) {
+  public constructor(width = 16, value: number | Record<number, boolean> = 0) {
     BitField.validateWidth(width);
     this.width = width;
-    this.value = value;
+    this.value = typeof value === "number" ? value : BitField.flags(value);
   }
 
   public getBit(bit: number): boolean {

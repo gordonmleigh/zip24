@@ -58,10 +58,8 @@ export async function read(
     minLength <= buffer.length - offset,
     `minLength is bigger than buffer length`,
   );
-  assert(
-    minLength > 0 && maxLength > 0 && offset > 0,
-    "lengths and offsets must be >0",
-  );
+  assert(minLength > 0 && maxLength > 0, "lengths must be > 0");
+  assert(offset >= 0, "offset must be >= 0");
   assert(minLength <= maxLength, `minLength is greater than maxLength`);
 
   let count = 0;
@@ -114,6 +112,9 @@ export function randomAccessReaderFromBuffer(
 export function normalizeDataSource(
   data: DataSource | undefined,
 ): ReadableStream<Uint8Array> {
+  // we can't assume that if data is already a ReadableStream that it has
+  // Uint8Array chunks, so we still need to wrap it.
+
   let iterator:
     | AsyncIterator<Uint8Array | string>
     | Iterator<Uint8Array | string>
@@ -146,9 +147,15 @@ export function normalizeDataSource(
       assert(iterator);
 
       const next = await iterator.next();
-      if (next.value !== undefined) {
+      if (typeof next.value === "string") {
         encoder ??= new TextEncoder();
-        controller.enqueue(encoder.encode(next.value as string));
+        controller.enqueue(encoder.encode(next.value));
+      } else if (next.value !== undefined) {
+        assert(
+          next.value instanceof Uint8Array,
+          `expected Uint8Array or string`,
+        );
+        controller.enqueue(next.value);
       }
       if (next.done) {
         controller.close();
