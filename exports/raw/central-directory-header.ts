@@ -32,7 +32,9 @@ export type CentralDirectoryHeaderInit = {
   zip64?: boolean | undefined;
 };
 
-export class CentralDirectoryHeader implements Serializable {
+export class CentralDirectoryHeader
+  implements Serializable, CentralDirectoryHeaderInit
+{
   // Central Directory Header (4.3.12)
   //
   // | offset | field                           | size |

@@ -20,7 +20,7 @@
     "stream"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "exports": {
     "./*": {
@@ -45,9 +45,6 @@
     "watch:compile": "tsc -w",
     "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
     "watch:test": "node --watch --test 'src/**/*.test.*'"
-  },
-  "dependencies": {
-    "crc-32": "^1.2.2"
   },
   "devDependencies": {
     "@propulsionworks/eslint-config": "^0.4.1",
@@ -91,5 +88,8 @@
         "strictSemVer": true
       }
     }
+  },
+  "dependencies": {
+    "crc-32": "^1.2.2"
   }
 }

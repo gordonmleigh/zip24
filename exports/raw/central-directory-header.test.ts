@@ -19,8 +19,12 @@ import {
   ZipSignatureError,
 } from "../errors.ts";
 import { CentralDirectoryHeader } from "./central-directory-header.ts";
-import { CompressionMethod } from "./compression-core.ts";
-import { ExtraFieldTag, ZipPlatform, ZipVersion } from "./constants.ts";
+import {
+  CompressionMethod,
+  ExtraFieldTag,
+  ZipPlatform,
+  ZipVersion,
+} from "./constants.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,

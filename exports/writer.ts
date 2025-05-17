@@ -1,206 +1,172 @@
-import {
-  DoubleEndedBuffer,
-  type DoubleEndedBufferOptions,
-} from "../util/double-ended-buffer.ts";
-import { Mutex } from "../util/mutex.ts";
-import type { ByteSink, DataSource } from "../util/streams.ts";
-import { defaultCompressors } from "./compression.ts";
+import { assert } from "../util/assert.ts";
+import type { DataSource } from "../util/streams.ts";
 import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
-import {
-  compress,
-  CompressionMethod,
-  type CompressionAlgorithms,
-} from "./raw/compression-core.ts";
 import { ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { DataDescriptor } from "./raw/data-descriptor.ts";
 import { LocalFileHeader } from "./raw/local-file-header.ts";
 import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "./raw/zip-trailer.ts";
 import { ZipEntry, type ZipEntryInfo } from "./zip-entry.ts";
 
-export type ZipWriterOptionsBase = {
-  compressors?: CompressionAlgorithms | undefined;
+/**
+ * Options for {@link ZipWriter}.
+ */
+export type ZipWriterOptions = {
+  comment?: string | undefined;
+  destination?: WritableStream<Uint8Array> | undefined;
+  preventClose?: boolean | undefined;
   startingOffset?: number | undefined;
 };
 
-export type ZipStreamWriterOptions = ZipWriterOptionsBase & {
-  sink: ByteSink;
-};
-
-export type ZipBufferWriterOptions = ZipWriterOptionsBase &
-  DoubleEndedBufferOptions;
-
-export type ZipWriterOptions = ZipStreamWriterOptions | ZipBufferWriterOptions;
-
-export class ZipWriter implements AsyncDisposable, AsyncIterable<Uint8Array> {
-  public static fromWritableStream(
-    // eslint-disable-next-line n/no-unsupported-features/node-builtins
-    stream: WritableStream,
-    options?: ZipWriterOptionsBase,
+/**
+ * A class which can create a zip file.
+ */
+export class ZipWriter
+  implements TransformStream<ZipEntry, Uint8Array>, AsyncDisposable
+{
+  /**
+   * Wrap a {@link WritableStream}. Files written to the returned instance will
+   * be written directly to the wrapped stream.
+   */
+  public static wrap(
+    destination: WritableStream<Uint8Array>,
+    options?: Omit<ZipWriterOptions, "destination">,
   ): ZipWriter {
-    return new ZipWriter({
+    return new this({
       ...options,
-      sink: stream.getWriter(),
+      destination,
     });
   }
 
-  private readonly buffer: DoubleEndedBuffer | undefined;
-  private readonly compressors: CompressionAlgorithms;
-  private readonly directory: CentralDirectoryHeader[] = [];
-  private readonly sink: ByteSink;
-  private readonly startingOffset: number;
-  private readonly writeLock = new Mutex();
+  readonly #centralDirectory: CentralDirectoryHeader[] = [];
+  readonly #comment: string;
+  readonly #preventClose: boolean;
+  readonly #readable: ReadableStream<Uint8Array> | undefined;
+  readonly #startingOffset: number;
+  readonly #writable: WritableStream<ZipEntry>;
+  readonly #writer: WritableStreamDefaultWriter<Uint8Array>;
+  #writtenBytes = 0;
 
-  private isFinalized = false;
-  private writtenBytes = 0;
-
-  public constructor(options: ZipWriterOptions = {}) {
-    const {
-      compressors = defaultCompressors,
-      highWaterMark,
-      sink = new DoubleEndedBuffer({ highWaterMark }),
-      startingOffset = 0,
-    } = options as Partial<ZipStreamWriterOptions & ZipBufferWriterOptions>;
-
-    if (sink instanceof DoubleEndedBuffer) {
-      this.buffer = sink;
-    }
-
-    this.compressors = compressors;
-    this.sink = sink;
-    this.startingOffset = startingOffset;
+  public get readable(): ReadableStream<Uint8Array> {
+    assert(
+      this.#readable,
+      `the stream is not readable when a destination has been supplied`,
+    );
+    return this.#readable;
   }
 
-  public async *[Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
-    if (this.buffer === undefined) {
-      throw new Error(`reading is not supported when initialized with sink`);
+  public get writable(): WritableStream<ZipEntry> {
+    return this.#writable;
+  }
+
+  public constructor(options: ZipWriterOptions = {}) {
+    this.#comment = options.comment ?? "";
+    this.#startingOffset = options.startingOffset ?? 0;
+
+    if (options.destination) {
+      this.#preventClose = options.preventClose ?? false;
+      this.#writer = options.destination.getWriter();
+    } else {
+      const buffer = new TransformStream<Uint8Array, Uint8Array>({
+        transform: (chunk, controller) => {
+          this.#writtenBytes += chunk.byteLength;
+          controller.enqueue(chunk);
+        },
+      });
+
+      this.#preventClose = false;
+      this.#readable = buffer.readable;
+      this.#writer = buffer.writable.getWriter();
     }
-    yield* this.buffer;
+
+    this.#writable = new WritableStream({
+      abort: async (reason) => {
+        await this.#writer.abort(reason);
+      },
+
+      close: async () => {
+        await this.#writeCentralDirectory();
+
+        if (this.#preventClose) {
+          this.#writer.releaseLock();
+        } else {
+          await this.#writer.close();
+        }
+      },
+
+      write: async (entry) => {
+        await this.#writeEntry(entry);
+      },
+    });
   }
 
   public async [Symbol.asyncDispose](): Promise<void> {
-    await this.sink.close();
+    await this.close();
   }
 
   /**
-   * Add a file to the Zip.
+   * Add an entry to the zip. If there is already something streaming to the
+   * instance's {@link writable}, this method will throw a {@link TypeError}.
+   * This method applies back pressure if the buffer is full.
    */
-  public readonly addFile = this.writeLock.synchronize(
-    async (file: ZipEntryInfo, content?: DataSource) => {
-      if (this.isFinalized) {
-        throw new Error(`can't add more files after calling finalize()`);
-      }
-      await this.writeFileEntry(file, content);
-    },
-  );
-
-  /**
-   * Finalize the zip with an optional comment.
-   */
-  public readonly finalize = this.writeLock.synchronize(
-    async (fileComment?: string) => {
-      if (this.isFinalized) {
-        throw new Error(`multiple calls to finalize()`);
-      }
-      this.isFinalized = true;
-      await this.writeCentralDirectory(fileComment);
-      await this.sink.close();
-    },
-  );
-
-  private async write(chunk: Uint8Array): Promise<void> {
-    await this.sink.write(chunk);
-    this.writtenBytes += chunk.byteLength;
-  }
-
-  private async writeFileEntry(
-    file: ZipEntryInfo,
+  public async addFile(entry: ZipEntry): Promise<void>;
+  public async addFile(
+    entry: ZipEntryInfo,
+    content?: DataSource,
+  ): Promise<void>;
+  public async addFile(
+    entry: ZipEntryInfo,
     content?: DataSource,
   ): Promise<void> {
-    const localHeaderOffset = this.startingOffset + this.writtenBytes;
-
-    // normalize the options
-    const entry = new ZipEntry({
-      ...file,
-      compressionMethod:
-        file.compressionMethod ??
-        (content === undefined || content === ""
-          ? CompressionMethod.Stored
-          : CompressionMethod.Deflate),
-      localHeaderOffset,
-      uncompressedData: content,
-    });
-
-    const hasDataDescriptor = entry.flags.hasDataDescriptor;
-
-    const localHeader = new LocalFileHeader({
-      compressedSize: hasDataDescriptor ? 0 : entry.compressedSize,
-      compressionMethod: entry.compressionMethod,
-      crc32: hasDataDescriptor ? 0 : entry.crc32,
-      extraField: entry.extraField,
-      flags: entry.flags,
-      lastModified: entry.lastModified,
-      path: entry.path,
-      uncompressedSize: hasDataDescriptor ? 0 : entry.uncompressedSize,
-      versionNeeded: entry.versionNeeded,
-      zip64: entry.zip64,
-    });
-
-    const dataDescriptor = new DataDescriptor(undefined, entry.zip64);
-    await this.write(localHeader.serialize());
-
-    const compressedData = compress(
-      entry.compressionMethod,
-      file,
-      dataDescriptor,
-      content,
-      this.compressors,
-    );
-    for await (const chunk of compressedData) {
-      await this.write(chunk);
+    // use the writable's built-in synchronization via the writer
+    const writer = this.#writable.getWriter();
+    try {
+      assert(writer.desiredSize, `the stream is closed or errored`);
+      if (writer.desiredSize < 0) {
+        await writer.ready;
+      }
+      await writer.write(
+        entry instanceof ZipEntry ? entry : new ZipEntry(entry, content),
+      );
+    } finally {
+      writer.releaseLock();
     }
-
-    if (hasDataDescriptor) {
-      await this.write(dataDescriptor.serialize());
-    }
-
-    this.directory.push(
-      new CentralDirectoryHeader({
-        attributes: entry.attributes,
-        comment: entry.comment,
-        compressedSize: dataDescriptor.compressedSize,
-        compressionMethod: entry.compressionMethod,
-        crc32: dataDescriptor.crc32,
-        extraField: entry.extraField,
-        flags: entry.flags,
-        lastModified: entry.lastModified,
-        localHeaderOffset,
-        path: entry.path,
-        uncompressedSize: dataDescriptor.uncompressedSize,
-        versionMadeBy: entry.versionMadeBy,
-        versionNeeded: entry.versionNeeded,
-        zip64: entry.zip64,
-      }),
-    );
   }
 
-  private async writeCentralDirectory(fileComment?: string): Promise<void> {
-    const directoryOffset = this.startingOffset + this.writtenBytes;
-    let useZip64 = this.directory.length > 0xffff;
+  /**
+   * Write the central directory and close the writer. No more entries can be
+   * added after this is called.
+   */
+  public async close(): Promise<void> {
+    await this.#writable.close();
+  }
+
+  async #write(chunk: Uint8Array): Promise<void> {
+    assert(this.#writer.desiredSize !== null);
+
+    if (this.#writer.desiredSize < 0) {
+      await this.#writer.ready;
+    }
+    await this.#writer.write(chunk);
+  }
+
+  async #writeCentralDirectory(): Promise<void> {
+    const directoryOffset = this.#startingOffset + this.#writtenBytes;
+    let useZip64 = this.#centralDirectory.length > 0xffff;
     let versionNeeded: number = ZipVersion.Deflate;
 
-    for (const header of this.directory) {
-      useZip64 ||= !!header.zip64;
-      versionNeeded = Math.max(versionNeeded, header.versionNeeded);
-      await this.write(header.serialize());
+    for (const entry of this.#centralDirectory) {
+      useZip64 ||= !!entry.zip64;
+      versionNeeded = Math.max(versionNeeded, entry.versionNeeded);
+      await this.#write(entry.serialize());
     }
 
-    const trailerOffset = this.startingOffset + this.writtenBytes;
+    const trailerOffset = this.#startingOffset + this.#writtenBytes;
     const directorySize = trailerOffset - directoryOffset;
     useZip64 ||= trailerOffset >= 0xffff_ffff;
 
     if (useZip64) {
       const eocdr64 = new Zip64Eocdr({
-        count: this.directory.length,
+        count: this.#centralDirectory.length,
         offset: directoryOffset,
         size: directorySize,
         platformMadeBy: ZipPlatform.UNIX,
@@ -208,20 +174,36 @@ export class ZipWriter implements AsyncDisposable, AsyncIterable<Uint8Array> {
         versionNeeded,
       });
 
-      await this.write(eocdr64.serialize());
-      await this.write(new Zip64Eocdl(trailerOffset).serialize());
+      await this.#write(eocdr64.serialize());
+      await this.#write(new Zip64Eocdl(trailerOffset).serialize());
     }
 
     const eocdr = new Eocdr(
       {
-        comment: fileComment ?? "",
-        count: this.directory.length,
+        comment: this.#comment,
+        count: this.#centralDirectory.length,
         offset: directoryOffset,
         size: directorySize,
       },
       useZip64,
     );
 
-    await this.write(eocdr.serialize());
+    await this.#write(eocdr.serialize());
+  }
+
+  async #writeEntry(entry: ZipEntry): Promise<void> {
+    const localHeader = new LocalFileHeader(entry);
+    // always write data descriptor
+    localHeader.flags.hasDataDescriptor = true;
+    await this.#write(localHeader.serialize());
+
+    for await (const chunk of entry.compressedData) {
+      await this.#write(chunk);
+    }
+
+    const dataDescriptor = new DataDescriptor(entry, entry.zip64);
+    await this.#write(dataDescriptor.serialize());
+
+    this.#centralDirectory.push(entry.header);
   }
 }

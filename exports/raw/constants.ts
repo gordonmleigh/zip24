@@ -1,3 +1,11 @@
+export const CompressionMethod = {
+  Stored: 0,
+  Deflate: 8,
+} as const;
+
+export type CompressionMethod =
+  (typeof CompressionMethod)[keyof typeof CompressionMethod];
+
 export const ZipPlatform = {
   // 4.4.2.2 The current mappings are:
   //   0 - MS-DOS and OS/2 (FAT / VFAT / FAT32 file systems)

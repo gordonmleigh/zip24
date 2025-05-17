@@ -1,15 +1,9 @@
-/* eslint-disable n/no-unsupported-features/node-builtins */
-import { hasExtraProperty } from "./assert.ts";
-
-const DefaultChunkSize = 1024 ** 2; // 1 MB
+import { ZipFormatError } from "../exports/errors.ts";
+import { assert } from "./assert.ts";
+import { computeCrc32 } from "./crc32.ts";
 
 export type AnyIterable<T> = AsyncIterable<T> | Iterable<T>;
 export type ByteSource = AnyIterable<Uint8Array>;
-
-export type ByteSink = {
-  close: () => PromiseLike<void> | void;
-  write: (chunk: Uint8Array) => PromiseLike<void>;
-};
 
 export type RandomAccessReadOptions = {
   buffer: Uint8Array;
@@ -36,15 +30,68 @@ export type RandomAccessReaderSourceOptions = {
   position?: number | undefined;
 };
 
+export type ExtendedReadOptions = {
+  buffer: Uint8Array;
+  offset?: number | undefined;
+  maxLength?: number | undefined;
+  minLength?: number | undefined;
+  position: number;
+};
+
+export async function read(
+  reader: RandomAccessReader,
+  options: ExtendedReadOptions,
+): Promise<number> {
+  const {
+    buffer,
+    offset = 0,
+    minLength = 0,
+    maxLength = buffer.length - offset,
+    position,
+  } = options;
+
+  assert(
+    maxLength <= buffer.length - offset,
+    `maxLength is bigger than buffer length`,
+  );
+  assert(
+    minLength <= buffer.length - offset,
+    `minLength is bigger than buffer length`,
+  );
+  assert(
+    minLength > 0 && maxLength > 0 && offset > 0,
+    "lengths and offsets must be >0",
+  );
+  assert(minLength <= maxLength, `minLength is greater than maxLength`);
+
+  let count = 0;
+  do {
+    const result = await reader.read({
+      buffer,
+      position: position + count,
+      length: maxLength - count,
+      offset: offset + count,
+    });
+    count += result.bytesRead;
+
+    if (result.bytesRead === 0) {
+      if (count < minLength) {
+        throw new ZipFormatError(`unexpected end of file`);
+      }
+      break;
+    }
+  } while (count < minLength);
+
+  return count;
+}
+
 export type DataSource =
   | Uint8Array
   | string
   | AsyncIterable<string>
   | AsyncIterable<Uint8Array>
   | Iterable<string>
-  | Iterable<Uint8Array>
-  | ReadableStream<string>
-  | ReadableStream<Uint8Array>;
+  | Iterable<Uint8Array>;
 
 export function randomAccessReaderFromBuffer(
   source: Uint8Array,
@@ -64,214 +111,84 @@ export function randomAccessReaderFromBuffer(
   };
 }
 
-export async function* iterableFromReadableStream<T>(
-  stream: ReadableStream<T>,
-): AsyncGenerator<T, undefined, undefined> {
-  // prevent narrowing to `never` after this block by asserting `unknown`
-  if (isAsyncIterable(stream as unknown)) {
-    yield* stream;
-    return;
-  }
-
-  const reader = stream.getReader();
-
-  try {
-    for (;;) {
-      const result = await reader.read();
-
-      if (result.value !== undefined) {
-        yield result.value;
-      }
-
-      if (result.done) {
-        break;
-      }
-    }
-  } finally {
-    await reader.cancel();
-  }
-}
-
-export async function* iterableFromRandomAccessReader(
-  reader: RandomAccessReader,
-  options: RandomAccessReaderSourceOptions = {},
-): AsyncGenerator<Uint8Array, undefined, undefined> {
-  const byteLength = options.byteLength ?? Number.POSITIVE_INFINITY;
-  const chunkSize = options.chunkSize ?? DefaultChunkSize;
-  let position = options.position ?? 0;
-  const endPosition = position + byteLength;
-
-  for (;;) {
-    const bufferSize = Math.min(chunkSize, endPosition - position);
-    if (bufferSize === 0) {
-      return;
-    }
-
-    const buffer = new Uint8Array(bufferSize);
-
-    const result = await reader.read({
-      buffer,
-      position,
-      length: bufferSize,
-    });
-
-    if (result.bytesRead > 0) {
-      yield buffer.subarray(0, result.bytesRead);
-      position += result.bytesRead;
-    } else {
-      return;
-    }
-  }
-}
-
-export async function* normalizeDataSource(
+export function normalizeDataSource(
   data: DataSource | undefined,
-): AsyncIterable<Uint8Array> {
-  if (data === undefined) {
-    return;
-  }
-  if (typeof data === "string") {
-    yield new TextEncoder().encode(data);
-  } else if (data instanceof Uint8Array) {
-    yield data;
-  } else {
-    const iterable =
-      isAsyncIterable(data) || isIterable(data)
-        ? data
-        : iterableFromReadableStream<string | Uint8Array>(data);
-
-    const encoder = new TextEncoder();
-
-    yield* mapIterable(iterable, (chunk: string | Uint8Array) =>
-      typeof chunk === "string" ? encoder.encode(chunk) : chunk,
-    );
-  }
-}
-
-export function readableStreamFromIterable(
-  input: ByteSource,
 ): ReadableStream<Uint8Array> {
-  const inputIterator = getAsyncIterator(input);
+  let iterator:
+    | AsyncIterator<Uint8Array | string>
+    | Iterator<Uint8Array | string>
+    | undefined;
 
-  return new ReadableStream({
-    pull: async (controller) => {
-      const result = await inputIterator.next();
-      if (result.value !== undefined) {
-        controller.enqueue(result.value as Uint8Array);
-      }
-      if (result.done) {
+  let encoder: TextEncoder | undefined;
+
+  return new ReadableStream<Uint8Array>({
+    start: (controller) => {
+      if (data === undefined) {
         controller.close();
+      } else if (typeof data === "string") {
+        if (data.length > 0) {
+          controller.enqueue(new TextEncoder().encode(data));
+        }
+        controller.close();
+      } else if (data instanceof Uint8Array) {
+        if (data.byteLength > 0) {
+          controller.enqueue(data);
+        }
+        controller.close();
+      } else if (Symbol.asyncIterator in data) {
+        iterator = data[Symbol.asyncIterator]();
+      } else if (Symbol.iterator in data) {
+        iterator = data[Symbol.iterator]();
       }
     },
 
-    cancel: async (reason) => {
-      await inputIterator.return?.(reason);
+    pull: async (controller) => {
+      assert(iterator);
+
+      const next = await iterator.next();
+      if (next.value !== undefined) {
+        encoder ??= new TextEncoder();
+        controller.enqueue(encoder.encode(next.value as string));
+      }
+      if (next.done) {
+        controller.close();
+      }
     },
   });
 }
 
-export async function bufferFromIterable(
-  input: ByteSource,
-): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
-
-  for await (const chunk of input) {
-    chunks.push(chunk);
-    byteLength += chunk.byteLength;
+/**
+ * A {@link TransformStream} which counts bytes on the way past.
+ */
+export class CountBytesStream extends TransformStream<Uint8Array, Uint8Array> {
+  public constructor(callback: (count: number) => void) {
+    let count = 0;
+    super({
+      transform: (chunk, controller) => {
+        count += chunk.byteLength;
+        controller.enqueue(chunk);
+      },
+      flush: () => {
+        callback(count);
+      },
+    });
   }
-
-  const output = new Uint8Array(byteLength);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    output.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  return output;
-}
-
-export async function textFromIterable(
-  input: ByteSource,
-  encoding?: string,
-): Promise<string> {
-  const decoder = new TextDecoder(encoding);
-  let output = "";
-
-  for await (const chunk of input) {
-    output += decoder.decode(chunk, { stream: true });
-  }
-
-  output += decoder.decode();
-  return output;
-}
-
-export async function* mapIterable<Input, Output>(
-  input: AnyIterable<Input>,
-  map: (input: Input) => Output | PromiseLike<Output>,
-  final?: () => void | PromiseLike<void>,
-): AsyncGenerator<Output> {
-  for await (const element of input) {
-    yield await map(element);
-  }
-  if (final) {
-    await final();
-  }
-}
-
-export async function* maxChunkSize(
-  input: ByteSource,
-  chunkSize: number,
-): ByteSource {
-  for await (const originalChunk of input) {
-    for (
-      let offset = 0;
-      offset < originalChunk.byteLength;
-      offset += chunkSize
-    ) {
-      yield originalChunk.subarray(
-        offset,
-        offset + Math.min(originalChunk.byteLength - offset, chunkSize),
-      );
-    }
-  }
-}
-
-export async function* identityStream<Input>(
-  input: AnyIterable<Input>,
-): AsyncGenerator<Input> {
-  for await (const element of input) {
-    yield element;
-  }
-}
-
-export function getAsyncIterator<T>(
-  iterable: AnyIterable<T>,
-): AsyncIterator<T> | Iterator<T> {
-  if (isAsyncIterable(iterable)) {
-    return iterable[Symbol.asyncIterator]();
-  }
-  if (isIterable(iterable)) {
-    return iterable[Symbol.iterator]();
-  }
-  throw new TypeError(`value is neither AsyncIterable nor Iterable`);
-}
-
-export function isAsyncIterable(
-  value: unknown,
-): value is AsyncIterable<unknown> {
-  return hasExtraProperty(value, Symbol.asyncIterator);
-}
-
-export function isIterable(value: unknown): value is Iterable<unknown> {
-  return hasExtraProperty(value, Symbol.iterator);
 }
 
 /**
- * A function which can transform data from an async iterable.
+ * A {@link TransformStream} which counts bytes on the way past.
  */
-
-export type AsyncTransform = (
-  input: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
-) => AsyncIterable<Uint8Array>;
+export class Crc32Stream extends TransformStream<Uint8Array, Uint8Array> {
+  public constructor(callback: (result: number) => void) {
+    let result = 0;
+    super({
+      transform: (chunk, controller) => {
+        result = computeCrc32(chunk, result);
+        controller.enqueue(chunk);
+      },
+      flush: () => {
+        callback(result);
+      },
+    });
+  }
+}

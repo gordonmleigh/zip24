@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { buffer } from "node:stream/consumers";
+import { buffer, text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import {
   EmptyZip32,
@@ -7,10 +7,9 @@ import {
   generateZip,
 } from "../test-util/fixtures.ts";
 import { ZipBufferReader } from "./buffer.ts";
-import { CompressionMethod } from "./raw/compression-core.ts";
-import { ZipPlatform, ZipVersion } from "./raw/constants.ts";
+import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { UnixFileAttributes } from "./raw/file-attributes.ts";
-import { ZipEntry } from "./zip-entry.ts";
+import { ZipEntry, ZipEntryReader } from "./zip-entry.ts";
 
 describe("web/buffer", () => {
   describe("ZipBufferReader", () => {
@@ -44,7 +43,7 @@ describe("web/buffer", () => {
       it("iterates all the files", async () => {
         const reader = new ZipBufferReader(Zip32WithThreeEntries);
 
-        const files: ZipEntry[] = [];
+        const files: ZipEntryReader[] = [];
         for (const file of reader.filesSync()) {
           files.push(file);
         }
@@ -80,7 +79,7 @@ describe("web/buffer", () => {
         assert.strictEqual(file0.isDirectory, false);
         assert.strictEqual(file0.isFile, true);
 
-        assert.strictEqual(await file0.toText(), "this is the file 1 content");
+        assert.strictEqual(await text(file0), "this is the file 1 content");
 
         //// FILE 1
         const file1 = files[1];
@@ -111,10 +110,7 @@ describe("web/buffer", () => {
         assert.strictEqual(file1.isDirectory, false);
         assert.strictEqual(file1.isFile, true);
 
-        assert.strictEqual(
-          await file1.toText(),
-          "file 2 content goes right here",
-        );
+        assert.strictEqual(await text(file1), "file 2 content goes right here");
 
         //// FILE 2
         const file2 = files[2];
@@ -144,7 +140,7 @@ describe("web/buffer", () => {
         assert.strictEqual(file2.isDirectory, true);
         assert.strictEqual(file2.isFile, false);
 
-        assert.strictEqual(await file2.toText(), "");
+        assert.strictEqual(await text(file2), "");
       });
     });
 

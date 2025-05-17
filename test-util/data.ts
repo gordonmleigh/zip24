@@ -3,23 +3,6 @@ import { deflateRawSync } from "node:zlib";
 import { CodePage437Encoder } from "../util/cp437.ts";
 import { computeCrc32 } from "../util/crc32.ts";
 import { DosDate } from "../util/dos-date.ts";
-import { bufferFromIterable, type AsyncTransform } from "../util/streams.ts";
-
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function* asyncIterable(
-  literals: TemplateStringsArray,
-  ...values: unknown[]
-): AsyncGenerator<Uint8Array> {
-  for (const [index, literal] of literals.entries()) {
-    if (literal) {
-      yield Buffer.from(literal);
-    }
-    if (index < values.length) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      yield Buffer.from(`${values[index]}`);
-    }
-  }
-}
 
 export function base64(
   literals: TemplateStringsArray,
@@ -107,15 +90,6 @@ export function longUint(value: number): Uint8Array {
   const buffer = Buffer.alloc(4);
   buffer.writeUint32LE(value);
   return buffer;
-}
-
-export function mockAsyncTransform(
-  implementation: (input: Uint8Array) => Uint8Array | PromiseLike<Uint8Array>,
-): AsyncTransform {
-  return async function* (input) {
-    const allInput = await bufferFromIterable(input);
-    yield await implementation(allInput);
-  };
 }
 
 export function shortUint(value: number): Uint8Array {

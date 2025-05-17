@@ -25,6 +25,7 @@ export default config(
           ignoreOverloadsWithDifferentJSDoc: true,
         },
       ],
+      "n/no-unsupported-features/node-builtins": "off",
     },
   },
   {
@@ -46,7 +47,6 @@ export default config(
       "@typescript-eslint/no-non-null-assertion": "off", // easier for testing
       "@typescript-eslint/no-unused-vars": "off", // easier for testing
       "@typescript-eslint/require-await": "off", // easier for testing
-      "n/no-unsupported-features/node-builtins": "off", // so we can use node:test
       "unicorn/no-abusive-eslint-disable": "off",
     },
   },

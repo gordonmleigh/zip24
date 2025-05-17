@@ -6,7 +6,6 @@ import {
   type Deserializer,
   type Serializable,
 } from "../../util/serialization.ts";
-import type { StrictInstanceType } from "../../util/type-utils.ts";
 import { ZipFormatError, ZipSignatureError } from "../errors.ts";
 import { ExtraFieldTag } from "./constants.ts";
 
@@ -283,9 +282,11 @@ export type KnownExtraFieldTypes = {
 };
 
 export type KnownExtraFields = {
-  [K in keyof KnownExtraFieldTypes]: StrictInstanceType<
-    KnownExtraFieldTypes[K]
-  >;
+  [K in keyof KnownExtraFieldTypes]: KnownExtraFieldTypes[K] extends new (
+    ...args: any[]
+  ) => infer Type
+    ? Type
+    : never;
 };
 
 export type ExtraFieldTypeFor<T> = T extends keyof KnownExtraFields
@@ -293,7 +294,7 @@ export type ExtraFieldTypeFor<T> = T extends keyof KnownExtraFields
   : typeof UnknownExtraField;
 
 export type ExtraFieldFor<T> = T extends keyof KnownExtraFields
-  ? StrictInstanceType<KnownExtraFieldTypes[T]>
+  ? KnownExtraFields[T]
   : UnknownExtraField;
 
 function getExtraFieldTypeForTag<T extends number>(

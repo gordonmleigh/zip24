@@ -14,8 +14,7 @@ import {
   utf8length,
 } from "../../test-util/data.ts";
 import { ZipSignatureError } from "../errors.ts";
-import { CompressionMethod } from "./compression-core.ts";
-import { ExtraFieldTag, ZipVersion } from "./constants.ts";
+import { CompressionMethod, ExtraFieldTag, ZipVersion } from "./constants.ts";
 import {
   ExtraFieldCollection,
   UnicodeExtraField,

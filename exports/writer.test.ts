@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { buffer } from "node:stream/consumers";
-import { describe, it, mock } from "node:test";
+import { describe, it } from "node:test";
 import { assertBufferEqual } from "../test-util/assert.ts";
 import {
   bigUint,
@@ -10,7 +10,6 @@ import {
   data,
   dosDate,
   longUint,
-  mockAsyncTransform,
   shortUint,
   tinyUint,
   utf8,
@@ -18,17 +17,14 @@ import {
   utf8length32,
 } from "../test-util/data.ts";
 import { computeCrc32 } from "../util/crc32.ts";
-import type { ByteSink } from "../util/streams.ts";
-import { defaultCompressors } from "./compression.ts";
-import { CompressionMethod } from "./raw/compression-core.ts";
-import { ZipPlatform, ZipVersion } from "./raw/constants.ts";
+import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { DosFileAttributes } from "./raw/file-attributes.ts";
 import { GeneralPurposeFlags } from "./raw/flags.ts";
 import { ZipWriter } from "./writer.ts";
 
-describe("web/writer", () => {
+describe("exports/writer", () => {
   describe("class ZipWriter", () => {
-    describe(".fromWritableStream()", () => {
+    describe("static wrap()", () => {
       it("throws an error if the stream fails", async () => {
         const error = new Error("bang");
 
@@ -38,7 +34,7 @@ describe("web/writer", () => {
           },
         });
 
-        const writer = ZipWriter.fromWritableStream(writableStream);
+        const writer = ZipWriter.wrap(writableStream);
 
         const write = writer.addFile(
           {
@@ -57,7 +53,7 @@ describe("web/writer", () => {
 
       it("writes the correct data to the stream", async () => {
         const sink = new MockSink();
-        const writer = ZipWriter.fromWritableStream(new WritableStream(sink));
+        const writer = ZipWriter.wrap(sink);
 
         await writer.addFile(
           {
@@ -69,7 +65,7 @@ describe("web/writer", () => {
           "hello world",
         );
 
-        await writer.finalize();
+        await writer.close();
 
         const expected = data(
           //## +0000 LOCAL ENTRY 1 HEADER (30+11+0 = 41 bytes)
@@ -135,197 +131,18 @@ describe("web/writer", () => {
         );
 
         assertBufferEqual(sink, expected);
-        assert.strictEqual(sink.close.mock.callCount(), 1);
+        assert.strictEqual(sink.closed, true);
       });
     });
 
-    describe("constructor", () => {
-      it("defaults to using the default compressors for web", async (t) => {
-        const compressorMock = t.mock.fn<(input: Uint8Array) => Uint8Array>(
-          () => Buffer.from("compressed!"),
-        );
-        t.mock.method(
-          defaultCompressors,
-          CompressionMethod.Deflate.toString() as any,
-          mockAsyncTransform(compressorMock),
-        );
-
-        const writer = new ZipWriter();
-
-        await writer.addFile(
-          {
-            path: "hello.txt",
-            lastModified: new Date("2005-03-09T12:55:15Z"),
-          },
-          "hello world",
-        );
-
-        await writer.finalize();
-
-        const expected = data(
-          //## +0000 LOCAL ENTRY 1 HEADER (30+9+0 = 39 bytes)
-          longUint(0x04034b50), // local header signature
-          shortUint(ZipVersion.Deflate), // version needed
-          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
-          shortUint(CompressionMethod.Deflate), // compression method
-          dosDate`2005-03-09T12:55:15Z`, // last modified
-          longUint(0), // crc32
-          longUint(0), // compressed size
-          longUint(0), // uncompressed size
-          cp437length`hello.txt`, // file name length
-          shortUint(0), // extra field length
-          cp437`hello.txt`, // file name
-          "", // extra field
-
-          //## +0039 LOCAL ENTRY 1 CONTENT (11 bytes)
-          utf8`compressed!`,
-
-          //## +0050 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
-          longUint(0x08074b50), // data descriptor signature
-          crc32`hello world`, // crc
-          utf8length32`compressed!`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-
-          //## +0066 DIRECTORY ENTRY 1 (46+9+0+0 = 55 bytes)
-          longUint(0x02014b50), // central directory header signature
-          tinyUint(ZipVersion.Deflate), // version made by
-          tinyUint(ZipPlatform.DOS), // platform made by
-          shortUint(ZipVersion.Deflate), // version needed
-          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
-          shortUint(CompressionMethod.Deflate), // compression method
-          dosDate`2005-03-09T12:55:15Z`, // last modified
-          crc32`hello world`, // crc32
-          utf8length32`compressed!`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-          cp437length`hello.txt`, // file name length
-          shortUint(0), // extra field length
-          shortUint(0), // file comment length
-          shortUint(0), // disk number start
-          shortUint(0), // internal file attributes
-          longUint(DosFileAttributes.File), // external file attributes
-          longUint(0), // relative offset of local header
-          cp437`hello.txt`, // file name
-          "", // extra field
-          "", // the comment
-
-          //## +0121 End of Central Directory Record
-          longUint(0x06054b50), // EOCDR signature
-          shortUint(0), // number of this disk
-          shortUint(0), // central directory start disk
-          shortUint(1), // total entries this disk
-          shortUint(1), // total entries all disks
-          longUint(121 - 66), // size of the central directory
-          longUint(66), // central directory offset
-          shortUint(0), // .ZIP file comment length
-        );
-
-        assertBufferEqual(await buffer(writer), expected);
-
-        assert.strictEqual(compressorMock.mock.callCount(), 1);
-
-        assertBufferEqual(
-          compressorMock.mock.calls[0]?.arguments[0]!,
-          Buffer.from("hello world"),
-        );
-      });
-
-      it("uses the provided compressors if provided", async (t) => {
-        const compressorMock = t.mock.fn<(input: Uint8Array) => Uint8Array>(
-          () => Buffer.from("COMPRESSED!"),
-        );
-
-        const writer = new ZipWriter({
-          compressors: {
-            [CompressionMethod.Deflate]: mockAsyncTransform(compressorMock),
-          },
-        });
-
-        await writer.addFile(
-          {
-            path: "hello.txt",
-            lastModified: new Date("2005-03-09T12:55:15Z"),
-          },
-          "hello world",
-        );
-
-        await writer.finalize();
-
-        const expected = data(
-          //## +0000 LOCAL ENTRY 1 HEADER (30+9+0 = 39 bytes)
-          longUint(0x04034b50), // local header signature
-          shortUint(ZipVersion.Deflate), // version needed
-          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
-          shortUint(CompressionMethod.Deflate), // compression method
-          dosDate`2005-03-09T12:55:15Z`, // last modified
-          longUint(0), // crc32
-          longUint(0), // compressed size
-          longUint(0), // uncompressed size
-          cp437length`hello.txt`, // file name length
-          shortUint(0), // extra field length
-          cp437`hello.txt`, // file name
-          "", // extra field
-
-          //## +0039 LOCAL ENTRY 1 CONTENT (11 bytes)
-          utf8`COMPRESSED!`,
-
-          //## +0050 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
-          longUint(0x08074b50), // data descriptor signature
-          crc32`hello world`, // crc
-          utf8length32`COMPRESSED!`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-
-          //## +0066 DIRECTORY ENTRY 1 (46+9+0+0 = 55 bytes)
-          longUint(0x02014b50), // central directory header signature
-          tinyUint(ZipVersion.Deflate), // version made by
-          tinyUint(ZipPlatform.DOS), // platform made by
-          shortUint(ZipVersion.Deflate), // version needed
-          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
-          shortUint(CompressionMethod.Deflate), // compression method
-          dosDate`2005-03-09T12:55:15Z`, // last modified
-          crc32`hello world`, // crc32
-          utf8length32`COMPRESSED!`, // compressed size
-          utf8length32`hello world`, // uncompressed size
-          cp437length`hello.txt`, // file name length
-          shortUint(0), // extra field length
-          shortUint(0), // file comment length
-          shortUint(0), // disk number start
-          shortUint(0), // internal file attributes
-          longUint(DosFileAttributes.File), // external file attributes
-          longUint(0), // relative offset of local header
-          cp437`hello.txt`, // file name
-          "", // extra field
-          "", // the comment
-
-          //## +0121 End of Central Directory Record
-          longUint(0x06054b50), // EOCDR signature
-          shortUint(0), // number of this disk
-          shortUint(0), // central directory start disk
-          shortUint(1), // total entries this disk
-          shortUint(1), // total entries all disks
-          longUint(121 - 66), // size of the central directory
-          longUint(66), // central directory offset
-          shortUint(0), // .ZIP file comment length
-        );
-
-        assertBufferEqual(await buffer(writer), expected);
-
-        assert.strictEqual(compressorMock.mock.callCount(), 1);
-
-        assertBufferEqual(
-          compressorMock.mock.calls[0]?.arguments[0]!,
-          Buffer.from("hello world"),
-        );
-      });
-    });
-
-    describe("#[Symbol.asyncDispose]()", () => {
+    describe("[Symbol.asyncDispose]()", () => {
       it("calls close on the sink", async () => {
         const sink = new MockSink();
-        const writer = new ZipWriter({ sink });
+        const writer = ZipWriter.wrap(sink);
 
-        assert.strictEqual(sink.close.mock.callCount(), 0);
+        assert.strictEqual(sink.closed, false);
         await writer[Symbol.asyncDispose]();
-        assert.strictEqual(sink.close.mock.callCount(), 1);
+        assert.strictEqual(sink.closed, true);
       });
     });
 
@@ -334,37 +151,39 @@ describe("web/writer", () => {
         const sink = new MockSink();
 
         {
-          await using writer = new ZipWriter({ sink });
+          const sink = new MockSink();
+          const writer = ZipWriter.wrap(sink);
 
           void writer;
-          assert.strictEqual(sink.close.mock.callCount(), 0);
+          assert.strictEqual(sink.closed, false);
         }
 
-        assert.strictEqual(sink.close.mock.callCount(), 1);
+        assert.strictEqual(sink.closed, true);
       });
     });
 
-    describe("#[Symbol.asyncIterable]()", () => {
+    describe("get readable", () => {
       it("throws if the writer is in sink mode", async () => {
         const sink = new MockSink();
-        const writer = new ZipWriter({ sink });
+        const writer = ZipWriter.wrap(sink);
 
         await writer.addFile({ path: "folder/" });
 
-        await assert.rejects(
-          () => buffer(writer),
+        assert.throws(
+          () => {
+            void writer.readable;
+          },
           (cause) =>
             cause instanceof Error &&
             cause.message ===
-              `reading is not supported when initialized with sink`,
+              `the stream is not readable when a destination has been supplied`,
         );
       });
     });
 
-    describe("#addFile()", () => {
-      it("outputs the correct data", async () => {
-        const sink = new MockSink();
-        const writer = new ZipWriter({ sink });
+    describe("addFile()", () => {
+      it("outputs the correct data for an uncompressed entry", async () => {
+        const writer = new ZipWriter();
 
         await writer.addFile(
           {
@@ -401,12 +220,86 @@ describe("web/writer", () => {
           utf8length32`this will be stored as-is`, // uncompressed size
         );
 
+        assertBufferEqual(await buffer(writer.readable), expected);
+      });
+
+      it("outputs the correct data for a compressed entry", async () => {
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
+
+        await writer.addFile(
+          {
+            path: "hello.txt",
+            lastModified: new Date("2005-03-09T12:55:15Z"),
+          },
+          "hello world",
+        );
+
+        await writer.close();
+
+        const expected = data(
+          //## +0000 LOCAL ENTRY 1 HEADER (30+9+0 = 39 bytes)
+          longUint(0x04034b50), // local header signature
+          shortUint(ZipVersion.Deflate), // version needed
+          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+          shortUint(CompressionMethod.Deflate), // compression method
+          dosDate`2005-03-09T12:55:15Z`, // last modified
+          longUint(0), // crc32
+          longUint(0), // compressed size
+          longUint(0), // uncompressed size
+          cp437length`hello.txt`, // file name length
+          shortUint(0), // extra field length
+          cp437`hello.txt`, // file name
+          "", // extra field
+
+          //## +0039 LOCAL ENTRY 1 CONTENT (13 bytes)
+          "cb48cdc9c95728cf2fca490100",
+
+          //## +0052 LOCAL ENTRY 1 DATA DESCRIPTOR (16 bytes)
+          longUint(0x08074b50), // data descriptor signature
+          crc32`hello world`, // crc
+          longUint(13), // compressed size
+          utf8length32`hello world`, // uncompressed size
+
+          //## +0068 DIRECTORY ENTRY 1 (46+9+0+0 = 55 bytes)
+          longUint(0x02014b50), // central directory header signature
+          tinyUint(ZipVersion.Deflate), // version made by
+          tinyUint(ZipPlatform.DOS), // platform made by
+          shortUint(ZipVersion.Deflate), // version needed
+          shortUint(GeneralPurposeFlags.HasDataDescriptor), // flags
+          shortUint(CompressionMethod.Deflate), // compression method
+          dosDate`2005-03-09T12:55:15Z`, // last modified
+          crc32`hello world`, // crc32
+          utf8length32`compressed!`, // compressed size
+          utf8length32`hello world`, // uncompressed size
+          cp437length`hello.txt`, // file name length
+          shortUint(0), // extra field length
+          shortUint(0), // file comment length
+          shortUint(0), // disk number start
+          shortUint(0), // internal file attributes
+          longUint(DosFileAttributes.File), // external file attributes
+          longUint(0), // relative offset of local header
+          cp437`hello.txt`, // file name
+          "", // extra field
+          "", // the comment
+
+          //## +0123 End of Central Directory Record
+          longUint(0x06054b50), // EOCDR signature
+          shortUint(0), // number of this disk
+          shortUint(0), // central directory start disk
+          shortUint(1), // total entries this disk
+          shortUint(1), // total entries all disks
+          longUint(123 - 68), // size of the central directory
+          longUint(68), // central directory offset
+          shortUint(0), // .ZIP file comment length
+        );
+
         assertBufferEqual(sink, expected);
       });
 
       it("skips the data descriptor when sizes and crc32 are given", async () => {
         const sink = new MockSink();
-        const writer = new ZipWriter({ sink });
+        const writer = ZipWriter.wrap(sink);
 
         const content = Buffer.from("hello world");
         const crc32 = computeCrc32(content);
@@ -445,10 +338,10 @@ describe("web/writer", () => {
         assertBufferEqual(sink, expected);
       });
 
-      it("throws if finalize() has already been called", async () => {
+      it("throws if close() has already been called", async () => {
         const writer = new ZipWriter();
 
-        await writer.finalize();
+        await writer.close();
 
         await assert.rejects(
           async () => {
@@ -461,24 +354,25 @@ describe("web/writer", () => {
       });
     });
 
-    describe("#finalize()", () => {
+    describe("close()", () => {
       it("throws if it has already been called", async () => {
         const writer = new ZipWriter();
 
-        await writer.finalize();
+        await writer.close();
 
         await assert.rejects(
           async () => {
-            await writer.finalize();
+            await writer.close();
           },
           (error) =>
-            error instanceof Error &&
-            error.message === `multiple calls to finalize()`,
+            error instanceof TypeError &&
+            "code" in error &&
+            error.code === "ERR_INVALID_STATE",
         );
       });
 
       it("writes the trailer", async () => {
-        const writer = new ZipWriter();
+        const writer = new ZipWriter({ comment: "Gordon is cool" });
 
         await writer.addFile(
           {
@@ -490,7 +384,7 @@ describe("web/writer", () => {
           "this will be stored as-is",
         );
 
-        await writer.finalize("Gordon is cool");
+        await writer.close();
 
         const expected = data(
           //## +0000 LOCAL ENTRY 1 HEADER (30+16+0 = 46 bytes)
@@ -550,7 +444,7 @@ describe("web/writer", () => {
           cp437`Gordon is cool`, // .ZIP file comment
         );
 
-        assertBufferEqual(await buffer(writer), expected);
+        assertBufferEqual(await buffer(writer.readable), expected);
       });
     });
 
@@ -559,7 +453,8 @@ describe("web/writer", () => {
         t.mock.timers.enable({ apis: ["Date"] });
         t.mock.timers.setTime(new Date("2005-03-09T12:55:15Z").getTime());
 
-        const writer = new ZipWriter();
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
 
         await writer.addFile(
           {
@@ -569,7 +464,7 @@ describe("web/writer", () => {
           "hello world",
         );
 
-        await writer.finalize();
+        await writer.close();
 
         const expected = data(
           //## +0000 LOCAL ENTRY 1 HEADER (30+9+0 = 39 bytes)
@@ -628,11 +523,12 @@ describe("web/writer", () => {
           shortUint(0), // .ZIP file comment length
         );
 
-        assertBufferEqual(await buffer(writer), expected);
+        assertBufferEqual(sink, expected);
       });
 
       it("can write a utf8 entry", async () => {
-        const writer = new ZipWriter();
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
 
         await writer.addFile(
           {
@@ -644,7 +540,7 @@ describe("web/writer", () => {
           "hello world",
         );
 
-        await writer.finalize();
+        await writer.close();
 
         const expected = data(
           //## +0000 LOCAL ENTRY 1 HEADER (30+11+0 = 41 bytes)
@@ -709,11 +605,12 @@ describe("web/writer", () => {
           shortUint(0), // .ZIP file comment length
         );
 
-        assertBufferEqual(await buffer(writer), expected);
+        assertBufferEqual(sink, expected);
       });
 
       it("can write a Zip64", async () => {
-        const writer = new ZipWriter();
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink, { comment: "file comment" });
 
         await writer.addFile(
           {
@@ -725,7 +622,7 @@ describe("web/writer", () => {
           "hello world",
         );
 
-        await writer.finalize("file comment");
+        await writer.close();
 
         const expected = data(
           //## +0000 LOCAL ENTRY 1 HEADER (30+9 = 39 bytes)
@@ -818,11 +715,12 @@ describe("web/writer", () => {
           cp437`file comment`,
         );
 
-        assertBufferEqual(await buffer(writer), expected);
+        assertBufferEqual(sink, expected);
       });
 
       it("defaults to CompressionMethod.Stored when content is empty", async () => {
-        const writer = new ZipWriter();
+        const sink = new MockSink();
+        const writer = ZipWriter.wrap(sink);
 
         await writer.addFile(
           {
@@ -837,7 +735,7 @@ describe("web/writer", () => {
           lastModified: new Date(`1994-03-02T22:44:08Z`),
         });
 
-        await writer.finalize();
+        await writer.close();
 
         const expected = data(
           //## +0000 LOCAL ENTRY 1 HEADER (30+7+0 = 37 bytes)
@@ -940,21 +838,29 @@ describe("web/writer", () => {
           "", // .ZIP file comment
         );
 
-        assertBufferEqual(await buffer(writer), expected);
+        assertBufferEqual(sink, expected);
       });
     });
   });
 });
 
-class MockSink implements ByteSink, Iterable<Uint8Array> {
+class MockSink
+  extends WritableStream<Uint8Array>
+  implements Iterable<Uint8Array>
+{
   public readonly chunks: Uint8Array[] = [];
+  public closed = false;
 
-  public readonly close = mock.fn<ByteSink["close"]>(() => Promise.resolve());
-
-  public readonly write = mock.fn<ByteSink["write"]>((chunk) => {
-    this.chunks.push(chunk);
-    return Promise.resolve();
-  });
+  public constructor() {
+    super({
+      write: (chunk) => {
+        this.chunks.push(chunk);
+      },
+      close: () => {
+        this.closed = true;
+      },
+    });
+  }
 
   public *[Symbol.iterator](): Iterator<Uint8Array> {
     yield* this.chunks;
