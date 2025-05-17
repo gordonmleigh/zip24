@@ -1,17 +1,17 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { ZipVersion } from "./raw/constants.ts";
-import {
-  DosFileAttributes,
-  UnixFileAttributes,
-} from "./raw/file-attributes.ts";
 import {
   ZipEntry,
   minimumVersion,
   needs64bit,
   needsDataDescriptor,
   needsUtf8,
-} from "./zip-entry.ts";
+} from "./entry.ts";
+import { ZipVersion } from "./raw/constants.ts";
+import {
+  DosFileAttributes,
+  UnixFileAttributes,
+} from "./raw/file-attributes.ts";
 
 describe("core/zip-entry", () => {
   describe("class ZipEntry", () => {

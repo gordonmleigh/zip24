@@ -7,9 +7,9 @@ import {
   generateZip,
 } from "../test-util/fixtures.ts";
 import { ZipBufferReader } from "./buffer.ts";
+import { ZipEntry, ZipEntryReader } from "./entry.ts";
 import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { UnixFileAttributes } from "./raw/file-attributes.ts";
-import { ZipEntry, ZipEntryReader } from "./zip-entry.ts";
 
 describe("web/buffer", () => {
   describe("ZipBufferReader", () => {

@@ -12,7 +12,7 @@ import { ZipFormatError } from "./errors.ts";
 import {
   CentralDirectoryHeader,
   type CentralDirectoryHeaderInit,
-} from "./raw/central-directory-header.js";
+} from "./raw/central-directory-header.ts";
 import {
   CompressionMethod,
   ExtraFieldTag,

@@ -10,10 +10,10 @@ import {
   randomAccessReaderFromBuffer,
   type RandomAccessReader,
 } from "../util/streams.ts";
+import { ZipEntry, type ZipEntryReader } from "./entry.ts";
 import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { UnixFileAttributes } from "./raw/file-attributes.ts";
 import { ZipReader } from "./reader.ts";
-import { ZipEntry, type ZipEntryReader } from "./zip-entry.ts";
 
 describe("web/reader", () => {
   describe("ZipReader", () => {

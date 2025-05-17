@@ -1,5 +1,6 @@
 import { assert } from "../util/assert.ts";
 import type { RandomAccessReader } from "../util/streams.ts";
+import { ZipEntryReader } from "./entry.ts";
 import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
 import {
   Eocdr,
@@ -7,7 +8,6 @@ import {
   Zip64Eocdr,
   ZipTrailer,
 } from "./raw/zip-trailer.ts";
-import { ZipEntryReader } from "./zip-entry.ts";
 
 /**
  * Options for {@link ZipReader} instance.

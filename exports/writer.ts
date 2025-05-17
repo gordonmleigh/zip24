@@ -1,11 +1,11 @@
 import { assert } from "../util/assert.ts";
 import type { DataSource } from "../util/streams.ts";
+import { ZipEntry, type ZipEntryInfo } from "./entry.ts";
 import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
 import { ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { DataDescriptor } from "./raw/data-descriptor.ts";
 import { LocalFileHeader } from "./raw/local-file-header.ts";
 import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "./raw/zip-trailer.ts";
-import { ZipEntry, type ZipEntryInfo } from "./zip-entry.ts";
 
 /**
  * Options for {@link ZipWriter}.

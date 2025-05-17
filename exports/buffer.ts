@@ -1,4 +1,5 @@
 import { BufferView, type BufferLike } from "../util/binary.ts";
+import { ZipEntryReader } from "./entry.ts";
 import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
 import { LocalFileHeader } from "./raw/local-file-header.ts";
 import {
@@ -7,7 +8,6 @@ import {
   Zip64Eocdr,
   ZipTrailer,
 } from "./raw/zip-trailer.ts";
-import { ZipEntryReader } from "./zip-entry.ts";
 
 /**
  * An object which can read zip data from a buffer.
