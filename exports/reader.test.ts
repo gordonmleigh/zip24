@@ -54,6 +54,7 @@ describe("web/reader", () => {
     it("can read the central directory in multiple chunks", async () => {
       const data = await buffer(
         generateZip({
+          fileCommentLength: 0xffff,
           fileCount: 30,
           fileSize: 10,
         }),
@@ -62,7 +63,7 @@ describe("web/reader", () => {
         randomAccessReaderFromBuffer(data),
         data.byteLength,
         {
-          bufferSize: 100,
+          bufferSize: ZipReader.MinBufferSize,
         },
       );
 

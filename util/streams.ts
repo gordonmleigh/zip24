@@ -52,15 +52,16 @@ export async function read(
 
   assert(
     maxLength <= buffer.length - offset,
-    `maxLength is bigger than buffer length`,
+    "maxLength must be <= buffer length",
   );
   assert(
     minLength <= buffer.length - offset,
-    `minLength is bigger than buffer length`,
+    `minLength must be <= buffer length`,
   );
-  assert(minLength > 0 && maxLength > 0, "lengths must be > 0");
+  assert(maxLength > 0, "maxLength must be > 0");
+  assert(minLength >= 0, "minLength must be >= 0");
   assert(offset >= 0, "offset must be >= 0");
-  assert(minLength <= maxLength, `minLength is greater than maxLength`);
+  assert(minLength <= maxLength, `minLength must be <= maxLength`);
 
   let count = 0;
   do {
@@ -81,6 +82,97 @@ export async function read(
   } while (count < minLength);
 
   return count;
+}
+
+export type ReaderDataInfo = {
+  startPosition: number;
+  length: number;
+};
+
+export type RandomAccessReaderStreamOptions = {
+  bufferSize?: number | undefined;
+  reader: RandomAccessReader;
+  startPosition: number;
+} & (
+  | {
+      length: number;
+    }
+  | {
+      header: (firstChunk: Uint8Array) => ReaderDataInfo;
+      headerLength: number;
+    }
+);
+
+export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
+  public constructor(options: RandomAccessReaderStreamOptions) {
+    const { bufferSize = 128 * 1024, reader } = options;
+
+    let position = options.startPosition;
+    let endPosition: number | undefined;
+
+    if ("length" in options) {
+      endPosition = position + options.length;
+    }
+
+    super({
+      start: async (controller) => {
+        if (!("header" in options)) {
+          return;
+        }
+        const buffer = new Uint8Array(bufferSize);
+
+        const length = await read(reader, {
+          buffer,
+          position,
+          minLength: options.headerLength,
+        });
+
+        const dataInfo = options.header(buffer);
+        const skipBytes = dataInfo.startPosition - position;
+        const firstChunkLength = Math.min(length - skipBytes, dataInfo.length);
+        position = dataInfo.startPosition;
+        endPosition = dataInfo.startPosition + dataInfo.length;
+
+        if (firstChunkLength > 0) {
+          const firstChunk = buffer.subarray(
+            skipBytes,
+            skipBytes + firstChunkLength,
+          );
+          controller.enqueue(firstChunk);
+          position += firstChunkLength;
+        }
+        if (position === endPosition) {
+          controller.close();
+        }
+      },
+
+      pull: async (controller) => {
+        assert(endPosition !== undefined);
+        const remaining = endPosition - position;
+        if (remaining === 0) {
+          controller.close();
+          return;
+        }
+
+        assert(remaining > 0, `remaining bytes should be >= 0`);
+        const buffer = new Uint8Array(Math.min(remaining, bufferSize));
+        const byteCount = await read(reader, { position, buffer });
+
+        assert(byteCount <= remaining);
+        position += byteCount;
+        assert(position <= endPosition, `we went past the end of the file`);
+
+        if (byteCount === 0) {
+          if (remaining - byteCount > 0) {
+            throw new ZipFormatError(`unexpected end of file`);
+          }
+          controller.close();
+        } else {
+          controller.enqueue(buffer.subarray(0, byteCount));
+        }
+      },
+    });
+  }
 }
 
 export type DataSource =

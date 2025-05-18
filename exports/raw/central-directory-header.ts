@@ -1,8 +1,14 @@
+import { assert } from "../../util/assert.ts";
 import { BufferView, type BufferLike } from "../../util/binary.ts";
 import { DosDate } from "../../util/dos-date.ts";
 import { EncodedString } from "../../util/encoded-string.ts";
 import { makeBuffer, type Serializable } from "../../util/serialization.ts";
-import { MultiDiskError, ZipSignatureError } from "../errors.ts";
+import { read, type RandomAccessReader } from "../../util/streams.ts";
+import {
+  MultiDiskError,
+  ZipFormatError,
+  ZipSignatureError,
+} from "../errors.ts";
 import { ExtraFieldTag, ZipPlatform } from "./constants.ts";
 import {
   ExtraFieldCollection,
@@ -14,6 +20,7 @@ import {
   type FileAttributes,
 } from "./file-attributes.ts";
 import { GeneralPurposeFlags } from "./flags.ts";
+import type { ZipTrailerFields } from "./zip-trailer.ts";
 
 export type CentralDirectoryHeaderInit = {
   attributes: FileAttributes;
@@ -61,6 +68,8 @@ export class CentralDirectoryHeader
   // |        | file comment (variable size)    |      |
 
   public static readonly FixedSize = 46;
+  // fixed size + max file name + max extra + max comment
+  public static readonly MaxSize = this.FixedSize + 3 * 0xffff;
   public static readonly Signature = 0x02014b50;
 
   public static deserialize(
@@ -274,5 +283,229 @@ export class CentralDirectoryHeader
 
     view.setBytes(offset, this.rawComment);
     return view.getOriginalBytes();
+  }
+}
+
+export type Zip64VersionFields = {
+  platformMadeBy: number;
+  versionMadeBy: number;
+  versionNeeded: number;
+};
+
+export type CentralDirectoryReader = ZipTrailerFields &
+  AsyncIterable<CentralDirectoryHeader, void, void>;
+
+export class CentralDirectoryBufferReader
+  implements
+    Iterable<CentralDirectoryHeader, void, void>,
+    CentralDirectoryReader
+{
+  readonly #buffer: BufferView;
+  readonly #trailer: ZipTrailerFields;
+
+  public get size(): number {
+    return this.#trailer.size;
+  }
+  public get comment(): string {
+    return this.#trailer.comment;
+  }
+  public get count(): number {
+    return this.#trailer.count;
+  }
+  public get offset(): number {
+    return this.#trailer.offset;
+  }
+  public get zip64(): Zip64VersionFields | undefined {
+    return this.#trailer.zip64;
+  }
+
+  public constructor(
+    trailer: ZipTrailerFields,
+    buffer: BufferLike,
+    bufferOffset?: number,
+  ) {
+    this.#buffer = new BufferView(buffer, bufferOffset, trailer.size);
+    this.#trailer = trailer;
+  }
+
+  public [Symbol.iterator](): Iterator<CentralDirectoryHeader, void, void> {
+    return this.entries();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  public async *[Symbol.asyncIterator](): AsyncIterator<
+    CentralDirectoryHeader,
+    void,
+    void
+  > {
+    yield* this.entries();
+  }
+
+  public *entries(): IterableIterator<CentralDirectoryHeader, void, void> {
+    let offset = 0;
+
+    for (let index = 0; index < this.#trailer.count; ++index) {
+      const header = CentralDirectoryHeader.deserialize(this.#buffer, offset);
+      offset += header.totalSize;
+      yield header;
+    }
+  }
+}
+
+export type CentralDirectoryRandomAccessReaderOptions = {
+  bufferSize?: number | undefined;
+  reader: RandomAccessReader;
+};
+
+export class CentralDirectoryRandomAccessReader
+  implements CentralDirectoryReader
+{
+  readonly #trailer: ZipTrailerFields;
+  readonly #options: CentralDirectoryRandomAccessReaderOptions;
+
+  public get size(): number {
+    return this.#trailer.size;
+  }
+  public get comment(): string {
+    return this.#trailer.comment;
+  }
+  public get count(): number {
+    return this.#trailer.count;
+  }
+  public get offset(): number {
+    return this.#trailer.offset;
+  }
+  public get zip64(): Zip64VersionFields | undefined {
+    return this.#trailer.zip64;
+  }
+
+  public constructor(
+    trailer: ZipTrailerFields,
+    options: CentralDirectoryRandomAccessReaderOptions,
+  ) {
+    this.#trailer = trailer;
+    this.#options = options;
+  }
+
+  public [Symbol.asyncIterator](): AsyncIterableIterator<
+    CentralDirectoryHeader,
+    void,
+    void
+  > {
+    const reader = new CentralDirectoryReadableStream(
+      this.#trailer,
+      this.#options,
+    );
+    return reader[Symbol.asyncIterator]();
+  }
+}
+
+export class CentralDirectoryReadableStream extends ReadableStream<CentralDirectoryHeader> {
+  public static readonly DefaultBufferSize = 512 * 1024;
+
+  readonly #buffer: Uint8Array;
+  readonly #endPosition: number;
+  readonly #entryCount: number;
+  readonly #reader: RandomAccessReader;
+
+  #readCount = 0;
+  #currentOffset = 0;
+  #currentPosition: number;
+  #endOffset = 0;
+
+  public constructor(
+    trailer: ZipTrailerFields,
+    options: CentralDirectoryRandomAccessReaderOptions,
+  ) {
+    super({
+      pull: async (controller) => {
+        await this.#pull(controller);
+      },
+    });
+
+    this.#buffer = new Uint8Array(
+      options.bufferSize ?? CentralDirectoryReadableStream.DefaultBufferSize,
+    );
+    this.#currentPosition = trailer.offset;
+    this.#endPosition = trailer.offset + trailer.size;
+    this.#entryCount = trailer.count;
+    this.#reader = options.reader;
+  }
+
+  async #fillBuffer(minLength?: number): Promise<void> {
+    if (minLength === undefined) {
+      await this.#fillBuffer(CentralDirectoryHeader.FixedSize);
+
+      const size = CentralDirectoryHeader.readTotalSize(
+        this.#buffer,
+        this.#currentOffset,
+      );
+      await this.#fillBuffer(size);
+      return;
+    }
+
+    if (this.#haveBytes(minLength)) {
+      return;
+    }
+
+    // we end up re-reading a small portion at the end of the buffer, but
+    // it's too small for there to be any benefit to trying to avoid that
+    this.#currentPosition += this.#currentOffset;
+    this.#currentOffset = 0;
+
+    const maxLength = Math.min(
+      this.#buffer.length,
+      this.#endPosition - this.#currentPosition,
+    );
+    if (minLength > maxLength) {
+      throw new ZipFormatError("unexpected end of file");
+    }
+
+    this.#endOffset = await read(this.#reader, {
+      buffer: this.#buffer,
+      position: this.#currentPosition,
+      minLength,
+      maxLength,
+    });
+  }
+
+  #haveBytes(count: number): boolean {
+    return this.#currentOffset + count <= this.#endOffset;
+  }
+
+  async #pull(controller: ReadableStreamDefaultController): Promise<void> {
+    if (this.#readCount === this.#entryCount) {
+      controller.close();
+      return;
+    }
+    assert(this.#readCount < this.#entryCount);
+
+    await this.#fillBuffer();
+    controller.enqueue(this.#readOne());
+
+    while (
+      this.#readCount < this.#entryCount &&
+      this.#haveBytes(CentralDirectoryHeader.FixedSize)
+    ) {
+      const headerLength = CentralDirectoryHeader.readTotalSize(
+        this.#buffer,
+        this.#currentOffset,
+      );
+      // don't have enough bytes left to read the whole header
+      if (!this.#haveBytes(headerLength)) {
+        break;
+      }
+      controller.enqueue(this.#readOne());
+    }
+  }
+
+  #readOne(): CentralDirectoryHeader {
+    const entry = CentralDirectoryHeader.deserialize(
+      this.#buffer,
+      this.#currentOffset,
+    );
+    ++this.#readCount;
+    this.#currentOffset += entry.totalSize;
+    return entry;
   }
 }

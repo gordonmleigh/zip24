@@ -1,7 +1,12 @@
 import { assert } from "../util/assert.ts";
-import type { RandomAccessReader } from "../util/streams.ts";
+import { read, type RandomAccessReader } from "../util/streams.ts";
 import { ZipEntryReader } from "./entry.ts";
-import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
+import {
+  CentralDirectoryBufferReader,
+  CentralDirectoryHeader,
+  CentralDirectoryRandomAccessReader,
+  type CentralDirectoryReader,
+} from "./raw/central-directory-header.ts";
 import {
   Eocdr,
   Zip64Eocdl,
@@ -22,29 +27,31 @@ export type ZipReaderOptions = {
 export class ZipReader
   implements AsyncDisposable, AsyncIterable<ZipEntryReader>, Disposable
 {
-  public static readonly DefaultBufferSize = 1024 ** 2;
+  public static readonly DefaultBufferSize = 1024 * 1024;
+  // we need to be able to read a whole directory header at a time
+  public static readonly MinBufferSize = CentralDirectoryHeader.MaxSize;
 
   readonly #bufferSize: number;
   readonly #fileSize: number;
   readonly #reader: RandomAccessReader;
 
-  #pendingOpen: Promise<void> | undefined;
-  #trailer: ZipTrailer | undefined;
+  #directory: CentralDirectoryReader | undefined;
+  #pendingOpen: Promise<CentralDirectoryReader> | undefined;
 
   /**
    * Get the file comment, if set.
    */
   public get comment(): string {
-    assert(this.#trailer, `call open() first`);
-    return this.#trailer.comment;
+    assert(this.#directory, `call open() first`);
+    return this.#directory.comment;
   }
 
   /**
    * Get the total number of entries in the zip.
    */
   public get entryCount(): number {
-    assert(this.#trailer, `call open() first`);
-    return this.#trailer.count;
+    assert(this.#directory, `call open() first`);
+    return this.#directory.count;
   }
 
   public constructor(
@@ -55,6 +62,11 @@ export class ZipReader
     this.#bufferSize = options.bufferSize ?? ZipReader.DefaultBufferSize;
     this.#fileSize = fileSize;
     this.#reader = reader;
+
+    assert(
+      this.#bufferSize >= ZipReader.MinBufferSize,
+      `buffer size must be at least ${Eocdr.MaxSize + Zip64Eocdl.FixedSize}`,
+    );
   }
 
   /**
@@ -95,45 +107,11 @@ export class ZipReader
    * Get an iterator which iterates over the file entries in the zip.
    */
   public async *files(): AsyncGenerator<ZipEntryReader> {
-    await this.open();
-    assert(this.#trailer, `expected this.directory to have a value`);
+    const directory = await this.open();
 
-    const buffer = new Uint8Array(this.#bufferSize);
-
-    let position = this.#trailer.offset;
-    let offset = 0;
-    let bufferLength = 0;
-
-    const ensureBuffer = async (length: number): Promise<void> => {
-      assert(
-        length <= buffer.byteLength,
-        `the configured buffer size (${this.#bufferSize}) is too small to read the full entry (${length})`,
-      );
-
-      if (offset + length > bufferLength) {
-        // there isn't enough buffer left to read all of the variable fields, so
-        // read a new chunk starting from the current file offset (position + offset)
-        position = position - bufferLength + offset;
-        offset = 0;
-
-        const result = await this.#reader.read({ buffer, position });
-        assert(result.bytesRead >= length, `unexpected end of file`);
-        bufferLength = result.bytesRead;
-        position += result.bytesRead;
-      }
-    };
-
-    // read the central directory a chunk at a time
-    for (let index = 0; index < this.entryCount; ++index) {
-      await ensureBuffer(CentralDirectoryHeader.FixedSize);
-      const headerLength = CentralDirectoryHeader.readTotalSize(buffer, offset);
-      await ensureBuffer(headerLength);
-
-      const header = CentralDirectoryHeader.deserialize(buffer, offset);
-      offset += headerLength;
-
+    for await (const entry of directory) {
       yield ZipEntryReader.fromRandomAccessReader(
-        header,
+        entry,
         this.#reader,
         this.#bufferSize,
       );
@@ -143,59 +121,89 @@ export class ZipReader
   /**
    * Open the file and initialize the instance state.
    */
-  public async open(): Promise<void> {
-    if (this.#trailer) {
-      return;
+  public async open(): Promise<CentralDirectoryReader> {
+    if (this.#directory) {
+      return this.#directory;
     }
-    if (this.#pendingOpen) {
-      await this.#pendingOpen;
-      return;
+    if (!this.#pendingOpen) {
+      this.#pendingOpen = this.#readCentralDirectory();
     }
+    this.#directory = await this.#pendingOpen;
+    return this.#directory;
+  }
 
-    let complete!: () => void;
-    this.#pendingOpen = new Promise((resolve) => {
-      complete = resolve;
-    });
-
+  async #readCentralDirectory(): Promise<CentralDirectoryReader> {
     // read up to the buffer size to try find all of the trailer
-    const bufferSize = Math.min(this.#fileSize, this.#bufferSize);
-    const position = this.#fileSize - bufferSize;
+    let bufferSize = Math.min(this.#fileSize, this.#bufferSize);
+    let position = this.#fileSize - bufferSize;
 
     const buffer = new Uint8Array(bufferSize);
-    const readResult = await this.#reader.read({ buffer, position });
-    assert(readResult.bytesRead === bufferSize, `unexpected end of file`);
+
+    await read(this.#reader, {
+      buffer,
+      position,
+      minLength: bufferSize,
+    });
 
     const eocdrOffset = Eocdr.findOffset(buffer);
     const eocdr = Eocdr.deserialize(buffer, eocdrOffset);
     const eocdl = Zip64Eocdl.find(buffer, eocdrOffset);
 
-    if (eocdl) {
-      if (eocdl.eocdrOffset < position) {
-        // we didn't manage to read the zip64 eocdr within the original buffer
-        const readResult = await this.#reader.read({
+    if (!eocdl) {
+      if (eocdr.offset >= position) {
+        // we already read all of the central directory into the buffer
+        return new CentralDirectoryBufferReader(
+          new ZipTrailer(eocdr),
           buffer,
-          position: eocdl.eocdrOffset,
-          length: Zip64Eocdr.FixedSize,
-        });
-
-        assert(
-          readResult.bytesRead === Zip64Eocdr.FixedSize,
-          `unexpected end of file`,
-        );
-
-        this.#trailer = new ZipTrailer(
-          eocdr,
-          Zip64Eocdr.deserialize(buffer, 0),
-        );
-      } else {
-        this.#trailer = new ZipTrailer(
-          eocdr,
-          Zip64Eocdr.deserialize(buffer, eocdl.eocdrOffset - position),
+          eocdr.offset - position,
         );
       }
-    } else {
-      this.#trailer = new ZipTrailer(eocdr);
+      // we don't have the whole directory, so stream it instead
+      return new CentralDirectoryRandomAccessReader(new ZipTrailer(eocdr), {
+        reader: this.#reader,
+        bufferSize: this.#bufferSize,
+      });
     }
-    complete();
+
+    let zip64eocdr: Zip64Eocdr;
+    if (eocdl.eocdrOffset < position) {
+      // We didn't manage to read the zip64 eocdr within the original buffer,
+      // so read again from the EOCDL offset. We attempt again to read the
+      // whole central directory in one chunk, so we'll read from a position
+      // that puts the ECODR at the _end_ of the buffer.
+
+      const endPosition = eocdl.eocdrOffset + Zip64Eocdr.FixedSize;
+      bufferSize = Math.min(this.#bufferSize, endPosition);
+      position = endPosition - bufferSize;
+
+      await read(this.#reader, {
+        buffer,
+        position,
+        minLength: bufferSize,
+      });
+
+      // read the EOCDR from the end of the buffer
+      zip64eocdr = Zip64Eocdr.deserialize(
+        buffer,
+        bufferSize - Zip64Eocdr.FixedSize,
+      );
+    } else {
+      zip64eocdr = Zip64Eocdr.deserialize(buffer, eocdl.eocdrOffset - position);
+    }
+
+    const trailer = new ZipTrailer(eocdr, zip64eocdr);
+
+    if (zip64eocdr.offset >= position) {
+      const bufferOffset = zip64eocdr.offset - position;
+      if (bufferOffset + zip64eocdr.size < bufferSize) {
+        // we have the whole EOCDR in the buffer
+        return new CentralDirectoryBufferReader(trailer, buffer, bufferOffset);
+      }
+    }
+    // we don't have the whole directory, so stream it instead
+    return new CentralDirectoryRandomAccessReader(trailer, {
+      reader: this.#reader,
+      bufferSize: this.#bufferSize,
+    });
   }
 }

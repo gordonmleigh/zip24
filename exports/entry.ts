@@ -5,7 +5,7 @@ import {
   CountBytesStream,
   Crc32Stream,
   normalizeDataSource,
-  read,
+  RandomAccessReaderStream,
   type DataSource,
   type RandomAccessReader,
 } from "../util/streams.ts";
@@ -135,78 +135,17 @@ export class ZipEntryReader
     reader: RandomAccessReader,
     bufferSize = 0x20000,
   ): ZipEntryReader {
-    let dataStart: number | undefined;
-
     return new this(header, () => {
-      let position = header.localHeaderOffset;
-      let end = position + header.compressedSize;
-
-      return new ReadableStream({
-        start: async (controller) => {
-          if (dataStart !== undefined) {
-            position = dataStart;
-            end = dataStart + header.compressedSize;
-            return;
-          }
-
-          const buffer = Buffer.alloc(
-            Math.min(bufferSize, header.compressedSize + 512),
-          );
-
-          const byteCount = await read(reader, {
-            buffer,
-            minLength: LocalFileHeader.FixedSize,
-            position,
-          });
-
-          const headerSize = LocalFileHeader.readTotalSize(buffer);
-
-          // only advance the position up to the end of the file, in case we
-          // over read
-          const validBufferSize = Math.min(
-            headerSize + header.compressedSize,
-            byteCount,
-          );
-          position += validBufferSize;
-
-          dataStart = header.localHeaderOffset + headerSize;
-          end = dataStart + header.compressedSize;
-
-          if (byteCount === headerSize) {
-            return;
-          }
-
-          const firstChunk = buffer.subarray(
-            headerSize,
-            Math.min(headerSize + header.compressedSize, byteCount),
-          );
-          controller.enqueue(firstChunk);
-        },
-
-        pull: async (controller) => {
-          const remaining = end - position;
-          if (remaining === 0) {
-            controller.close();
-            return;
-          }
-
-          assert(remaining > 0, `remaining bytes should be >= 0`);
-          const buffer = Buffer.alloc(Math.min(remaining, bufferSize));
-          const byteCount = await read(reader, { position, buffer });
-
-          assert(byteCount <= remaining);
-          position += byteCount;
-          assert(position <= end, `we went past the end of the file`);
-
-          if (byteCount === 0) {
-            if (remaining - byteCount > 0) {
-              throw new ZipFormatError(`unexpected end of file`);
-            }
-            controller.close();
-          } else {
-            controller.enqueue(buffer.subarray(0, byteCount));
-          }
-        },
+      return new RandomAccessReaderStream({
+        bufferSize,
+        headerLength: LocalFileHeader.FixedSize,
+        header: (chunk) => ({
+          length: header.compressedSize,
+          startPosition:
+            header.localHeaderOffset + LocalFileHeader.readTotalSize(chunk),
+        }),
+        reader,
+        startPosition: header.localHeaderOffset,
       });
     });
   }

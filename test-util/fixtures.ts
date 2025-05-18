@@ -249,7 +249,7 @@ export async function* generateZip(
 
     const pattern = `comment ${fileIndex}`;
     const fileComment = Buffer.from(
-      pattern.repeat(Math.ceil(fileCommentLength / pattern.length)),
+      pattern.repeat(Math.floor(fileCommentLength / pattern.length)),
     );
 
     const directoryChunk = data(

@@ -8,36 +8,6 @@ import {
 } from "../errors.ts";
 import { ZipPlatform, ZipVersion } from "./constants.ts";
 
-export type Zip64VersionFields = {
-  platformMadeBy: number;
-  versionMadeBy: number;
-  versionNeeded: number;
-};
-
-export type ZipTrailerFields = {
-  count: number;
-  offset: number;
-  comment: string;
-  size: number;
-  zip64?: Zip64VersionFields | undefined;
-};
-
-export class ZipTrailer implements ZipTrailerFields {
-  public comment: string;
-  public count: number;
-  public offset: number;
-  public size: number;
-  public zip64: Zip64VersionFields | undefined;
-
-  public constructor(eocdr?: EocdrFields, eocdr64?: Zip64EocdrFields) {
-    this.comment = eocdr?.comment ?? "";
-    this.count = eocdr64?.count ?? eocdr?.count ?? 0;
-    this.offset = eocdr64?.offset ?? eocdr?.offset ?? 0;
-    this.size = eocdr64?.size ?? eocdr?.size ?? 0;
-    this.zip64 = eocdr64;
-  }
-}
-
 export type EocdrFields = {
   count: number;
   offset: number;
@@ -59,6 +29,8 @@ export class Eocdr implements EocdrFields, Serializable {
   // | 22     | (end)                         |      |
 
   public static readonly FixedSize = 22;
+  // fixed size + max extra field + max comment
+  public static readonly MaxSize = this.FixedSize + 2 * 0xffff;
   public static readonly Signature = 0x06054b50;
 
   public static deserialize(
@@ -329,5 +301,35 @@ export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
     view.writeUint64LE(this.offset, 48); // central directory offset
 
     return view.getOriginalBytes();
+  }
+}
+
+export type Zip64VersionFields = {
+  platformMadeBy: number;
+  versionMadeBy: number;
+  versionNeeded: number;
+};
+
+export type ZipTrailerFields = {
+  count: number;
+  offset: number;
+  comment: string;
+  size: number;
+  zip64?: Zip64VersionFields | undefined;
+};
+
+export class ZipTrailer implements ZipTrailerFields {
+  public comment: string;
+  public count: number;
+  public offset: number;
+  public size: number;
+  public zip64: Zip64VersionFields | undefined;
+
+  public constructor(eocdr: EocdrFields, eocdr64?: Zip64EocdrFields) {
+    this.comment = eocdr.comment;
+    this.count = eocdr64?.count ?? eocdr.count;
+    this.offset = eocdr64?.offset ?? eocdr.offset;
+    this.size = eocdr64?.size ?? eocdr.size;
+    this.zip64 = eocdr64;
   }
 }

@@ -418,15 +418,6 @@ describe("core/zip-trailer", () => {
 
   describe("class ZipTrailer", () => {
     describe(".constructor()", () => {
-      it("sets defaults when no arguments are passed", () => {
-        const trailer = new ZipTrailer();
-        assert.strictEqual(trailer.comment, "");
-        assert.strictEqual(trailer.count, 0);
-        assert.strictEqual(trailer.offset, 0);
-        assert.strictEqual(trailer.size, 0);
-        assert.strictEqual(trailer.zip64, undefined);
-      });
-
       it("sets eocdr fields if provider", () => {
         const trailer = new ZipTrailer({
           comment: "the comment",
