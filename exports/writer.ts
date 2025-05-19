@@ -11,8 +11,10 @@ import { Eocdr, Zip64Eocdl, Zip64Eocdr } from "./raw/zip-trailer.ts";
  * Options for {@link ZipWriter}.
  */
 export type ZipWriterOptions = {
+  bufferSize?: number | undefined;
   comment?: string | undefined;
   destination?: WritableStream<Uint8Array> | undefined;
+  preventAbort?: boolean | undefined;
   preventClose?: boolean | undefined;
   startingOffset?: number | undefined;
 };
@@ -39,22 +41,22 @@ export class ZipWriter
 
   readonly #centralDirectory: CentralDirectoryHeader[] = [];
   readonly #comment: string;
-  readonly #preventClose: boolean;
-  readonly #readable: ReadableStream<Uint8Array> | undefined;
-  readonly #writable: WritableStream<ZipEntry>;
-  readonly #writer: WritableStreamDefaultWriter<Uint8Array>;
+  readonly #output: ReadableStream<Uint8Array> | undefined;
+  readonly #input: WritableStream<ZipEntry>;
+  readonly #byteWriter: WritableStreamDefaultWriter<Uint8Array>;
   #currentOffset: number;
+  #inputMutex = Promise.resolve();
 
   public get readable(): ReadableStream<Uint8Array> {
     assert(
-      this.#readable,
+      this.#output,
       `the stream is not readable when a destination has been supplied`,
     );
-    return this.#readable;
+    return this.#output;
   }
 
   public get writable(): WritableStream<ZipEntry> {
-    return this.#writable;
+    return this.#input;
   }
 
   public constructor(options: ZipWriterOptions = {}) {
@@ -62,27 +64,36 @@ export class ZipWriter
     this.#currentOffset = options.startingOffset ?? 0;
 
     if (options.destination) {
-      this.#preventClose = options.preventClose ?? false;
-      this.#writer = options.destination.getWriter();
+      this.#byteWriter = options.destination.getWriter();
     } else {
-      const buffer = new TransformStream<Uint8Array, Uint8Array>();
-      this.#preventClose = false;
-      this.#readable = buffer.readable;
-      this.#writer = buffer.writable.getWriter();
+      const buffer = new TransformStream<Uint8Array, Uint8Array>(
+        undefined,
+        options.bufferSize
+          ? new ByteLengthQueuingStrategy({
+              highWaterMark: options.bufferSize,
+            })
+          : undefined,
+      );
+      this.#output = buffer.readable;
+      this.#byteWriter = buffer.writable.getWriter();
     }
 
-    this.#writable = new WritableStream({
+    this.#input = new WritableStream({
       abort: async (reason) => {
-        await this.#writer.abort(reason);
+        if (options.destination && options.preventAbort) {
+          this.#byteWriter.releaseLock();
+        } else {
+          await this.#byteWriter.abort(reason);
+        }
       },
 
       close: async () => {
         await this.#writeCentralDirectory();
 
-        if (this.#preventClose) {
-          this.#writer.releaseLock();
+        if (options.destination && options.preventClose) {
+          this.#byteWriter.releaseLock();
         } else {
-          await this.#writer.close();
+          await this.#byteWriter.close();
         }
       },
 
@@ -110,21 +121,18 @@ export class ZipWriter
     entry: ZipEntryInfo,
     content?: DataSource,
   ): Promise<void> {
-    // use the writable's built-in synchronization via the writer
-    const writer = this.#writable.getWriter();
-    try {
-      // If desiredSize is null, it means the writer has errored. When we try to
-      // write after this, the error will automatically be propagated, so we
-      // carry on anyway.
-      if (writer.desiredSize !== null && writer.desiredSize < 0) {
-        await writer.ready;
+    // crude mutex: we're using the internal continuation queue as our work queue
+    this.#inputMutex = this.#inputMutex.then(async () => {
+      const writer = this.#input.getWriter();
+      try {
+        await writer.write(
+          entry instanceof ZipEntry ? entry : new ZipEntry(entry, content),
+        );
+      } finally {
+        writer.releaseLock();
       }
-      await writer.write(
-        entry instanceof ZipEntry ? entry : new ZipEntry(entry, content),
-      );
-    } finally {
-      writer.releaseLock();
-    }
+    });
+    await this.#inputMutex;
   }
 
   /**
@@ -132,17 +140,14 @@ export class ZipWriter
    * added after this is called.
    */
   public async close(): Promise<void> {
-    await this.#writable.close();
+    await this.#inputMutex;
+    await this.#input.close();
   }
 
-  async #write(chunk: Uint8Array): Promise<void> {
-    // If desiredSize is null, it means the writer has errored. When we try to
-    // write after this, the error will automatically be propagated, so we carry
-    // on anyway.
-    if (this.#writer.desiredSize !== null && this.#writer.desiredSize < 0) {
-      await this.#writer.ready;
-    }
-    await this.#writer.write(chunk);
+  async #writeBytes(chunk: Uint8Array): Promise<void> {
+    await this.#byteWriter.ready;
+    // only wait if backpressure signalled, not on every write
+    void this.#byteWriter.write(chunk);
     this.#currentOffset += chunk.length;
   }
 
@@ -154,7 +159,7 @@ export class ZipWriter
     for (const entry of this.#centralDirectory) {
       useZip64 ||= !!entry.zip64;
       versionNeeded = Math.max(versionNeeded, entry.versionNeeded);
-      await this.#write(entry.serialize());
+      await this.#writeBytes(entry.serialize());
     }
 
     const trailerOffset = this.#currentOffset;
@@ -171,8 +176,8 @@ export class ZipWriter
         versionNeeded,
       });
 
-      await this.#write(eocdr64.serialize());
-      await this.#write(new Zip64Eocdl(trailerOffset).serialize());
+      await this.#writeBytes(eocdr64.serialize());
+      await this.#writeBytes(new Zip64Eocdl(trailerOffset).serialize());
     }
 
     const eocdr = new Eocdr(
@@ -185,21 +190,21 @@ export class ZipWriter
       useZip64,
     );
 
-    await this.#write(eocdr.serialize());
+    await this.#writeBytes(eocdr.serialize());
   }
 
   async #writeEntry(entry: ZipEntry): Promise<void> {
     entry.header.localHeaderOffset = this.#currentOffset;
     const localHeader = new LocalFileHeader(entry);
-    await this.#write(localHeader.serialize());
+    await this.#writeBytes(localHeader.serialize());
 
     for await (const chunk of entry.compressedData) {
-      await this.#write(chunk);
+      await this.#writeBytes(chunk);
     }
 
     if (localHeader.flags.hasDataDescriptor) {
       const dataDescriptor = new DataDescriptor(entry, entry.zip64);
-      await this.#write(dataDescriptor.serialize());
+      await this.#writeBytes(dataDescriptor.serialize());
     }
 
     this.#centralDirectory.push(entry.header);

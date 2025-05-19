@@ -24,7 +24,7 @@ import { LocalFileHeader } from "./local-file-header.ts";
 
 describe("core/local-file-header", () => {
   describe("class LocalFileHeader", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("throws if the signature is invalid", () => {
         const buffer = data(
           longUint(0xffffffff), // signature
@@ -174,7 +174,7 @@ describe("core/local-file-header", () => {
       });
     });
 
-    describe(".readTotalSize()", () => {
+    describe("readTotalSize()", () => {
       it("throws if the signature is invalid", () => {
         const buffer = data(
           longUint(0xffffffff), // signature
@@ -221,7 +221,7 @@ describe("core/local-file-header", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("writes all the basic fields", () => {
         const flags = new GeneralPurposeFlags();
         flags.hasUtf8Strings = true;

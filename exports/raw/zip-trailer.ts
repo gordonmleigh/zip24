@@ -229,7 +229,8 @@ export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
   // | 32     | total entries on all disks    | 8    |
   // | 40     | size of the central directory | 8    |
   // | 48     | central directory offset      | 8    |
-  // | 56     | (end)                         |      |
+  // | 56     | extensible data sector        | ...  |
+  // | ...    | (56 + record size - 12)       |      |
 
   public static readonly FixedSize = 56;
   public static readonly Signature = 0x06064b50;

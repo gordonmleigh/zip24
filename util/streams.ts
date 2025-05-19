@@ -93,15 +93,9 @@ export type RandomAccessReaderStreamOptions = {
   bufferSize?: number | undefined;
   reader: RandomAccessReader;
   startPosition: number;
-} & (
-  | {
-      length: number;
-    }
-  | {
-      header: (firstChunk: Uint8Array) => ReaderDataInfo;
-      headerLength: number;
-    }
-);
+  header: (firstChunk: Uint8Array) => ReaderDataInfo;
+  headerLength: number;
+};
 
 export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
   public constructor(options: RandomAccessReaderStreamOptions) {
@@ -110,15 +104,8 @@ export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
     let position = options.startPosition;
     let endPosition: number | undefined;
 
-    if ("length" in options) {
-      endPosition = position + options.length;
-    }
-
     super({
       start: async (controller) => {
-        if (!("header" in options)) {
-          return;
-        }
         const buffer = new Uint8Array(bufferSize);
 
         const length = await read(reader, {
@@ -162,14 +149,8 @@ export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
         position += byteCount;
         assert(position <= endPosition, `we went past the end of the file`);
 
-        if (byteCount === 0) {
-          if (remaining - byteCount > 0) {
-            throw new ZipFormatError(`unexpected end of file`);
-          }
-          controller.close();
-        } else {
-          controller.enqueue(buffer.subarray(0, byteCount));
-        }
+        assert(byteCount > 0, `unexpected end of file`);
+        controller.enqueue(buffer.subarray(0, byteCount));
       },
     });
   }

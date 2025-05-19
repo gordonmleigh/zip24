@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { buffer, text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
+import { assertInstanceOf } from "../test-util/assert.ts";
 import {
   EmptyZip32,
   Zip32WithThreeEntries,
@@ -10,19 +11,23 @@ import {
   randomAccessReaderFromBuffer,
   type RandomAccessReader,
 } from "../util/streams.ts";
-import { ZipEntry, type ZipEntryReader } from "./entry.ts";
+import { ZipEntry, ZipEntryReader } from "./entry.ts";
+import {
+  CentralDirectoryBufferReader,
+  CentralDirectoryRandomAccessReader,
+} from "./raw/central-directory-header.ts";
 import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { UnixFileAttributes } from "./raw/file-attributes.ts";
 import { ZipReader } from "./reader.ts";
 
-describe("web/reader", () => {
-  describe("ZipReader", () => {
-    it("can read a very large zip", async () => {
-      // 12 MB file with 100 files of 100 kB each + roughly 2 MB central dir
+describe("exports/reader", () => {
+  describe("class ZipReader", () => {
+    it("can read a large zip", async () => {
+      // 120 MB file with 100 files of 1 MB each + roughly 2 MB central dir
       const data = await buffer(
         generateZip({
           fileCount: 100,
-          fileSize: 100 * 1024,
+          fileSize: 1024 * 1024,
           // pad out the central dir to force multiple chunks to be read
           fileCommentLength: 30 * 1024,
         }),
@@ -30,6 +35,7 @@ describe("web/reader", () => {
       const reader = new ZipReader(
         randomAccessReaderFromBuffer(data),
         data.byteLength,
+        { bufferSize: ZipReader.MinBufferSize },
       );
 
       let fileIndex = 0;
@@ -76,20 +82,23 @@ describe("web/reader", () => {
       assert.strictEqual(fileIndex, 30);
     });
 
-    it("can read a very large Zip64", async () => {
-      // 12 MB file with 100 files of 100 kB each + roughly 2 MB central dir
+    it("can read a large Zip64", async () => {
+      // 22 MB file with 100 files of 100 kB each + roughly 6 MB central dir
+      // plus 10 MB extensible data
       const data = await buffer(
         generateZip({
           fileCount: 100,
           fileSize: 100 * 1024,
           // pad out the central dir to force multiple chunks to be read
-          fileCommentLength: 30 * 1024,
+          fileCommentLength: 0xffff,
           zip64: true,
+          zip64ExtensibleDataLength: 10 * 1024 * 1024,
         }),
       );
       const reader = new ZipReader(
         randomAccessReaderFromBuffer(data),
         data.byteLength,
+        { bufferSize: ZipReader.MinBufferSize },
       );
 
       let fileIndex = 0;
@@ -111,7 +120,7 @@ describe("web/reader", () => {
       assert.strictEqual(fileIndex, 100);
     });
 
-    describe("comment", () => {
+    describe("get comment", () => {
       it("returns the zip file comment", async () => {
         const reader = new ZipReader(
           randomAccessReaderFromBuffer(EmptyZip32),
@@ -122,7 +131,7 @@ describe("web/reader", () => {
       });
     });
 
-    describe("entryCount", () => {
+    describe("get entryCount", () => {
       it("returns the total number of entries in the zip", async () => {
         const reader = new ZipReader(
           randomAccessReaderFromBuffer(Zip32WithThreeEntries),
@@ -289,6 +298,138 @@ describe("web/reader", () => {
 
         assert.strictEqual(close.mock.callCount(), 1);
         assert.strictEqual(hasWaited, true);
+      });
+
+      it("disposes the underlying reader if it is AsyncDisposable", async () => {
+        let hasWaited = false;
+
+        const close = mock.fn(async () => {
+          await Promise.resolve();
+          hasWaited = true;
+        });
+
+        const reader: RandomAccessReader = {
+          [Symbol.asyncDispose]: close,
+        } as any;
+        const zipReader = new ZipReader(reader, 0);
+
+        await zipReader.close();
+
+        assert.strictEqual(close.mock.callCount(), 1);
+        assert.strictEqual(hasWaited, true);
+      });
+
+      it("disposes the underlying reader if it is Disposable", async () => {
+        let hasWaited = false;
+
+        const close = mock.fn(() => {
+          hasWaited = true;
+        });
+
+        const reader: RandomAccessReader = { [Symbol.dispose]: close } as any;
+        const zipReader = new ZipReader(reader, 0);
+
+        await zipReader.close();
+
+        assert.strictEqual(close.mock.callCount(), 1);
+        assert.strictEqual(hasWaited, true);
+      });
+    });
+  });
+
+  describe("open()", () => {
+    it("returns the same value if called multiple times", async () => {
+      const data = await buffer(generateZip({ fileCount: 2 }));
+      const reader = new ZipReader(
+        randomAccessReaderFromBuffer(data),
+        data.byteLength,
+        { bufferSize: ZipReader.MinBufferSize },
+      );
+
+      const result1 = await reader.open();
+      const result2 = await reader.open();
+
+      assert.strictEqual(result1, result2);
+    });
+
+    describe("for standard zips", () => {
+      it("reads the whole directory at once if less than buffer size", async () => {
+        const data = await buffer(generateZip({ fileCount: 10 }));
+        const dataReader = randomAccessReaderFromBuffer(data);
+        const read = mock.method(dataReader, "read");
+
+        const zipReader = new ZipReader(dataReader, data.byteLength, {
+          bufferSize: ZipReader.MinBufferSize,
+        });
+
+        const result1 = await zipReader.open();
+
+        assertInstanceOf(result1, CentralDirectoryBufferReader);
+        assert.strictEqual(read.mock.callCount(), 1);
+      });
+
+      it("reads the directory in chunks if more than buffer size", async () => {
+        const fileCount = 20;
+
+        const data = await buffer(
+          generateZip({ fileCount, fileCommentLength: 0xffff }),
+        );
+        const dataReader = randomAccessReaderFromBuffer(data);
+        const read = mock.method(dataReader, "read");
+
+        const bufferSize = ZipReader.MinBufferSize;
+
+        const zipReader = new ZipReader(dataReader, data.byteLength, {
+          bufferSize,
+        });
+
+        const directory = await zipReader.open();
+
+        let entryCount = 0;
+        let totalSize = 0;
+
+        for await (const entry of directory) {
+          ++entryCount;
+          totalSize += entry.totalSize;
+        }
+
+        // make sure the test conditions are actually valid
+        assert(directory.size > ZipReader.MinBufferSize);
+
+        assert.strictEqual(entryCount, fileCount);
+        assert.strictEqual(totalSize, directory.size);
+        assertInstanceOf(directory, CentralDirectoryRandomAccessReader);
+
+        // The stream actually reads overlapping blocks to avoid having to copy
+        // partial chunks, because generally the zip entry size is quite small
+        // and there's no benefit to trying to minimize the overlap. So here we
+        // calculate the number of blocks we have to read in order to cover all
+        // the entries, taking into account that we can only read a whole number
+        // per read.
+        const entrySize = totalSize / fileCount;
+        const entriesPerBlock = Math.floor(bufferSize / entrySize);
+        // we read one extra for the initial trailer read
+        const totalBlocks = Math.ceil(fileCount / entriesPerBlock) + 1;
+
+        assert.strictEqual(read.mock.callCount(), totalBlocks);
+      });
+    });
+
+    describe("for zip64", () => {
+      it("reads the whole directory at once if less than buffer size", async () => {
+        const data = await buffer(generateZip({ fileCount: 10, zip64: true }));
+        const dataReader = randomAccessReaderFromBuffer(data);
+        const read = mock.method(dataReader, "read");
+
+        const zipReader = new ZipReader(dataReader, data.byteLength, {
+          bufferSize: ZipReader.MinBufferSize,
+        });
+
+        const result1 = await zipReader.open();
+
+        assertInstanceOf(result1, CentralDirectoryBufferReader);
+        assert(result1.zip64);
+        assert.strictEqual(read.mock.callCount(), 1);
       });
     });
   });

@@ -5,7 +5,7 @@ import { DataDescriptor } from "./data-descriptor.ts";
 
 describe("core/data-descriptor", () => {
   describe("DataDescriptor", () => {
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("can serialize a 32-bit descriptor", () => {
         const descriptor = new DataDescriptor({
           compressedSize: 0x12345678,

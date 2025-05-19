@@ -353,7 +353,7 @@ export class CentralDirectoryBufferReader
 }
 
 export type CentralDirectoryRandomAccessReaderOptions = {
-  bufferSize?: number | undefined;
+  bufferSize: number;
   reader: RandomAccessReader;
 };
 
@@ -401,8 +401,6 @@ export class CentralDirectoryRandomAccessReader
 }
 
 export class CentralDirectoryReadableStream extends ReadableStream<CentralDirectoryHeader> {
-  public static readonly DefaultBufferSize = 512 * 1024;
-
   readonly #buffer: Uint8Array;
   readonly #endPosition: number;
   readonly #entryCount: number;
@@ -423,9 +421,7 @@ export class CentralDirectoryReadableStream extends ReadableStream<CentralDirect
       },
     });
 
-    this.#buffer = new Uint8Array(
-      options.bufferSize ?? CentralDirectoryReadableStream.DefaultBufferSize,
-    );
+    this.#buffer = new Uint8Array(options.bufferSize);
     this.#currentPosition = trailer.offset;
     this.#endPosition = trailer.offset + trailer.size;
     this.#entryCount = trailer.count;

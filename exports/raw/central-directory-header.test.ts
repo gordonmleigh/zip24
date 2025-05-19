@@ -13,12 +13,18 @@ import {
   utf8,
   utf8length,
 } from "../../test-util/data.ts";
+import { randomAccessReaderFromBuffer } from "../../util/streams.ts";
 import {
   MultiDiskError,
   ZipFormatError,
   ZipSignatureError,
 } from "../errors.ts";
-import { CentralDirectoryHeader } from "./central-directory-header.ts";
+import {
+  CentralDirectoryBufferReader,
+  CentralDirectoryHeader,
+  CentralDirectoryRandomAccessReader,
+  CentralDirectoryReadableStream,
+} from "./central-directory-header.ts";
 import {
   CompressionMethod,
   ExtraFieldTag,
@@ -32,9 +38,9 @@ import {
 import { UnixFileAttributes } from "./file-attributes.ts";
 import { GeneralPurposeFlags } from "./flags.ts";
 
-describe("core/central-directory-header", () => {
+describe("exports/raw/central-directory-header", () => {
   describe("class CentralDirectoryHeader", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("throws if the signature is invalid", () => {
         const buffer = data(
           /* 00 +04 */ "ffffffff", // signature  (0x02014b50)
@@ -379,7 +385,7 @@ describe("core/central-directory-header", () => {
       });
     });
 
-    describe(".readTotalSize()", () => {
+    describe("static readTotalSize()", () => {
       it("throws if the signature is invalid", () => {
         const buffer = data(
           /* 00 +04 */ "ffffffff", // signature  (0x02014b50)
@@ -441,7 +447,7 @@ describe("core/central-directory-header", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("writes all the basic fields", () => {
         const entry = new CentralDirectoryHeader({
           attributes: new UnixFileAttributes(0o10_755),
@@ -669,6 +675,92 @@ describe("core/central-directory-header", () => {
         const result = entry.serialize();
 
         assertBufferEqual(result, expected);
+      });
+    });
+  });
+
+  describe("class CentralDirectoryBufferReader", () => {
+    describe("constructor", () => {
+      it("sets the instance properties", () => {
+        const data = new Uint8Array(1024);
+
+        const reader = new CentralDirectoryBufferReader(
+          {
+            comment: "comment here",
+            count: 10,
+            offset: 123,
+            size: 456,
+            zip64: {
+              platformMadeBy: ZipPlatform.UNIX,
+              versionMadeBy: ZipVersion.Zip64,
+              versionNeeded: ZipVersion.Utf8Encoding,
+            },
+          },
+          data,
+        );
+
+        assert.strictEqual(reader.comment, "comment here");
+        assert.strictEqual(reader.count, 10);
+        assert.strictEqual(reader.offset, 123);
+        assert.strictEqual(reader.size, 456);
+        assert.strictEqual(reader.zip64?.platformMadeBy, ZipPlatform.UNIX);
+        assert.strictEqual(reader.zip64.versionMadeBy, ZipVersion.Zip64);
+        assert.strictEqual(reader.zip64.versionNeeded, ZipVersion.Utf8Encoding);
+      });
+    });
+  });
+
+  describe("class CentralDirectoryRandomAccessReader", () => {
+    describe("constructor", () => {
+      it("sets the instance properties", () => {
+        const data = randomAccessReaderFromBuffer(new Uint8Array(1024));
+
+        const reader = new CentralDirectoryRandomAccessReader(
+          {
+            comment: "comment here",
+            count: 10,
+            offset: 123,
+            size: 456,
+            zip64: {
+              platformMadeBy: ZipPlatform.UNIX,
+              versionMadeBy: ZipVersion.Zip64,
+              versionNeeded: ZipVersion.Utf8Encoding,
+            },
+          },
+          { reader: data, bufferSize: 100 },
+        );
+
+        assert.strictEqual(reader.comment, "comment here");
+        assert.strictEqual(reader.count, 10);
+        assert.strictEqual(reader.offset, 123);
+        assert.strictEqual(reader.size, 456);
+        assert.strictEqual(reader.zip64?.platformMadeBy, ZipPlatform.UNIX);
+        assert.strictEqual(reader.zip64.versionMadeBy, ZipVersion.Zip64);
+        assert.strictEqual(reader.zip64.versionNeeded, ZipVersion.Utf8Encoding);
+      });
+    });
+  });
+
+  describe("class CentralDirectoryReadableStream", () => {
+    describe("iteration", () => {
+      it("throws ZipFormatError if size is too small for number of entries", async () => {
+        const data = randomAccessReaderFromBuffer(new Uint8Array(10));
+
+        const readable = new CentralDirectoryReadableStream(
+          {
+            comment: "",
+            count: 10,
+            offset: 0,
+            size: 10,
+          },
+          { reader: data, bufferSize: 100 },
+        );
+
+        const reader = readable.getReader();
+        await assert.rejects(
+          () => reader.read(),
+          (error) => error instanceof ZipFormatError,
+        );
       });
     });
   });

@@ -43,7 +43,7 @@
     "release": "release-it -VV",
     "test": "c8 --100 --src src/ --all -r text -r lcovonly node --test-reporter=spec --enable-source-maps --test '**/*.test.*'",
     "watch:compile": "tsc -w",
-    "watch:coverage": "nodemon -e ts,js --watch src --exec npm run coverage",
+    "watch:coverage": "nodemon -e ts,js --watch '**/*.ts' --exec npm run coverage",
     "watch:test": "node --watch --test '**/*.test.*'"
   },
   "devDependencies": {

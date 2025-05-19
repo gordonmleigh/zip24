@@ -197,7 +197,7 @@ export class ZipEntryReader
    * Returns the compressed data.
    */
   public openCompressed(): ReadableStream<Uint8Array> {
-    return new ReadableStream(this.#data());
+    return this.#data();
   }
 }
 

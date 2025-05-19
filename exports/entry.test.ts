@@ -1,21 +1,73 @@
 import assert from "node:assert";
+import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
+import { normalizeDataSource } from "../util/streams.ts";
 import {
   ZipEntry,
+  ZipEntryBase,
+  ZipEntryReader,
   minimumVersion,
   needs64bit,
   needsDataDescriptor,
   needsUtf8,
 } from "./entry.ts";
-import { ZipVersion } from "./raw/constants.ts";
+import { ZipFormatError } from "./errors.ts";
+import { CentralDirectoryHeader } from "./raw/central-directory-header.ts";
+import { CompressionMethod, ZipVersion } from "./raw/constants.ts";
+import {
+  ExtraFieldCollection,
+  Zip64ExtraField,
+} from "./raw/extra-field-collection.ts";
 import {
   DosFileAttributes,
   UnixFileAttributes,
 } from "./raw/file-attributes.ts";
+import { GeneralPurposeFlags } from "./raw/flags.ts";
 
-describe("core/zip-entry", () => {
+describe("exports/entry", () => {
+  describe("class ZipEntryBase", () => {
+    describe("constructor", () => {
+      it("sets all the instance properties", () => {
+        const extraField = new ExtraFieldCollection([]);
+
+        const entry = new ZipEntryBase({
+          attributes: new DosFileAttributes(DosFileAttributes.System),
+          comment: "the comment goes here",
+          compressedSize: 0x11223344,
+          compressionMethod: CompressionMethod.Deflate,
+          crc32: 0x55667788,
+          extraField,
+          flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+          lastModified: new Date(1747586332724),
+          localHeaderOffset: 0x44332211,
+          path: "here is the path",
+          uncompressedSize: 0x88776655,
+          versionMadeBy: ZipVersion.Utf8Encoding,
+          versionNeeded: ZipVersion.Deflate,
+        });
+
+        assert.strictEqual(entry.attributes.value, DosFileAttributes.System);
+        assert.strictEqual(entry.comment, "the comment goes here");
+        assert.strictEqual(entry.compressedSize, 0x11223344);
+        assert.strictEqual(entry.compressionMethod, CompressionMethod.Deflate);
+        assert.strictEqual(entry.crc32, 0x55667788);
+        assert.strictEqual(entry.extraField, extraField);
+        assert.strictEqual(
+          entry.flags.value,
+          GeneralPurposeFlags.HasEncryption,
+        );
+        assert.strictEqual(entry.lastModified.getTime(), 1747586332724);
+        assert.strictEqual(entry.localHeaderOffset, 0x44332211);
+        assert.strictEqual(entry.path, "here is the path");
+        assert.strictEqual(entry.uncompressedSize, 0x88776655);
+        assert.strictEqual(entry.versionMadeBy, ZipVersion.Utf8Encoding);
+        assert.strictEqual(entry.versionNeeded, ZipVersion.Deflate);
+      });
+    });
+  });
+
   describe("class ZipEntry", () => {
-    describe("#isDirectory", () => {
+    describe("get isDirectory", () => {
       it("returns true if the entry is a unix directory", () => {
         const attributes = new UnixFileAttributes();
         attributes.isDirectory = true;
@@ -59,7 +111,7 @@ describe("core/zip-entry", () => {
       });
     });
 
-    describe("#isFile", () => {
+    describe("get isFile", () => {
       it("returns false if the entry is a unix directory", () => {
         const attributes = new UnixFileAttributes();
         attributes.isDirectory = true;
@@ -102,9 +154,203 @@ describe("core/zip-entry", () => {
         assert.strictEqual(entry.isFile, false);
       });
     });
+
+    describe("constructor()", () => {
+      it("throws if the provided crc32 is invalid", () => {
+        assert.throws(
+          () => new ZipEntry({ crc32: 123 }, Buffer.from("hello world")),
+        );
+      });
+
+      it("throws if the provided uncompressedSize is invalid", () => {
+        assert.throws(
+          () =>
+            new ZipEntry({ uncompressedSize: 10 }, Buffer.from("hello world")),
+        );
+      });
+
+      it("throws if the uncompressedSize and crc32 is not given with compressedData", () => {
+        assert.throws(
+          () =>
+            new ZipEntry({
+              uncompressedSize: 11,
+              compressedData: Buffer.from("hello world"),
+            }),
+        );
+        assert.throws(
+          () =>
+            new ZipEntry({
+              crc32: 11,
+              compressedData: Buffer.from("hello world"),
+            }),
+        );
+        assert.doesNotThrow(
+          () =>
+            new ZipEntry({
+              uncompressedSize: 11,
+              crc32: 11,
+              compressedData: Buffer.from("hello world"),
+            }),
+        );
+      });
+
+      it("sets compression method to Stored if the data is empty", () => {
+        const entry = new ZipEntry({}, new Uint8Array());
+        assert.strictEqual(entry.compressionMethod, CompressionMethod.Stored);
+      });
+
+      it("copies the flags", () => {
+        const flags = new GeneralPurposeFlags(
+          GeneralPurposeFlags.HasUtf8Strings |
+            GeneralPurposeFlags.HasDataDescriptor,
+        );
+        const entry = new ZipEntry({ flags }, "hello");
+
+        assert.strictEqual(entry.flags.value, flags.value);
+        assert.notStrictEqual(entry.flags, flags);
+      });
+    });
   });
 
-  describe("minimumVersion()", () => {
+  describe("class ZipEntryReader", () => {
+    describe("open()", () => {
+      it("throws if the compression method is unknown", () => {
+        const entry = new ZipEntryReader(
+          new CentralDirectoryHeader({
+            attributes: new DosFileAttributes(DosFileAttributes.System),
+            comment: "the comment goes here",
+            compressedSize: 0x11223344,
+            compressionMethod: 10,
+            crc32: 222957957,
+            extraField: new ExtraFieldCollection(),
+            flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+            lastModified: new Date(1747586332724),
+            localHeaderOffset: 0x44332211,
+            path: "here is the path",
+            uncompressedSize: 0x88776655,
+            versionMadeBy: ZipVersion.Utf8Encoding,
+            versionNeeded: ZipVersion.Deflate,
+          }),
+          () => new ReadableStream(),
+        );
+        assert.throws(
+          () => entry.open(),
+          (error) =>
+            error instanceof ZipFormatError &&
+            error.message === "unknown compression method 10",
+        );
+      });
+
+      it("throws if the compressed size is wrong", async () => {
+        const entry = new ZipEntryReader(
+          new CentralDirectoryHeader({
+            attributes: new DosFileAttributes(DosFileAttributes.System),
+            comment: "the comment goes here",
+            compressedSize: 11,
+            compressionMethod: CompressionMethod.Stored,
+            crc32: 222957957,
+            extraField: new ExtraFieldCollection(),
+            flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+            lastModified: new Date(1747586332724),
+            localHeaderOffset: 0x44332211,
+            path: "here is the path",
+            uncompressedSize: 22,
+            versionMadeBy: ZipVersion.Utf8Encoding,
+            versionNeeded: ZipVersion.Deflate,
+          }),
+          () => normalizeDataSource("hello world"),
+        );
+        await assert.rejects(
+          () => text(entry.open()),
+          (error) =>
+            error instanceof ZipFormatError &&
+            error.message === "entry size mismatch",
+        );
+      });
+
+      it("throws if the crc32 size is wrong", async () => {
+        const entry = new ZipEntryReader(
+          new CentralDirectoryHeader({
+            attributes: new DosFileAttributes(DosFileAttributes.System),
+            comment: "the comment goes here",
+            compressedSize: 11,
+            compressionMethod: CompressionMethod.Stored,
+            crc32: 11,
+            extraField: new ExtraFieldCollection(),
+            flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+            lastModified: new Date(1747586332724),
+            localHeaderOffset: 0x44332211,
+            path: "here is the path",
+            uncompressedSize: 11,
+            versionMadeBy: ZipVersion.Utf8Encoding,
+            versionNeeded: ZipVersion.Deflate,
+          }),
+          () => normalizeDataSource("hello world"),
+        );
+        await assert.rejects(
+          () => text(entry.open()),
+          (error) =>
+            error instanceof ZipFormatError &&
+            error.message === "CRC-32 mismatch",
+        );
+      });
+
+      it("throws if the uncompressed size is wrong", async () => {
+        const entry = new ZipEntryReader(
+          new CentralDirectoryHeader({
+            attributes: new DosFileAttributes(DosFileAttributes.System),
+            comment: "the comment goes here",
+            compressedSize: 11,
+            compressionMethod: CompressionMethod.Stored,
+            crc32: 11,
+            extraField: new ExtraFieldCollection(),
+            flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+            lastModified: new Date(1747586332724),
+            localHeaderOffset: 0x44332211,
+            path: "here is the path",
+            uncompressedSize: 5,
+            versionMadeBy: ZipVersion.Utf8Encoding,
+            versionNeeded: ZipVersion.Deflate,
+          }),
+          () => normalizeDataSource("hello world"),
+        );
+        await assert.rejects(
+          () => text(entry.open()),
+          (error) =>
+            error instanceof ZipFormatError &&
+            error.message === "entry size mismatch",
+        );
+      });
+    });
+
+    describe("openCompressed()", () => {
+      it("returns the compressed data", async () => {
+        const entry = new ZipEntryReader(
+          new CentralDirectoryHeader({
+            attributes: new DosFileAttributes(DosFileAttributes.System),
+            comment: "the comment goes here",
+            compressedSize: 11,
+            compressionMethod: 123,
+            crc32: 11,
+            extraField: new ExtraFieldCollection(),
+            flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+            lastModified: new Date(1747586332724),
+            localHeaderOffset: 0x44332211,
+            path: "here is the path",
+            uncompressedSize: 11,
+            versionMadeBy: ZipVersion.Utf8Encoding,
+            versionNeeded: ZipVersion.Deflate,
+          }),
+          () => normalizeDataSource("still compressed"),
+        );
+
+        const data = await text(entry.openCompressed());
+        assert.strictEqual(data, "still compressed");
+      });
+    });
+  });
+
+  describe("function minimumVersion()", () => {
     it("returns the correct version for features", () => {
       assert.strictEqual(minimumVersion({}), ZipVersion.Deflate);
 
@@ -165,7 +411,7 @@ describe("core/zip-entry", () => {
     });
   });
 
-  describe("needs64bit()", () => {
+  describe("function needs64bit()", () => {
     it("returns false if all values fit in 32bit", () => {
       const result = needs64bit({
         compressedSize: 0xffff_ffff,
@@ -237,6 +483,17 @@ describe("core/zip-entry", () => {
       assert.strictEqual(result, true);
     });
 
+    it("returns true if there is a zip64 extra field", () => {
+      const result = needs64bit({
+        compressedSize: 0xffff_ffff,
+        uncompressedSize: 0xffff_ffff,
+        localHeaderOffset: 0xffff_ffff,
+        extraField: new ExtraFieldCollection([new Zip64ExtraField([1, 2, 3])]),
+      });
+
+      assert.strictEqual(result, true);
+    });
+
     it("throws if zip64 is false and the values don't fit in 32 bit", () => {
       assert.throws(
         () =>
@@ -254,7 +511,7 @@ describe("core/zip-entry", () => {
     });
   });
 
-  describe("needsDataDescriptor()", () => {
+  describe("function needsDataDescriptor()", () => {
     it("returns false if all values are provided", () => {
       const result = needsDataDescriptor({
         compressedSize: 0,
@@ -289,7 +546,7 @@ describe("core/zip-entry", () => {
     });
   });
 
-  describe("needsUtf8()", () => {
+  describe("function needsUtf8()", () => {
     it("returns false if values are cp437 encodable", () => {
       const result = needsUtf8({
         comment: "hello",

@@ -20,7 +20,7 @@ import { Eocdr, Zip64Eocdl, Zip64Eocdr, ZipTrailer } from "./zip-trailer.ts";
 
 describe("core/zip-trailer", () => {
   describe("class Eocdr", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("reads all the fields", () => {
         const buffer = data(
           longUint(0x06054b50), // signature (0x06054b50)
@@ -105,7 +105,7 @@ describe("core/zip-trailer", () => {
       });
     });
 
-    describe(".find()", () => {
+    describe("static find()", () => {
       it("finds the offset of the EOCDR", () => {
         const buffer = data(
           "c34b9b3fd8fab4e5083dfcf0ba51325e", // 16 bytes per line
@@ -147,7 +147,7 @@ describe("core/zip-trailer", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("writes all the values", () => {
         const record = new Eocdr({
           comment: "hello world",
@@ -204,7 +204,7 @@ describe("core/zip-trailer", () => {
   });
 
   describe("class Zip64Eocdl", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("reads all the fields", () => {
         const buffer = data(
           longUint(0x07064b50), // EOCDL signature (0x07064b50)
@@ -249,7 +249,7 @@ describe("core/zip-trailer", () => {
       });
     });
 
-    describe(".find()", () => {
+    describe("static find()", () => {
       it("returns an instance if the EOCDL is present", () => {
         const buffer = data(
           longUint(0x07064b50), // EOCDL signature
@@ -316,7 +316,7 @@ describe("core/zip-trailer", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("writes all the fields", () => {
         const record = new Zip64Eocdl(0x123456789abc);
         const result = record.serialize();
@@ -334,7 +334,7 @@ describe("core/zip-trailer", () => {
   });
 
   describe("class Zip64Eocdr", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("can read all the fields", () => {
         const buffer = data(
           longUint(0x06064b50), // EOCDR64 signature
@@ -384,7 +384,7 @@ describe("core/zip-trailer", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("writes all the fields", () => {
         const eocdr = new Zip64Eocdr({
           count: 0x112233445566,
@@ -417,7 +417,7 @@ describe("core/zip-trailer", () => {
   });
 
   describe("class ZipTrailer", () => {
-    describe(".constructor()", () => {
+    describe("constructor()", () => {
       it("sets eocdr fields if provider", () => {
         const trailer = new ZipTrailer({
           comment: "the comment",

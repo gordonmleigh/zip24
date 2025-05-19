@@ -6,7 +6,7 @@ import { EncodedString } from "./encoded-string.ts";
 
 describe("util/encoded-string", () => {
   describe("class EncodedString", () => {
-    describe("#constructor()", () => {
+    describe("constructor()", () => {
       describe("with cp437 encoding", () => {
         it("sets the value if given as string", () => {
           const encoded = new EncodedString("cp437", "♥♦♣♠");
@@ -54,7 +54,7 @@ describe("util/encoded-string", () => {
       });
     });
 
-    describe(".toString()", () => {
+    describe("toString()", () => {
       it("returns the string value", () => {
         const encoded = new EncodedString("utf8", "1️⃣");
         assert.strictEqual(encoded.toString(), "1️⃣");

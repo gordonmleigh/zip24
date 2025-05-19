@@ -50,7 +50,7 @@ describe("util/cp437", () => {
     });
   });
 
-  describe("CodePage437Decoder", () => {
+  describe("CodePage437Encoder", () => {
     describe("encode()", () => {
       it("returns an empty array if input is undefined", () => {
         const encoder = new CodePage437Encoder();

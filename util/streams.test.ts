@@ -2,12 +2,47 @@ import assert from "node:assert";
 import { Readable } from "node:stream";
 import { buffer } from "node:stream/consumers";
 import { describe, it } from "node:test";
+import { ZipFormatError } from "../exports/errors.ts";
 import { assertBufferEqual } from "../test-util/assert.ts";
 import { data, utf8 } from "../test-util/data.ts";
-import { normalizeDataSource } from "./streams.ts";
+import {
+  normalizeDataSource,
+  randomAccessReaderFromBuffer,
+  read,
+} from "./streams.ts";
 
 describe("util/streams", () => {
-  describe("normalizeDataSource", () => {
+  describe("function read()", () => {
+    it("returns at least minLength", async () => {
+      const reader = randomAccessReaderFromBuffer(utf8`ABCDEFGHIJKLMNOP`);
+      const buffer = new Uint8Array(100);
+      const count = await read(reader, { buffer, position: 2, minLength: 5 });
+
+      assert.strictEqual(count, 14);
+      const text = new TextDecoder().decode(buffer.subarray(0, count));
+      assert.strictEqual(text, "CDEFGHIJKLMNOP");
+    });
+
+    it("throws ZipFormatError if minLength is longer than available data", async () => {
+      const reader = randomAccessReaderFromBuffer(utf8`ABCDEFGHIJKLMNOP`);
+      const buffer = new Uint8Array(100);
+
+      await assert.rejects(
+        () => read(reader, { buffer, position: 2, minLength: 50 }),
+        (error) => error instanceof ZipFormatError,
+      );
+    });
+
+    it("successfully reads nothing if minLength is zero", async () => {
+      const reader = randomAccessReaderFromBuffer(utf8`ABCDEFGHIJKLMNOP`);
+      const buffer = new Uint8Array(100);
+
+      const count = await read(reader, { buffer, position: 16, minLength: 0 });
+      assert.strictEqual(count, 0);
+    });
+  });
+
+  describe("function normalizeDataSource()", () => {
     it("makes an empty stream from undefined", async () => {
       const output = normalizeDataSource(undefined);
       const iterator = output[Symbol.asyncIterator]();

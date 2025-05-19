@@ -4,21 +4,6 @@ import { CodePage437Encoder } from "../util/cp437.ts";
 import { computeCrc32 } from "../util/crc32.ts";
 import { DosDate } from "../util/dos-date.ts";
 
-export function base64(
-  literals: TemplateStringsArray,
-  ...values: unknown[]
-): Uint8Array {
-  return Buffer.from(baseTemplate(literals, ...values), "base64");
-}
-
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function* base64iterable(
-  literals: TemplateStringsArray,
-  ...values: unknown[]
-): AsyncGenerator<Uint8Array> {
-  yield base64(literals, ...values);
-}
-
 export function bigUint(value: number): Uint8Array {
   assert(value >= 0 && value <= Number.MAX_SAFE_INTEGER);
   const buffer = Buffer.alloc(8);

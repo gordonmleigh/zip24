@@ -1,6 +1,3 @@
-import { PackageRoot } from "#package";
-import { mkdir } from "node:fs/promises";
-import { resolve } from "node:path";
 import { CompressionMethod, ZipVersion } from "../exports/raw/constants.ts";
 import { CodePage437Encoder } from "../util/cp437.ts";
 import { computeCrc32 } from "../util/crc32.ts";
@@ -335,10 +332,4 @@ export async function* generateZip(
     shortUint(zipCommentRaw.byteLength), // .ZIP file comment length
     zipCommentRaw, // .ZIP file comment
   );
-}
-
-export async function getTemporaryOutputDirectory(): Promise<string> {
-  const localDirectory = resolve(PackageRoot, ".local/");
-  await mkdir(localDirectory, { recursive: true });
-  return localDirectory;
 }

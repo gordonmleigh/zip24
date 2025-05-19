@@ -23,7 +23,7 @@ import {
 
 describe("core/extra-field-collection", () => {
   describe("class UnicodeExtraField", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("can read a unicode comment field", () => {
         const buffer = data(
           "abcdef",
@@ -102,7 +102,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#fallbackUnicode()", () => {
+    describe("fallbackUnicode()", () => {
       it("returns the original if there is no matching field", () => {
         const original = new EncodedString("cp437", "hello");
         const fields = new ExtraFieldCollection();
@@ -154,7 +154,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("writes the correct data", () => {
         const field = new UnicodeExtraField(
           ExtraFieldTag.UnicodeCommentField,
@@ -177,7 +177,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#value", () => {
+    describe("value", () => {
       it("can round-trip the value", () => {
         const field = new UnicodeExtraField(
           ExtraFieldTag.UnicodeCommentField,
@@ -193,7 +193,7 @@ describe("core/extra-field-collection", () => {
   });
 
   describe("class UnknownExtraField", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("can deserialize a field", () => {
         const buffer = data(
           "abcdef",
@@ -212,7 +212,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       const field = new UnknownExtraField(0x1234, data("0504030201"));
 
       const buffer = field.serialize();
@@ -229,7 +229,7 @@ describe("core/extra-field-collection", () => {
   });
 
   describe("class Zip64ExtraField", () => {
-    describe(".deserialize()", () => {
+    describe("static deserialize()", () => {
       it("can read two values from a Zip64 extended info field", () => {
         const buffer = data(
           "0100", // tag: Zip64 extended information extra field
@@ -298,7 +298,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe(".from", () => {
+    describe("from", () => {
       it("sets the fields in order", () => {
         const field = Zip64ExtraField.from({
           uncompressedSize: 1,
@@ -310,7 +310,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#readFields()", () => {
+    describe("readFields()", () => {
       it("can read sizes from a Zip64 extended info field", () => {
         const entry: Zip64SizeFields = {
           compressedSize: 0xffff_ffff,
@@ -378,7 +378,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#serialize", () => {
+    describe("serialize()", () => {
       it("can serialize 2 values", () => {
         const field = new Zip64ExtraField([0x010203040506, 0x060504030201]);
 
@@ -415,7 +415,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#setValues()", () => {
+    describe("setValues()", () => {
       it("sets the fields in order", () => {
         const field = new Zip64ExtraField();
 
@@ -442,7 +442,7 @@ describe("core/extra-field-collection", () => {
   });
 
   describe("class ExtraFieldCollection", () => {
-    describe(".deserialize", () => {
+    describe("static deserialize()", () => {
       it("can read four fields together", () => {
         const buffer = data(
           "7563", // tag: Info-ZIP Unicode Comment Extra Field
@@ -500,7 +500,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#[Symbol.iterator]()", () => {
+    describe("[Symbol.iterator]()", () => {
       it("iterates through the fields", () => {
         const fields = [
           new UnicodeExtraField(ExtraFieldTag.UnicodeCommentField, 0, "hello"),
@@ -528,7 +528,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#getField()", () => {
+    describe("getField()", () => {
       it("returns the field with the given tag", () => {
         const fields = new ExtraFieldCollection([
           new UnicodeExtraField(ExtraFieldTag.UnicodeCommentField, 0, "hello"),
@@ -556,7 +556,7 @@ describe("core/extra-field-collection", () => {
       });
     });
 
-    describe("#serialize()", () => {
+    describe("serialize()", () => {
       it("serializes the fields properly", () => {
         const fields = new ExtraFieldCollection([
           new UnicodeExtraField(
