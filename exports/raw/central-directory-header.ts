@@ -1,9 +1,11 @@
-import { assert } from "../../util/assert.ts";
 import { BufferView, type BufferLike } from "../../util/binary.ts";
 import { DosDate } from "../../util/dos-date.ts";
 import { EncodedString } from "../../util/encoded-string.ts";
 import { makeBuffer, type Serializable } from "../../util/serialization.ts";
-import { read, type RandomAccessReader } from "../../util/streams.ts";
+import {
+  RandomAccessReaderStream,
+  type RandomAccessReader,
+} from "../../util/streams.ts";
 import {
   MultiDiskError,
   ZipFormatError,
@@ -392,116 +394,77 @@ export class CentralDirectoryRandomAccessReader
     void,
     void
   > {
-    const reader = new CentralDirectoryReadableStream(
-      this.#trailer,
-      this.#options,
-    );
+    const source = new RandomAccessReaderStream({
+      ...this.#options,
+      startPosition: this.#trailer.offset,
+      length: this.#trailer.size,
+    });
+    const reader = CentralDirectoryStream.from(source, {
+      entryCount: this.#trailer.count,
+    });
+
     return reader[Symbol.asyncIterator]();
   }
 }
 
-export class CentralDirectoryReadableStream extends ReadableStream<CentralDirectoryHeader> {
-  readonly #buffer: Uint8Array;
-  readonly #endPosition: number;
-  readonly #entryCount: number;
-  readonly #reader: RandomAccessReader;
+export type CentralDirectoryStreamOptions = {
+  entryCount: number;
+};
 
-  #readCount = 0;
-  #currentOffset = 0;
-  #currentPosition: number;
-  #endOffset = 0;
+export class CentralDirectoryStream extends TransformStream<
+  Uint8Array,
+  CentralDirectoryHeader
+> {
+  public static from(
+    readable: ReadableStream<Uint8Array>,
+    options: CentralDirectoryStreamOptions,
+  ): ReadableStream<CentralDirectoryHeader> {
+    return readable.pipeThrough(new CentralDirectoryStream(options));
+  }
 
-  public constructor(
-    trailer: ZipTrailerFields,
-    options: CentralDirectoryRandomAccessReaderOptions,
-  ) {
+  #headersRead = 0;
+  #lastChunk: Uint8Array | undefined;
+
+  public constructor(options: CentralDirectoryStreamOptions) {
     super({
-      pull: async (controller) => {
-        await this.#pull(controller);
+      transform: (newChunk, controller) => {
+        this.#processChunk(newChunk, controller);
+      },
+      flush: () => {
+        if (this.#headersRead !== options.entryCount) {
+          throw new ZipFormatError("central directory size mismatch");
+        }
       },
     });
-
-    this.#buffer = new Uint8Array(options.bufferSize);
-    this.#currentPosition = trailer.offset;
-    this.#endPosition = trailer.offset + trailer.size;
-    this.#entryCount = trailer.count;
-    this.#reader = options.reader;
   }
 
-  async #fillBuffer(minLength?: number): Promise<void> {
-    if (minLength === undefined) {
-      await this.#fillBuffer(CentralDirectoryHeader.FixedSize);
-
-      const size = CentralDirectoryHeader.readTotalSize(
-        this.#buffer,
-        this.#currentOffset,
-      );
-      await this.#fillBuffer(size);
-      return;
+  #processChunk(
+    newChunk: Uint8Array,
+    controller: TransformStreamDefaultController<CentralDirectoryHeader>,
+  ): void {
+    let chunk: Uint8Array;
+    if (this.#lastChunk) {
+      chunk = new Uint8Array(this.#lastChunk.byteLength + newChunk.length);
+      chunk.set(this.#lastChunk);
+      chunk.set(newChunk, this.#lastChunk.byteLength);
+    } else {
+      chunk = newChunk;
     }
-
-    if (this.#haveBytes(minLength)) {
-      return;
-    }
-
-    // we end up re-reading a small portion at the end of the buffer, but
-    // it's too small for there to be any benefit to trying to avoid that
-    this.#currentPosition += this.#currentOffset;
-    this.#currentOffset = 0;
-
-    const maxLength = Math.min(
-      this.#buffer.length,
-      this.#endPosition - this.#currentPosition,
-    );
-    if (minLength > maxLength) {
-      throw new ZipFormatError("unexpected end of file");
-    }
-
-    this.#endOffset = await read(this.#reader, {
-      buffer: this.#buffer,
-      position: this.#currentPosition,
-      minLength,
-      maxLength,
-    });
-  }
-
-  #haveBytes(count: number): boolean {
-    return this.#currentOffset + count <= this.#endOffset;
-  }
-
-  async #pull(controller: ReadableStreamDefaultController): Promise<void> {
-    if (this.#readCount === this.#entryCount) {
-      controller.close();
-      return;
-    }
-    assert(this.#readCount < this.#entryCount);
-
-    await this.#fillBuffer();
-    controller.enqueue(this.#readOne());
-
-    while (
-      this.#readCount < this.#entryCount &&
-      this.#haveBytes(CentralDirectoryHeader.FixedSize)
-    ) {
-      const headerLength = CentralDirectoryHeader.readTotalSize(
-        this.#buffer,
-        this.#currentOffset,
-      );
-      // don't have enough bytes left to read the whole header
-      if (!this.#haveBytes(headerLength)) {
+    let offset = 0;
+    while (offset + CentralDirectoryHeader.FixedSize < chunk.byteLength) {
+      const headerLength = CentralDirectoryHeader.readTotalSize(chunk, offset);
+      if (offset + headerLength > chunk.byteLength) {
+        // can't read the whole thing
         break;
       }
-      controller.enqueue(this.#readOne());
+      controller.enqueue(CentralDirectoryHeader.deserialize(chunk, offset));
+      ++this.#headersRead;
+      offset += headerLength;
     }
-  }
-
-  #readOne(): CentralDirectoryHeader {
-    const entry = CentralDirectoryHeader.deserialize(
-      this.#buffer,
-      this.#currentOffset,
-    );
-    ++this.#readCount;
-    this.#currentOffset += entry.totalSize;
-    return entry;
+    if (offset === chunk.byteLength) {
+      this.#lastChunk = undefined;
+    } else if (offset < chunk.byteLength) {
+      this.#lastChunk = chunk.subarray(offset);
+    }
   }
 }

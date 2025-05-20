@@ -138,7 +138,7 @@ export class ZipEntryReader
     return new this(header, () => {
       return new RandomAccessReaderStream({
         bufferSize,
-        headerLength: LocalFileHeader.FixedSize,
+        headerMinLength: LocalFileHeader.FixedSize,
         header: (chunk) => ({
           length: header.compressedSize,
           startPosition:

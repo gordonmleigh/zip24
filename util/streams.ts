@@ -93,9 +93,15 @@ export type RandomAccessReaderStreamOptions = {
   bufferSize?: number | undefined;
   reader: RandomAccessReader;
   startPosition: number;
-  header: (firstChunk: Uint8Array) => ReaderDataInfo;
-  headerLength: number;
-};
+} & (
+  | {
+      header: (firstChunk: Uint8Array) => ReaderDataInfo;
+      headerMinLength: number;
+    }
+  | {
+      length: number;
+    }
+);
 
 export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
   public constructor(options: RandomAccessReaderStreamOptions) {
@@ -104,14 +110,22 @@ export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
     let position = options.startPosition;
     let endPosition: number | undefined;
 
+    if ("length" in options) {
+      endPosition = position + options.length;
+    }
+
     super({
       start: async (controller) => {
         const buffer = new Uint8Array(bufferSize);
 
+        if (!("header" in options)) {
+          return;
+        }
+
         const length = await read(reader, {
           buffer,
           position,
-          minLength: options.headerLength,
+          minLength: options.headerMinLength,
         });
 
         const dataInfo = options.header(buffer);

@@ -400,16 +400,8 @@ describe("exports/reader", () => {
         assert.strictEqual(totalSize, directory.size);
         assertInstanceOf(directory, CentralDirectoryRandomAccessReader);
 
-        // The stream actually reads overlapping blocks to avoid having to copy
-        // partial chunks, because generally the zip entry size is quite small
-        // and there's no benefit to trying to minimize the overlap. So here we
-        // calculate the number of blocks we have to read in order to cover all
-        // the entries, taking into account that we can only read a whole number
-        // per read.
-        const entrySize = totalSize / fileCount;
-        const entriesPerBlock = Math.floor(bufferSize / entrySize);
         // we read one extra for the initial trailer read
-        const totalBlocks = Math.ceil(fileCount / entriesPerBlock) + 1;
+        const totalBlocks = Math.ceil(totalSize / bufferSize) + 1;
 
         assert.strictEqual(read.mock.callCount(), totalBlocks);
       });
