@@ -56,16 +56,11 @@
       }
     }
   },
-  "imports": {
-    "#package": {
-      "node": "./package.js",
-      "types": "./package.d.ts"
-    }
-  },
   "scripts": {
     "build": "npm run clean && npm run test && npm run compile && npm run lint",
     "clean": "rm -rf lib/",
-    "compile": "tsc",
+    "check": "tsc",
+    "compile": "tsc -p tsconfig.build.json",
     "coverage": "c8 node --test-reporter=dot --test '**/*.test.ts'",
     "lint": "eslint",
     "release": "release-it -VV",
@@ -86,10 +81,10 @@
     "typescript": "^5.8"
   },
   "files": [
-    "src/",
-    "lib/",
-    "!*.test.*",
-    "!**/test-util/"
+    "**/*.ts",
+    "!**/*.test.ts",
+    "out/",
+    "package.*"
   ],
   "release-it": {
     "$schema": "https://unpkg.com/release-it/schema/release-it.json",
