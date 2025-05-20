@@ -2,7 +2,7 @@ import propulsionworks, { config } from "@propulsionworks/eslint-config";
 
 export default config(
   {
-    ignores: ["node_modules/", "lib/", "eslint.config.js"],
+    ignores: ["node_modules/", "out/", "eslint.config.js"],
   },
   {
     files: ["**/*.js", "**/*.ts"],

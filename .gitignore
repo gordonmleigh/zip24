@@ -3,6 +3,5 @@
 *.local.*
 *.log
 coverage/
-dist/
-lib/
+out/
 node_modules/
