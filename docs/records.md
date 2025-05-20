@@ -97,7 +97,8 @@ This record has an optional signature value of `0x08074b50` which precedes the o
 | 32     | total entries on all disks    | 8    |
 | 40     | size of the central directory | 8    |
 | 48     | central directory offset      | 8    |
-| 56     | (end)                         |      |
+| 56     | extensible data sector        | ...  |
+| ...    | (56 + record size - 12)       |      |
 
 ## Zip64 End of Central Directory Locator (4.3.15)
 

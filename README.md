@@ -82,6 +82,10 @@ Nope! Reading a zip forwards from start to finish is something that the zip form
 
 ## Writing Zips
 
+### With `ZipWriter.open()`
+
+You can use `ZipWriter.open()` on Node.js to write directly to a file:
+
 ```ts
 import { ZipWriter } from "zip24/writer";
 
@@ -106,8 +110,27 @@ await writer.addFile(
   "this will be stored as-is",
 );
 
-await writer.finalize("Gordon is cool");
+await writer.close();
 ```
+
+### With `destination` option
+
+You can also output to any writer you'd like. On Node, [`Writable`](https://nodejs.org/api/stream.html#class-streamwritable) is also supported as a destination. Note that the destination must be an instance of `Writable`, not just "Writable-like".
+
+```ts
+import { ZipWriter } from "zip24/writer";
+
+const destination = createWritableStreamSomehow();
+const writer = new ZipWriter({ destination });
+
+// etc
+
+await writer.close();
+```
+
+### With streams
+
+`ZipWriter` is also a [TransformStream](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream), so you can pipe `ZipEntry`/`ZipEntryInfo` instances in and pipe the output to a stream of your choice.
 
 ## About this library
 
