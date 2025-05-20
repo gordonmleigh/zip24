@@ -31,6 +31,10 @@
       "types": "./out/exports/entry.d.ts",
       "default": "./out/exports/entry.js"
     },
+    "./raw/*": {
+      "types": "./out/exports/raw/*.d.ts",
+      "default": "./out/exports/raw/*.js"
+    },
     "./reader": {
       "node": {
         "types": "./out/exports/node/reader.d.ts",
