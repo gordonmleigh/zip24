@@ -366,17 +366,13 @@ describe("exports/writer", { signal: AbortSignal.timeout(1000) }, () => {
           ),
         );
 
-        await writer.write(
-          new ZipEntry(
-            {
-              comment: "comment 2",
-              compressionMethod: CompressionMethod.Stored,
-              lastModified: new Date(`1994-03-02T22:44:08Z`),
-              path: "zip-file-002.txt",
-            },
-            "this will be stored as-is",
-          ),
-        );
+        await writer.write({
+          comment: "comment 2",
+          compressionMethod: CompressionMethod.Stored,
+          lastModified: new Date(`1994-03-02T22:44:08Z`),
+          path: "zip-file-002.txt",
+          uncompressedData: "this will be stored as-is",
+        });
 
         await writer.close();
 

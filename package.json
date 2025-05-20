@@ -62,10 +62,10 @@
     "build": "npm run clean && npm run test && npm run compile && npm run lint",
     "clean": "rm -rf lib/",
     "compile": "tsc",
-    "coverage": "c8 --exclude '*.js' --exclude '*.d.ts' --exclude '**/*.test.ts' --exclude 'types/' --all -r text -r lcovonly node --test-reporter=dot --test '**/*.test.ts'",
+    "coverage": "c8 node --test-reporter=dot --test '**/*.test.ts'",
     "lint": "eslint",
     "release": "release-it -VV",
-    "test": "c8 --100 --exclude '*.js' --exclude '*.d.ts' --exclude '**/*.test.ts' --exclude 'types/' --all -r text -r lcovonly node --test-reporter=spec --enable-source-maps --test '**/*.test.*'",
+    "test": "c8 --100 node --test-reporter=spec --test '**/*.test.*'",
     "watch:compile": "tsc -w",
     "watch:coverage": "nodemon -e ts,js --watch '**/*.ts' --exec npm run coverage",
     "watch:test": "node --watch --test '**/*.test.*'"
