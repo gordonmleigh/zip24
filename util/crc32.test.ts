@@ -26,8 +26,27 @@ describe("util/crc32", () => {
       assert.strictEqual(output, 2795502179);
     });
 
+    it("returns the correct CRC32", () => {
+      // crc values from here: https://crccalc.com/ (CRC-32/ISO-HDLC)
+      assert.strictEqual(computeCrc32(Buffer.from("hello world")), 0x0d4a1185);
+      assert.strictEqual(computeCrc32(Buffer.from("wooo")), 0xab4fc085);
+      assert.strictEqual(computeCrc32(Buffer.from("blah blah")), 0xf412535a);
+    });
+
+    it("returns the correct CRC32 with multiple chunks", () => {
+      // crc values from here: https://crccalc.com/ (CRC-32/ISO-HDLC)
+      assert.strictEqual(
+        computeCrc32(Buffer.from(" world"), computeCrc32(Buffer.from("hello"))),
+        computeCrc32(Buffer.from("hello world")),
+      );
+      assert.strictEqual(
+        computeCrc32(Buffer.from(" blah"), computeCrc32(Buffer.from("blah"))),
+        computeCrc32(Buffer.from("blah blah")),
+      );
+    });
+
     it("returns the correct CRC32 of a sub view", () => {
-      // crc value from here: https://crccalc.com/
+      // crc value from here: https://crccalc.com/ (CRC-32/ISO-HDLC)
       const base = new Uint8Array([
         0xff, 0xff, 0xff, 0x12, 0x34, 0x56, 0x78, 0x90, 0xff, 0xff, 0xff,
       ]);

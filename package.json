@@ -111,8 +111,5 @@
         "strictSemVer": true
       }
     }
-  },
-  "dependencies": {
-    "crc-32": "^1.2.2"
   }
 }
