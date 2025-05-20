@@ -130,7 +130,7 @@ await writer.close();
 
 ### With streams
 
-`ZipWriter` is also a [TransformStream](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream), so you can pipe `ZipEntry` instances in and pipe the output to a stream of your choice.
+`ZipWriter` is also a [TransformStream](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream), so you can pipe `ZipEntry`/`ZipEntryInfo` instances in and pipe the output to a stream of your choice.
 
 ## About this library
 

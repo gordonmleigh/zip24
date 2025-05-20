@@ -23,7 +23,7 @@ export type ZipWriterOptions = {
  * A class which can create a zip file.
  */
 export class ZipWriter
-  implements TransformStream<ZipEntry, Uint8Array>, AsyncDisposable
+  implements TransformStream<ZipEntryInfo, Uint8Array>, AsyncDisposable
 {
   /**
    * Wrap a {@link WritableStream}. Files written to the returned instance will
@@ -42,7 +42,7 @@ export class ZipWriter
   readonly #centralDirectory: CentralDirectoryHeader[] = [];
   readonly #comment: string;
   readonly #output: ReadableStream<Uint8Array> | undefined;
-  readonly #input: WritableStream<ZipEntry>;
+  readonly #input: WritableStream<ZipEntryInfo>;
   readonly #byteWriter: WritableStreamDefaultWriter<Uint8Array>;
   #currentOffset: number;
   #inputMutex = Promise.resolve();
@@ -55,7 +55,7 @@ export class ZipWriter
     return this.#output;
   }
 
-  public get writable(): WritableStream<ZipEntry> {
+  public get writable(): WritableStream<ZipEntryInfo> {
     return this.#input;
   }
 
@@ -193,7 +193,9 @@ export class ZipWriter
     await this.#writeBytes(eocdr.serialize());
   }
 
-  async #writeEntry(entry: ZipEntry): Promise<void> {
+  async #writeEntry(input: ZipEntryInfo): Promise<void> {
+    const entry = input instanceof ZipEntry ? input : new ZipEntry(input);
+
     entry.header.localHeaderOffset = this.#currentOffset;
     const localHeader = new LocalFileHeader(entry);
     await this.#writeBytes(localHeader.serialize());
