@@ -1,3 +1,4 @@
+import { assert } from "../../util/assert.ts";
 import { BufferView, type BufferLike } from "../../util/binary.ts";
 import { DosDate } from "../../util/dos-date.ts";
 import { EncodedString } from "../../util/encoded-string.ts";
@@ -151,6 +152,16 @@ export class CentralDirectoryHeader
     byteOffset?: number,
     byteLength?: number,
   ): number {
+    return (
+      this.FixedSize + this.readVariableSize(buffer, byteOffset, byteLength)
+    );
+  }
+
+  public static readVariableSize(
+    buffer: BufferLike,
+    byteOffset?: number,
+    byteLength?: number,
+  ): number {
     const view = new BufferView(buffer, byteOffset, byteLength);
     const signature = view.readUint32LE(0);
 
@@ -162,12 +173,7 @@ export class CentralDirectoryHeader
     const extraFieldLength = view.readUint16LE(30);
     const commentLength = view.readUint16LE(32);
 
-    return (
-      CentralDirectoryHeader.FixedSize +
-      pathLength +
-      extraFieldLength +
-      commentLength
-    );
+    return pathLength + extraFieldLength + commentLength;
   }
 
   public attributes: FileAttributes;
@@ -386,7 +392,7 @@ export class CentralDirectoryStreamReader implements CentralDirectoryReader {
     void,
     void
   > {
-    const reader = CentralDirectoryStream.from(this.#source(), {
+    const reader = new CentralDirectoryStream(this.#source(), {
       entryCount: this.#trailer.count,
     });
 
@@ -398,62 +404,192 @@ export type CentralDirectoryStreamOptions = {
   entryCount: number;
 };
 
-export class CentralDirectoryStream extends TransformStream<
-  Uint8Array,
-  CentralDirectoryHeader
-> {
-  public static from(
-    readable: ByteSource,
-    options: CentralDirectoryStreamOptions,
-  ): ReadableStream<CentralDirectoryHeader> {
-    return normalizeByteSource(readable).pipeThrough(
-      new CentralDirectoryStream(options),
-    );
-  }
+export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeader> {
+  readonly #source: ReadableStreamDefaultReader<Uint8Array>;
+  readonly #entryCount: number;
 
+  #controller!: ReadableStreamDefaultController<CentralDirectoryHeader>;
   #headersRead = 0;
-  #lastChunk: Uint8Array | undefined;
+  #buffer = new Uint8Array(256);
+  #bufferSize = 0;
+  #bufferTarget = 0;
 
-  public constructor(options: CentralDirectoryStreamOptions) {
+  public constructor(
+    source: ByteSource,
+    options: CentralDirectoryStreamOptions,
+  ) {
     super({
-      transform: (newChunk, controller) => {
-        this.#processChunk(newChunk, controller);
+      start: async (controller) => {
+        if (options.entryCount === 0) {
+          controller.close();
+          return;
+        }
+        // finish constructing first
+        await Promise.resolve();
+        this.#controller = controller;
       },
-      flush: () => {
-        if (this.#headersRead !== options.entryCount) {
-          throw new ZipFormatError("central directory size mismatch");
+
+      pull: async (controller) => {
+        try {
+          await this.#pull();
+        } catch (error) {
+          controller.error(error);
+          await this.#source.cancel();
         }
       },
     });
+    this.#entryCount = options.entryCount;
+    this.#source = normalizeByteSource(source).getReader();
   }
 
-  #processChunk(
-    newChunk: Uint8Array,
-    controller: TransformStreamDefaultController<CentralDirectoryHeader>,
-  ): void {
-    let chunk: Uint8Array;
-    if (this.#lastChunk) {
-      chunk = new Uint8Array(this.#lastChunk.byteLength + newChunk.length);
-      chunk.set(this.#lastChunk);
-      chunk.set(newChunk, this.#lastChunk.byteLength);
-    } else {
-      chunk = newChunk;
+  #bufferChunk(chunk: Uint8Array): void {
+    if (this.#bufferTarget > this.#buffer.byteLength) {
+      const oldBuffer = this.#buffer;
+      this.#buffer = new Uint8Array(this.#bufferTarget);
+      this.#buffer.set(oldBuffer.subarray(0, this.#bufferSize));
+      this.#buffer.set(chunk, this.#bufferSize);
     }
+
+    this.#buffer.set(chunk, this.#bufferSize);
+    this.#bufferSize = this.#bufferSize + chunk.byteLength;
+  }
+
+  #emit(header: CentralDirectoryHeader): void {
+    ++this.#headersRead;
+    this.#controller.enqueue(header);
+  }
+
+  #processChunk(newChunk: Uint8Array): number {
+    const currentCount = this.#headersRead;
+
     let offset = 0;
-    while (offset + CentralDirectoryHeader.FixedSize < chunk.byteLength) {
-      const headerLength = CentralDirectoryHeader.readTotalSize(chunk, offset);
-      if (offset + headerLength > chunk.byteLength) {
-        // can't read the whole thing
-        break;
+    do {
+      offset = this.#processEntry(newChunk, offset);
+    } while (offset);
+
+    // return number read from this chunk
+    return this.#headersRead - currentCount;
+  }
+
+  #processEntry(newChunk: Uint8Array, byteOffset: number): number {
+    if (this.#bufferTarget > 0) {
+      // we have something in the buffer and we already parsed the header length
+      // into #bufferTarget
+
+      // we should only have an offset if we're processing the chunk, not buffer
+      assert(byteOffset === 0);
+
+      if (this.#bufferTarget - this.#bufferSize > newChunk.byteLength) {
+        // we still don't have enough, so add the chunk on to the existing buffer
+        this.#bufferChunk(newChunk);
+        return 0;
       }
-      controller.enqueue(CentralDirectoryHeader.deserialize(chunk, offset));
-      ++this.#headersRead;
-      offset += headerLength;
+      // we now have enough data to process an entry
+      const nextOffset = this.#bufferTarget - this.#bufferSize;
+      // buffer what we need from the new chunk
+      this.#bufferChunk(newChunk.subarray(0, nextOffset));
+      // parse and reset the buffer
+      this.#emit(this.#unbufferEntry());
+      // return the offset in newChunk of the next header
+      return nextOffset;
+    } else if (this.#bufferSize > 0) {
+      // we have something in the buffer but didn't already read the length
+
+      // we should only have an offset if we're processing the chunk, not buffer
+      assert(byteOffset === 0);
+
+      const requiredBytes = CentralDirectoryHeader.FixedSize - this.#bufferSize;
+      assert(requiredBytes > 0);
+
+      if (requiredBytes > newChunk.byteLength) {
+        // we still don't have enough for the fixed fields, so buffer and return
+        this.#bufferChunk(newChunk);
+        return 0;
+      }
+
+      // we now have enough for the fixed fields so read the total length
+      this.#bufferChunk(newChunk.subarray(0, requiredBytes));
+      const newChunkRemaining = newChunk.byteLength - requiredBytes;
+
+      const variableLength = CentralDirectoryHeader.readVariableSize(
+        this.#buffer,
+        0,
+        this.#bufferSize,
+      );
+      const headerLength = CentralDirectoryHeader.FixedSize + variableLength;
+
+      if (variableLength > newChunkRemaining) {
+        // we don't have enough for the whole header, but we know how much we
+        // need now
+        this.#bufferTarget = headerLength;
+        // buffer the rest of the chunk, skipping the bit we already buffered
+        this.#bufferChunk(newChunk.subarray(requiredBytes));
+        return 0;
+      }
+
+      const nextOffset = requiredBytes + variableLength;
+
+      // we now have enough data to process an entry - buffer the remaining header
+      this.#bufferChunk(newChunk.subarray(requiredBytes, nextOffset));
+      // parse and reset the buffer
+      this.#emit(this.#unbufferEntry());
+      // return the offset in new chunk of the next header
+      return nextOffset;
     }
-    if (offset === chunk.byteLength) {
-      this.#lastChunk = undefined;
-    } else if (offset < chunk.byteLength) {
-      this.#lastChunk = chunk.subarray(offset);
+
+    const availableBytes = newChunk.byteLength - byteOffset;
+    if (availableBytes < CentralDirectoryHeader.FixedSize) {
+      // there's nothing in the buffer and the new chunk is too short
+      this.#bufferChunk(newChunk.subarray(byteOffset));
+      return 0;
     }
+
+    // there's nothing in the buffer and the new chunk is at least long enough
+    // to read the total length
+
+    const headerLength = CentralDirectoryHeader.readTotalSize(
+      newChunk,
+      byteOffset,
+    );
+    if (availableBytes >= headerLength) {
+      // we have enough data to read the whole header
+      this.#emit(CentralDirectoryHeader.deserialize(newChunk, byteOffset));
+      // return the offset in newChunk of the next header
+      return byteOffset + headerLength;
+    }
+
+    // we don't have enough data for the variable fields
+    this.#bufferTarget = headerLength;
+    this.#bufferChunk(newChunk.subarray(byteOffset));
+    return 0;
+  }
+
+  async #pull(): Promise<void> {
+    // loop until we read at least one entry
+    let chunk: Uint8Array;
+    do {
+      const next = await this.#source.read();
+      if (next.done) {
+        throw new ZipFormatError("unexpected end of data");
+      }
+      chunk = next.value;
+    } while (this.#processChunk(chunk) === 0);
+
+    if (this.#headersRead >= this.#entryCount) {
+      this.#controller.close();
+      await this.#source.cancel();
+    }
+  }
+
+  #unbufferEntry(): CentralDirectoryHeader {
+    const header = CentralDirectoryHeader.deserialize(
+      this.#buffer,
+      0,
+      this.#bufferSize,
+    );
+
+    this.#bufferSize = 0;
+    this.#bufferTarget = 0;
+    return header;
   }
 }

@@ -744,7 +744,7 @@ describe("exports/raw/central-directory-header", () => {
       it("throws ZipFormatError if size is too small for number of entries", async () => {
         const data = normalizeDataSource(new Uint8Array(10));
 
-        const readable = CentralDirectoryStream.from(data, {
+        const readable = new CentralDirectoryStream(data, {
           entryCount: 1,
         });
 
