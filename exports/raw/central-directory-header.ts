@@ -3,8 +3,10 @@ import { DosDate } from "../../util/dos-date.ts";
 import { EncodedString } from "../../util/encoded-string.ts";
 import { makeBuffer, type Serializable } from "../../util/serialization.ts";
 import {
-  RandomAccessReaderStream,
-  type RandomAccessReader,
+  normalizeByteSource,
+  normalizeByteSourceProvider,
+  type ByteSource,
+  type ByteSourceProvider,
 } from "../../util/streams.ts";
 import {
   MultiDiskError,
@@ -354,16 +356,9 @@ export class CentralDirectoryBufferReader
   }
 }
 
-export type CentralDirectoryRandomAccessReaderOptions = {
-  bufferSize: number;
-  reader: RandomAccessReader;
-};
-
-export class CentralDirectoryRandomAccessReader
-  implements CentralDirectoryReader
-{
+export class CentralDirectoryStreamReader implements CentralDirectoryReader {
+  readonly #source: () => ReadableStream<Uint8Array>;
   readonly #trailer: ZipTrailerFields;
-  readonly #options: CentralDirectoryRandomAccessReaderOptions;
 
   public get size(): number {
     return this.#trailer.size;
@@ -381,12 +376,9 @@ export class CentralDirectoryRandomAccessReader
     return this.#trailer.zip64;
   }
 
-  public constructor(
-    trailer: ZipTrailerFields,
-    options: CentralDirectoryRandomAccessReaderOptions,
-  ) {
+  public constructor(trailer: ZipTrailerFields, source: ByteSourceProvider) {
+    this.#source = normalizeByteSourceProvider(source);
     this.#trailer = trailer;
-    this.#options = options;
   }
 
   public [Symbol.asyncIterator](): AsyncIterableIterator<
@@ -394,12 +386,7 @@ export class CentralDirectoryRandomAccessReader
     void,
     void
   > {
-    const source = new RandomAccessReaderStream({
-      ...this.#options,
-      startPosition: this.#trailer.offset,
-      length: this.#trailer.size,
-    });
-    const reader = CentralDirectoryStream.from(source, {
+    const reader = CentralDirectoryStream.from(this.#source(), {
       entryCount: this.#trailer.count,
     });
 
@@ -416,10 +403,12 @@ export class CentralDirectoryStream extends TransformStream<
   CentralDirectoryHeader
 > {
   public static from(
-    readable: ReadableStream<Uint8Array>,
+    readable: ByteSource,
     options: CentralDirectoryStreamOptions,
   ): ReadableStream<CentralDirectoryHeader> {
-    return readable.pipeThrough(new CentralDirectoryStream(options));
+    return normalizeByteSource(readable).pipeThrough(
+      new CentralDirectoryStream(options),
+    );
   }
 
   #headersRead = 0;

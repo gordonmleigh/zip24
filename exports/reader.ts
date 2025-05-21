@@ -1,12 +1,21 @@
 import { assert } from "../util/assert.ts";
-import { read, type RandomAccessReader } from "../util/streams.ts";
+import {
+  normalizeByteSource,
+  RandomAccessReaderStream,
+  read,
+  readableStreamFromDeferred,
+  type ByteSource,
+  type ByteSourceProvider,
+  type RandomAccessReader,
+} from "../util/streams.ts";
 import { ZipEntryReader } from "./entry.ts";
 import {
   CentralDirectoryBufferReader,
   CentralDirectoryHeader,
-  CentralDirectoryRandomAccessReader,
+  CentralDirectoryStreamReader,
   type CentralDirectoryReader,
 } from "./raw/central-directory-header.ts";
+import { LocalFileHeader } from "./raw/local-file-header.ts";
 import {
   Eocdr,
   Zip64Eocdl,
@@ -15,10 +24,26 @@ import {
 } from "./raw/zip-trailer.ts";
 
 /**
+ * Options for {@link ZipReaderOptions.openStream}.
+ */
+export type OpenStreamOptions = {
+  startPosition: number;
+  length: number;
+};
+
+/**
  * Options for {@link ZipReader} instance.
  */
 export type ZipReaderOptions = {
+  /**
+   * How many bytes to read from the underlying source at a time.
+   */
   bufferSize?: number | undefined;
+  /**
+   * A custom implementation for getting a stream of data. If not provided, the
+   * data will be read in chunks via the {@link RandomAccessReader}.
+   */
+  openStream?: ((options: OpenStreamOptions) => ByteSource) | undefined;
 };
 
 /**
@@ -35,6 +60,10 @@ export class ZipReader
   readonly #fileSize: number;
   readonly #reader: RandomAccessReader;
 
+  readonly #openStream:
+    | ((options: OpenStreamOptions) => ByteSource)
+    | undefined;
+
   #directory: CentralDirectoryReader | undefined;
   #pendingOpen: Promise<CentralDirectoryReader> | undefined;
 
@@ -42,16 +71,23 @@ export class ZipReader
    * Get the file comment, if set.
    */
   public get comment(): string {
+    return this.directory.comment;
+  }
+
+  /**
+   * Get the zip's central directory. You must call {@link ZipReader.open}
+   * first.
+   */
+  public get directory(): CentralDirectoryReader {
     assert(this.#directory, `call open() first`);
-    return this.#directory.comment;
+    return this.#directory;
   }
 
   /**
    * Get the total number of entries in the zip.
    */
   public get entryCount(): number {
-    assert(this.#directory, `call open() first`);
-    return this.#directory.count;
+    return this.directory.count;
   }
 
   public constructor(
@@ -62,10 +98,11 @@ export class ZipReader
     this.#bufferSize = options.bufferSize ?? ZipReader.DefaultBufferSize;
     this.#fileSize = fileSize;
     this.#reader = reader;
+    this.#openStream = options.openStream;
 
     assert(
       this.#bufferSize >= ZipReader.MinBufferSize,
-      `buffer size must be at least ${Eocdr.MaxSize + Zip64Eocdl.FixedSize}`,
+      `buffer size must be at least ${Eocdr.MaxSize + Zip64Eocdl.FixedSize} bytes`,
     );
   }
 
@@ -109,12 +146,8 @@ export class ZipReader
   public async *files(): AsyncGenerator<ZipEntryReader> {
     const directory = await this.open();
 
-    for await (const entry of directory) {
-      yield ZipEntryReader.fromRandomAccessReader(
-        entry,
-        this.#reader,
-        this.#bufferSize,
-      );
+    for await (const header of directory) {
+      yield new ZipEntryReader(header, this.makeEntryStreamProvider(header));
     }
   }
 
@@ -130,6 +163,64 @@ export class ZipReader
     }
     this.#directory = await this.#pendingOpen;
     return this.#directory;
+  }
+
+  protected makeEntryStreamProvider(
+    entry: CentralDirectoryHeader,
+  ): ByteSourceProvider {
+    let localHeaderLength: number | undefined;
+    let pendingLocalHeaderLength: Promise<number> | undefined;
+
+    const readLocalHeaderLength = async (): Promise<number> => {
+      const buffer = new Uint8Array(LocalFileHeader.FixedSize);
+
+      await read(this.#reader, {
+        buffer,
+        minLength: LocalFileHeader.FixedSize,
+        position: entry.localHeaderOffset,
+      });
+
+      localHeaderLength = LocalFileHeader.readTotalSize(buffer);
+      return localHeaderLength;
+    };
+
+    return () => {
+      if (localHeaderLength !== undefined) {
+        return this.openStream({
+          length: entry.compressedSize,
+          startPosition: entry.localHeaderOffset + localHeaderLength,
+        });
+      }
+      pendingLocalHeaderLength ??= readLocalHeaderLength();
+
+      return readableStreamFromDeferred(
+        pendingLocalHeaderLength.then((localHeaderLength) =>
+          this.openStream({
+            length: entry.compressedSize,
+            startPosition: entry.localHeaderOffset + localHeaderLength,
+          }),
+        ),
+      );
+    };
+  }
+
+  protected openDirectoryStream(trailer: ZipTrailer): ByteSource {
+    return this.openStream({
+      length: trailer.size,
+      startPosition: trailer.offset,
+    });
+  }
+
+  protected openStream(options: OpenStreamOptions): ReadableStream<Uint8Array> {
+    if (this.#openStream) {
+      return normalizeByteSource(this.#openStream(options));
+    }
+    return new RandomAccessReaderStream({
+      bufferSize: this.#bufferSize,
+      length: options.length,
+      reader: this.#reader,
+      startPosition: options.startPosition,
+    });
   }
 
   async #readCentralDirectory(): Promise<CentralDirectoryReader> {
@@ -150,19 +241,21 @@ export class ZipReader
     const eocdl = Zip64Eocdl.find(buffer, eocdrOffset);
 
     if (!eocdl) {
+      const trailer = new ZipTrailer(eocdr);
+
       if (eocdr.offset >= position) {
         // we already read all of the central directory into the buffer
         return new CentralDirectoryBufferReader(
-          new ZipTrailer(eocdr),
+          trailer,
           buffer,
           eocdr.offset - position,
         );
       }
+
       // we don't have the whole directory, so stream it instead
-      return new CentralDirectoryRandomAccessReader(new ZipTrailer(eocdr), {
-        reader: this.#reader,
-        bufferSize: this.#bufferSize,
-      });
+      return new CentralDirectoryStreamReader(trailer, () =>
+        this.openDirectoryStream(trailer),
+      );
     }
 
     let zip64eocdr: Zip64Eocdr;
@@ -201,9 +294,8 @@ export class ZipReader
       }
     }
     // we don't have the whole directory, so stream it instead
-    return new CentralDirectoryRandomAccessReader(trailer, {
-      reader: this.#reader,
-      bufferSize: this.#bufferSize,
-    });
+    return new CentralDirectoryStreamReader(trailer, () =>
+      this.openDirectoryStream(trailer),
+    );
   }
 }

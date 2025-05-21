@@ -13,10 +13,7 @@ import {
   utf8,
   utf8length,
 } from "../../test-util/data.ts";
-import {
-  normalizeDataSource,
-  randomAccessReaderFromBuffer,
-} from "../../util/streams.ts";
+import { normalizeDataSource } from "../../util/streams.ts";
 import {
   MultiDiskError,
   ZipFormatError,
@@ -25,8 +22,8 @@ import {
 import {
   CentralDirectoryBufferReader,
   CentralDirectoryHeader,
-  CentralDirectoryRandomAccessReader,
   CentralDirectoryStream,
+  CentralDirectoryStreamReader,
 } from "./central-directory-header.ts";
 import {
   CompressionMethod,
@@ -716,9 +713,7 @@ describe("exports/raw/central-directory-header", () => {
   describe("class CentralDirectoryRandomAccessReader", () => {
     describe("constructor", () => {
       it("sets the instance properties", () => {
-        const data = randomAccessReaderFromBuffer(new Uint8Array(1024));
-
-        const reader = new CentralDirectoryRandomAccessReader(
+        const reader = new CentralDirectoryStreamReader(
           {
             comment: "comment here",
             count: 10,
@@ -730,7 +725,7 @@ describe("exports/raw/central-directory-header", () => {
               versionNeeded: ZipVersion.Utf8Encoding,
             },
           },
-          { reader: data, bufferSize: 100 },
+          new Uint8Array(1024),
         );
 
         assert.strictEqual(reader.comment, "comment here");
@@ -749,7 +744,9 @@ describe("exports/raw/central-directory-header", () => {
       it("throws ZipFormatError if size is too small for number of entries", async () => {
         const data = normalizeDataSource(new Uint8Array(10));
 
-        const readable = CentralDirectoryStream.from(data, { entryCount: 1 });
+        const readable = CentralDirectoryStream.from(data, {
+          entryCount: 1,
+        });
 
         const reader = readable.getReader();
         await assert.rejects(

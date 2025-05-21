@@ -3,7 +3,9 @@ import { assert } from "./assert.ts";
 import { computeCrc32 } from "./crc32.ts";
 
 export type AnyIterable<T> = AsyncIterable<T> | Iterable<T>;
-export type ByteSource = AnyIterable<Uint8Array>;
+export type ByteStream = AnyIterable<Uint8Array>;
+export type ByteSource = AnyIterable<Uint8Array> | Uint8Array;
+export type ByteSourceProvider = Uint8Array | (() => ByteSource);
 
 export type RandomAccessReadOptions = {
   buffer: Uint8Array;
@@ -93,62 +95,18 @@ export type RandomAccessReaderStreamOptions = {
   bufferSize?: number | undefined;
   reader: RandomAccessReader;
   startPosition: number;
-} & (
-  | {
-      header: (firstChunk: Uint8Array) => ReaderDataInfo;
-      headerMinLength: number;
-    }
-  | {
-      length: number;
-    }
-);
+  length: number;
+};
 
 export class RandomAccessReaderStream extends ReadableStream<Uint8Array> {
   public constructor(options: RandomAccessReaderStreamOptions) {
     const { bufferSize = 128 * 1024, reader } = options;
 
     let position = options.startPosition;
-    let endPosition: number | undefined;
-
-    if ("length" in options) {
-      endPosition = position + options.length;
-    }
+    const endPosition = position + options.length;
 
     super({
-      start: async (controller) => {
-        const buffer = new Uint8Array(bufferSize);
-
-        if (!("header" in options)) {
-          return;
-        }
-
-        const length = await read(reader, {
-          buffer,
-          position,
-          minLength: options.headerMinLength,
-        });
-
-        const dataInfo = options.header(buffer);
-        const skipBytes = dataInfo.startPosition - position;
-        const firstChunkLength = Math.min(length - skipBytes, dataInfo.length);
-        position = dataInfo.startPosition;
-        endPosition = dataInfo.startPosition + dataInfo.length;
-
-        if (firstChunkLength > 0) {
-          const firstChunk = buffer.subarray(
-            skipBytes,
-            skipBytes + firstChunkLength,
-          );
-          controller.enqueue(firstChunk);
-          position += firstChunkLength;
-        }
-        if (position === endPosition) {
-          controller.close();
-        }
-      },
-
       pull: async (controller) => {
-        assert(endPosition !== undefined);
         const remaining = endPosition - position;
         if (remaining === 0) {
           controller.close();
@@ -196,59 +154,73 @@ export function randomAccessReaderFromBuffer(
   };
 }
 
+export function normalizeByteSource(
+  data: ByteSource,
+): ReadableStream<Uint8Array> {
+  if (data instanceof ReadableStream) {
+    return data as ReadableStream<Uint8Array>;
+  }
+  if (data instanceof Uint8Array) {
+    return readableStreamFromIterable([data]);
+  }
+  if (Symbol.iterator in data) {
+    return readableStreamFromIterable(data);
+  }
+  return readableStreamFromAsyncIterable(data);
+}
+
+export function normalizeByteSourceProvider(
+  provider: ByteSourceProvider,
+): () => ReadableStream<Uint8Array> {
+  if (provider instanceof Uint8Array) {
+    return () => normalizeByteSource(provider);
+  }
+  return () => normalizeByteSource(provider());
+}
+
 export function normalizeDataSource(
   data: DataSource | undefined,
 ): ReadableStream<Uint8Array> {
   // we can't assume that if data is already a ReadableStream that it has
   // Uint8Array chunks, so we still need to wrap it.
 
-  let iterator:
-    | AsyncIterator<Uint8Array | string>
-    | Iterator<Uint8Array | string>
-    | undefined;
+  if (!data) {
+    return readableStreamFromIterable([]);
+  }
+  if (typeof data === "string") {
+    return readableStreamFromIterable([new TextEncoder().encode(data)]);
+  }
+  if (data instanceof Uint8Array) {
+    return readableStreamFromIterable([data]);
+  }
 
   let encoder: TextEncoder | undefined;
-
-  return new ReadableStream<Uint8Array>({
-    start: (controller) => {
-      if (data === undefined) {
-        controller.close();
-      } else if (typeof data === "string") {
-        if (data.length > 0) {
-          controller.enqueue(new TextEncoder().encode(data));
+  if (Symbol.iterator in data) {
+    return readableStreamFromIterable(
+      (function* () {
+        for (const chunk of data) {
+          if (typeof chunk === "string") {
+            encoder ??= new TextEncoder();
+            yield encoder.encode(chunk);
+          } else {
+            yield chunk;
+          }
         }
-        controller.close();
-      } else if (data instanceof Uint8Array) {
-        if (data.byteLength > 0) {
-          controller.enqueue(data);
+      })(),
+    );
+  }
+  return readableStreamFromAsyncIterable(
+    (async function* () {
+      for await (const chunk of data) {
+        if (typeof chunk === "string") {
+          encoder ??= new TextEncoder();
+          yield encoder.encode(chunk);
+        } else {
+          yield chunk;
         }
-        controller.close();
-      } else if (Symbol.asyncIterator in data) {
-        iterator = data[Symbol.asyncIterator]();
-      } else if (Symbol.iterator in data) {
-        iterator = data[Symbol.iterator]();
       }
-    },
-
-    pull: async (controller) => {
-      assert(iterator);
-
-      const next = await iterator.next();
-      if (typeof next.value === "string") {
-        encoder ??= new TextEncoder();
-        controller.enqueue(encoder.encode(next.value));
-      } else if (next.value !== undefined) {
-        assert(
-          next.value instanceof Uint8Array,
-          `expected Uint8Array or string`,
-        );
-        controller.enqueue(next.value);
-      }
-      if (next.done) {
-        controller.close();
-      }
-    },
-  });
+    })(),
+  );
 }
 
 /**
@@ -284,5 +256,134 @@ export class Crc32Stream extends TransformStream<Uint8Array, Uint8Array> {
         callback(result);
       },
     });
+  }
+}
+
+export function readableStreamFromDeferred<T>(
+  promise: PromiseLike<ReadableStream<T>>,
+): ReadableStream<T> {
+  let reader: ReadableStreamDefaultReader<T>;
+
+  return new ReadableStream<T>({
+    start: async () => {
+      const readable = await promise;
+      reader = readable.getReader();
+    },
+
+    pull: async (controller) => {
+      const { value, done } = await reader.read();
+      if (done) {
+        controller.close();
+      } else {
+        controller.enqueue(value);
+      }
+    },
+
+    cancel: async (reason) => {
+      await reader.cancel(reason);
+    },
+  });
+}
+
+/**
+ * This isn't available everywhere yet.
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/from_static}
+ */
+function readableStreamFromAsyncIterable<T>(
+  asyncIterable: AsyncIterable<T>,
+): ReadableStream<T> {
+  // use the provided version if it exists
+  if ("from" in ReadableStream && typeof ReadableStream.from === "function") {
+    return (ReadableStream.from as typeof readableStreamFromAsyncIterable)(
+      asyncIterable,
+    );
+  }
+
+  // Spec: https://streams.spec.whatwg.org/#readable-stream-from-iterable
+  // 2.
+  const iteratorRecord = asyncIterable[Symbol.asyncIterator]();
+  // 4.
+  const pullAlgorithm: UnderlyingDefaultSource<T>["pull"] = async (
+    controller,
+  ) => {
+    // 4.1 - 4.4
+    const iterResult = await iteratorRecord.next();
+    // 4.4.1
+    assertIteratorResultObject(iterResult);
+    // 4.4.2
+    if (iterResult.done) {
+      // 4.4.3
+      controller.close();
+    } else {
+      // 4.4.2
+      controller.enqueue(iterResult.value);
+    }
+  };
+  // 5.
+  const cancelAlgorithm: UnderlyingDefaultSource<T>["cancel"] = async (
+    reason,
+  ) => {
+    // 5.3
+    if (iteratorRecord.return === undefined) {
+      return;
+    }
+    // 5.5-5.7
+    const iterResult = await iteratorRecord.return(reason);
+    // 5.8
+    assertIteratorResultObject(iterResult);
+  };
+
+  // 6.-7.
+  return new ReadableStream<T>(
+    {
+      pull: pullAlgorithm,
+      cancel: cancelAlgorithm,
+    },
+    { highWaterMark: 0 },
+  );
+}
+
+/**
+ * This is the synchronous analog of {@link readableStreamFromAsyncIterable}.
+ */
+function readableStreamFromIterable<T>(
+  iterable: Iterable<T>,
+): ReadableStream<T> {
+  const iteratorRecord = iterable[Symbol.iterator]();
+
+  const pullAlgorithm: UnderlyingDefaultSource<T>["pull"] = (controller) => {
+    const iterResult = iteratorRecord.next();
+    assertIteratorResultObject(iterResult);
+    if (iterResult.done) {
+      controller.close();
+    } else {
+      controller.enqueue(iterResult.value);
+    }
+  };
+  const cancelAlgorithm: UnderlyingDefaultSource<T>["cancel"] = (reason) => {
+    if (iteratorRecord.return === undefined) {
+      return;
+    }
+    const iterResult = iteratorRecord.return(reason);
+    assertIteratorResultObject(iterResult);
+  };
+
+  return new ReadableStream<T>(
+    {
+      pull: pullAlgorithm,
+      cancel: cancelAlgorithm,
+    },
+    { highWaterMark: 0 },
+  );
+}
+
+function assertIteratorResultObject(value: unknown): asserts value is object {
+  if (typeof value !== "object") {
+    throw Object.assign(
+      new TypeError(
+        "The promise returned by the iterator.next() method must fulfill with an object",
+      ),
+      { code: "ERR_INVALID_STATE" },
+    );
   }
 }

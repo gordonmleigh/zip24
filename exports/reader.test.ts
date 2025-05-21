@@ -14,7 +14,7 @@ import {
 import { ZipEntry, ZipEntryReader } from "./entry.ts";
 import {
   CentralDirectoryBufferReader,
-  CentralDirectoryRandomAccessReader,
+  CentralDirectoryStreamReader,
 } from "./raw/central-directory-header.ts";
 import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { UnixFileAttributes } from "./raw/file-attributes.ts";
@@ -398,7 +398,7 @@ describe("exports/reader", () => {
 
         assert.strictEqual(entryCount, fileCount);
         assert.strictEqual(totalSize, directory.size);
-        assertInstanceOf(directory, CentralDirectoryRandomAccessReader);
+        assertInstanceOf(directory, CentralDirectoryStreamReader);
 
         // we read one extra for the initial trailer read
         const totalBlocks = Math.ceil(totalSize / bufferSize) + 1;

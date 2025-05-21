@@ -1,7 +1,6 @@
 import assert from "node:assert";
 import { text } from "node:stream/consumers";
 import { describe, it } from "node:test";
-import { normalizeDataSource } from "../util/streams.ts";
 import {
   ZipEntry,
   ZipEntryBase,
@@ -219,7 +218,7 @@ describe("exports/entry", () => {
           new CentralDirectoryHeader({
             attributes: new DosFileAttributes(DosFileAttributes.System),
             comment: "the comment goes here",
-            compressedSize: 0x11223344,
+            compressedSize: 11,
             compressionMethod: 10,
             crc32: 222957957,
             extraField: new ExtraFieldCollection(),
@@ -231,7 +230,7 @@ describe("exports/entry", () => {
             versionMadeBy: ZipVersion.Utf8Encoding,
             versionNeeded: ZipVersion.Deflate,
           }),
-          () => new ReadableStream(),
+          Buffer.from("hello world"),
         );
         assert.throws(
           () => entry.open(),
@@ -242,33 +241,36 @@ describe("exports/entry", () => {
       });
 
       it("throws if the compressed size is wrong", async () => {
+        const header = new CentralDirectoryHeader({
+          attributes: new DosFileAttributes(DosFileAttributes.System),
+          comment: "the comment goes here",
+          compressedSize: 13,
+          compressionMethod: CompressionMethod.Stored,
+          crc32: 222957957,
+          extraField: new ExtraFieldCollection(),
+          flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
+          lastModified: new Date(1747586332724),
+          localHeaderOffset: 0x44332211,
+          path: "here is the path",
+          uncompressedSize: 11,
+          versionMadeBy: ZipVersion.Utf8Encoding,
+          versionNeeded: ZipVersion.Deflate,
+        });
         const entry = new ZipEntryReader(
-          new CentralDirectoryHeader({
-            attributes: new DosFileAttributes(DosFileAttributes.System),
-            comment: "the comment goes here",
-            compressedSize: 11,
-            compressionMethod: CompressionMethod.Stored,
-            crc32: 222957957,
-            extraField: new ExtraFieldCollection(),
-            flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
-            lastModified: new Date(1747586332724),
-            localHeaderOffset: 0x44332211,
-            path: "here is the path",
-            uncompressedSize: 22,
-            versionMadeBy: ZipVersion.Utf8Encoding,
-            versionNeeded: ZipVersion.Deflate,
-          }),
-          () => normalizeDataSource("hello world"),
+          header,
+          // needs to be a provider or the constructor will throw before we get
+          // to open()
+          () => Buffer.from("hello world"),
         );
         await assert.rejects(
           () => text(entry.open()),
           (error) =>
             error instanceof ZipFormatError &&
-            error.message === "entry size mismatch",
+            error.message === "entry compressed size mismatch",
         );
       });
 
-      it("throws if the crc32 size is wrong", async () => {
+      it("throws if the crc32 is wrong", async () => {
         const entry = new ZipEntryReader(
           new CentralDirectoryHeader({
             attributes: new DosFileAttributes(DosFileAttributes.System),
@@ -285,7 +287,7 @@ describe("exports/entry", () => {
             versionMadeBy: ZipVersion.Utf8Encoding,
             versionNeeded: ZipVersion.Deflate,
           }),
-          () => normalizeDataSource("hello world"),
+          Buffer.from("hello world"),
         );
         await assert.rejects(
           () => text(entry.open()),
@@ -302,7 +304,7 @@ describe("exports/entry", () => {
             comment: "the comment goes here",
             compressedSize: 11,
             compressionMethod: CompressionMethod.Stored,
-            crc32: 11,
+            crc32: 222957957,
             extraField: new ExtraFieldCollection(),
             flags: new GeneralPurposeFlags(GeneralPurposeFlags.HasEncryption),
             lastModified: new Date(1747586332724),
@@ -312,13 +314,13 @@ describe("exports/entry", () => {
             versionMadeBy: ZipVersion.Utf8Encoding,
             versionNeeded: ZipVersion.Deflate,
           }),
-          () => normalizeDataSource("hello world"),
+          Buffer.from("hello world"),
         );
         await assert.rejects(
           () => text(entry.open()),
           (error) =>
             error instanceof ZipFormatError &&
-            error.message === "entry size mismatch",
+            error.message === "entry uncompressed size mismatch",
         );
       });
     });
@@ -329,7 +331,7 @@ describe("exports/entry", () => {
           new CentralDirectoryHeader({
             attributes: new DosFileAttributes(DosFileAttributes.System),
             comment: "the comment goes here",
-            compressedSize: 11,
+            compressedSize: 16,
             compressionMethod: 123,
             crc32: 11,
             extraField: new ExtraFieldCollection(),
@@ -341,7 +343,7 @@ describe("exports/entry", () => {
             versionMadeBy: ZipVersion.Utf8Encoding,
             versionNeeded: ZipVersion.Deflate,
           }),
-          () => normalizeDataSource("still compressed"),
+          Buffer.from("still compressed"),
         );
 
         const data = await text(entry.openCompressed());

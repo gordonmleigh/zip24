@@ -58,7 +58,7 @@ export class ZipBufferReader
         entry.localHeaderOffset,
       );
 
-      yield ZipEntryReader.fromBuffer(
+      yield new ZipEntryReader(
         entry,
         this.#buffer.getOriginalBytes(
           entry.localHeaderOffset + localHeaderSize,
