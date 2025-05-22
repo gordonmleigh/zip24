@@ -264,10 +264,15 @@ export function readableStreamFromDeferred<T>(
 ): ReadableStream<T> {
   let reader: ReadableStreamDefaultReader<T>;
 
+  const readerPromise = promise.then((readable) => {
+    reader = readable.getReader();
+    return reader;
+  });
+
   return new ReadableStream<T>({
     start: async () => {
-      const readable = await promise;
-      reader = readable.getReader();
+      // make sure we're initialized before calling pull()
+      await readerPromise;
     },
 
     pull: async (controller) => {
@@ -280,15 +285,14 @@ export function readableStreamFromDeferred<T>(
     },
 
     cancel: async (reason) => {
+      // need to await this again because ReadableStream doesn't wait until
+      // start() is finished before calling cancel()
+      const reader = await readerPromise;
       await reader.cancel(reason);
     },
   });
 }
 
-/**
- * This isn't available everywhere yet.
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/from_static}
- */
 function readableStreamFromAsyncIterable<T>(
   asyncIterable: AsyncIterable<T>,
 ): ReadableStream<T> {
@@ -298,7 +302,17 @@ function readableStreamFromAsyncIterable<T>(
       asyncIterable,
     );
   }
+  /* c8 ignore next */
+  return fallbackReadableStreamFromAsyncIterable(asyncIterable);
+}
 
+/**
+ * This isn't available everywhere yet.
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/from_static}
+ */
+export function fallbackReadableStreamFromAsyncIterable<T>(
+  asyncIterable: AsyncIterable<T>,
+): ReadableStream<T> {
   // Spec: https://streams.spec.whatwg.org/#readable-stream-from-iterable
   // 2.
   const iteratorRecord = asyncIterable[Symbol.asyncIterator]();
@@ -309,7 +323,7 @@ function readableStreamFromAsyncIterable<T>(
     // 4.1 - 4.4
     const iterResult = await iteratorRecord.next();
     // 4.4.1
-    assertIteratorResultObject(iterResult);
+    assertIteratorResultObject(iterResult, "async", "next");
     // 4.4.2
     if (iterResult.done) {
       // 4.4.3
@@ -330,7 +344,7 @@ function readableStreamFromAsyncIterable<T>(
     // 5.5-5.7
     const iterResult = await iteratorRecord.return(reason);
     // 5.8
-    assertIteratorResultObject(iterResult);
+    assertIteratorResultObject(iterResult, "async", "return");
   };
 
   // 6.-7.
@@ -346,14 +360,14 @@ function readableStreamFromAsyncIterable<T>(
 /**
  * This is the synchronous analog of {@link readableStreamFromAsyncIterable}.
  */
-function readableStreamFromIterable<T>(
+export function readableStreamFromIterable<T>(
   iterable: Iterable<T>,
 ): ReadableStream<T> {
   const iteratorRecord = iterable[Symbol.iterator]();
 
   const pullAlgorithm: UnderlyingDefaultSource<T>["pull"] = (controller) => {
     const iterResult = iteratorRecord.next();
-    assertIteratorResultObject(iterResult);
+    assertIteratorResultObject(iterResult, "sync", "next");
     if (iterResult.done) {
       controller.close();
     } else {
@@ -365,7 +379,7 @@ function readableStreamFromIterable<T>(
       return;
     }
     const iterResult = iteratorRecord.return(reason);
-    assertIteratorResultObject(iterResult);
+    assertIteratorResultObject(iterResult, "sync", "return");
   };
 
   return new ReadableStream<T>(
@@ -377,11 +391,17 @@ function readableStreamFromIterable<T>(
   );
 }
 
-function assertIteratorResultObject(value: unknown): asserts value is object {
+function assertIteratorResultObject(
+  value: unknown,
+  type: "async" | "sync",
+  method: "next" | "return",
+): asserts value is object {
   if (typeof value !== "object") {
     throw Object.assign(
       new TypeError(
-        "The promise returned by the iterator.next() method must fulfill with an object",
+        type === "async"
+          ? `The promise returned by the iterator.${method}() method must fulfill with an object`
+          : `The value returned by the iterator.${method}() method be an object`,
       ),
       { code: "ERR_INVALID_STATE" },
     );

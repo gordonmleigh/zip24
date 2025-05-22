@@ -405,7 +405,7 @@ export type CentralDirectoryStreamOptions = {
 };
 
 export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeader> {
-  readonly #source: ReadableStreamDefaultReader<Uint8Array>;
+  readonly #source: ReadableStreamDefaultReader<Uint8Array> | undefined;
   readonly #entryCount: number;
 
   #controller!: ReadableStreamDefaultController<CentralDirectoryHeader>;
@@ -434,12 +434,16 @@ export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeade
           await this.#pull();
         } catch (error) {
           controller.error(error);
-          await this.#source.cancel();
+          await this.#source?.cancel();
         }
       },
     });
+
     this.#entryCount = options.entryCount;
-    this.#source = normalizeByteSource(source).getReader();
+
+    if (options.entryCount > 0) {
+      this.#source = normalizeByteSource(source).getReader();
+    }
   }
 
   #bufferChunk(chunk: Uint8Array): void {
@@ -565,6 +569,7 @@ export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeade
   }
 
   async #pull(): Promise<void> {
+    assert(this.#source);
     // loop until we read at least one entry
     let chunk: Uint8Array;
     do {

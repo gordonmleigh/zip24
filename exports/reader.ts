@@ -109,7 +109,7 @@ export class ZipReader
   /**
    * Get an iterator which iterates over the file entries in the zip.
    */
-  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader> {
+  public [Symbol.asyncIterator](): AsyncIterator<ZipEntryReader, void, void> {
     return this.files();
   }
 
@@ -143,7 +143,7 @@ export class ZipReader
   /**
    * Get an iterator which iterates over the file entries in the zip.
    */
-  public async *files(): AsyncGenerator<ZipEntryReader> {
+  public async *files(): AsyncIterableIterator<ZipEntryReader, void, void> {
     const directory = await this.open();
 
     for await (const header of directory) {

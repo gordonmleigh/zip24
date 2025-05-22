@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { Readable } from "node:stream";
 import { buffer, text } from "node:stream/consumers";
 import { describe, it, mock } from "node:test";
 import { assertInstanceOf } from "../test-util/assert.ts";
@@ -18,7 +19,8 @@ import {
 } from "./raw/central-directory-header.ts";
 import { CompressionMethod, ZipPlatform, ZipVersion } from "./raw/constants.ts";
 import { UnixFileAttributes } from "./raw/file-attributes.ts";
-import { ZipReader } from "./reader.ts";
+import { LocalFileHeader } from "./raw/local-file-header.ts";
+import { ZipReader, type OpenStreamOptions } from "./reader.ts";
 
 describe("exports/reader", () => {
   describe("class ZipReader", () => {
@@ -247,6 +249,129 @@ describe("exports/reader", () => {
         assert.strictEqual(file2.isFile, false);
 
         assert.strictEqual(await text(file2), "");
+      });
+
+      describe("the returned ZipEntry instance", () => {
+        it("only reads the local header once", async () => {
+          const bufferReader = randomAccessReaderFromBuffer(
+            Zip32WithThreeEntries,
+          );
+          const read = mock.method(bufferReader, "read");
+
+          const reader = new ZipReader(
+            bufferReader,
+            Zip32WithThreeEntries.byteLength,
+          );
+
+          const firstEntryResult = await reader.files().next();
+          assert(!firstEntryResult.done);
+          const firstEntry = firstEntryResult.value;
+
+          const fileData1 = await text(firstEntry.open());
+          const fileData2 = await text(firstEntry.open());
+
+          const expectedContent = "this is the file 1 content";
+          assert.strictEqual(fileData1, expectedContent);
+          assert.strictEqual(fileData2, expectedContent);
+
+          // central dir + file header + file data + file data
+          assert.strictEqual(read.mock.callCount(), 4);
+
+          // central dir read
+          assert.partialDeepStrictEqual(read.mock.calls[0]?.arguments[0], {
+            position: 0,
+            length: Zip32WithThreeEntries.byteLength,
+          });
+
+          // file header read
+          assert.partialDeepStrictEqual(read.mock.calls[1]?.arguments[0], {
+            position: 0,
+            length: LocalFileHeader.FixedSize,
+          });
+
+          // data read 1
+          assert.partialDeepStrictEqual(read.mock.calls[2]?.arguments[0], {
+            position: 36,
+            length: 26,
+          });
+
+          // data read 2
+          assert.partialDeepStrictEqual(read.mock.calls[2]?.arguments[0], {
+            position: 36,
+            length: 26,
+          });
+        });
+
+        it("uses the openStream implementation if provided", async () => {
+          const bufferReader = randomAccessReaderFromBuffer(
+            Zip32WithThreeEntries,
+          );
+          const read = mock.method(bufferReader, "read");
+
+          const openStream = mock.fn((opts: OpenStreamOptions) =>
+            Buffer.from("this is the file 1 content"),
+          );
+
+          const reader = new ZipReader(
+            bufferReader,
+            Zip32WithThreeEntries.byteLength,
+            { openStream },
+          );
+
+          const firstEntryResult = await reader.files().next();
+          assert(!firstEntryResult.done);
+          const firstEntry = firstEntryResult.value;
+
+          const fileData = await text(firstEntry.open());
+
+          const expectedContent = "this is the file 1 content";
+          assert.strictEqual(fileData, expectedContent);
+
+          assert.strictEqual(openStream.mock.callCount(), 1);
+
+          assert.deepStrictEqual(openStream.mock.calls[0]?.arguments[0], {
+            startPosition: 36,
+            length: 26,
+          });
+
+          // central dir + file header
+          assert.strictEqual(read.mock.callCount(), 2);
+
+          // central dir read
+          assert.partialDeepStrictEqual(read.mock.calls[0]?.arguments[0], {
+            position: 0,
+            length: Zip32WithThreeEntries.byteLength,
+          });
+
+          // file header read
+          assert.partialDeepStrictEqual(read.mock.calls[1]?.arguments[0], {
+            position: 0,
+            length: LocalFileHeader.FixedSize,
+          });
+        });
+
+        it("accepts a Node Readable from openStream", async () => {
+          const openStream = mock.fn((opts: OpenStreamOptions) =>
+            Readable.from(Buffer.from("this is the file 1 content")),
+          );
+
+          const reader = new ZipReader(
+            randomAccessReaderFromBuffer(Zip32WithThreeEntries),
+            Zip32WithThreeEntries.byteLength,
+            { openStream },
+          );
+
+          const firstEntryResult = await reader.files().next();
+          assert(!firstEntryResult.done);
+          const firstEntry = firstEntryResult.value;
+
+          const fileData = await text(firstEntry.open());
+
+          const expectedContent = "this is the file 1 content";
+          assert.strictEqual(fileData, expectedContent);
+
+          assert.strictEqual(openStream.mock.callCount(), 1);
+        });
       });
     });
 
