@@ -1,14 +1,17 @@
 import assert from "node:assert";
 import { Readable } from "node:stream";
-import { buffer } from "node:stream/consumers";
-import { describe, it } from "node:test";
+import { buffer, text } from "node:stream/consumers";
+import { describe, it, mock } from "node:test";
 import { ZipFormatError } from "../exports/errors.ts";
-import { assertBufferEqual } from "../test-util/assert.ts";
+import { assertBufferEqual, assertInstanceOf } from "../test-util/assert.ts";
 import { data, utf8 } from "../test-util/data.ts";
 import {
+  fallbackReadableStreamFromAsyncIterable,
   normalizeDataSource,
   randomAccessReaderFromBuffer,
   read,
+  readableStreamFromDeferred,
+  readableStreamFromIterable,
 } from "./streams.ts";
 
 describe("util/streams", () => {
@@ -154,6 +157,220 @@ describe("util/streams", () => {
       const expected = utf8`one,two,three,`;
 
       assertBufferEqual(output, expected);
+    });
+  });
+
+  describe("function fallbackReadableStreamFromAsyncIterable()", () => {
+    it("converts an AsyncIterable to a ReadableStream", async () => {
+      const input = Readable.from([
+        Buffer.from("one,"),
+        Buffer.from("two,"),
+        Buffer.from("three"),
+      ]);
+
+      const readable = fallbackReadableStreamFromAsyncIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const output = await text(readable);
+
+      assert.strictEqual(output, "one,two,three");
+    });
+
+    it("propagates cancel", async () => {
+      const returnFn = mock.fn(
+        async (reason: unknown) => ({ done: true, value: undefined }) as const,
+      );
+
+      const input: AsyncIterableIterator<Uint8Array> = {
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+
+        next: async () => ({ done: true, value: undefined }),
+        return: returnFn,
+      };
+
+      const readable = fallbackReadableStreamFromAsyncIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const reader = readable.getReader();
+
+      const reason = Symbol();
+      await reader.cancel(reason);
+
+      assert.strictEqual(returnFn.mock.callCount(), 1);
+      assert.strictEqual(returnFn.mock.calls[0]?.arguments[0], reason);
+    });
+
+    it("accepts iterators with no return() method", async () => {
+      const input: AsyncIterableIterator<Uint8Array> = {
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+
+        next: async () => ({ done: true, value: undefined }),
+      };
+
+      const readable = fallbackReadableStreamFromAsyncIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const reader = readable.getReader();
+
+      const reason = Symbol();
+      await reader.cancel(reason);
+    });
+
+    it("throws TypeError if the iterable returns something other than an object", async () => {
+      const input: AsyncIterableIterator<Uint8Array> = {
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+
+        next: async () => 2 as any,
+      };
+
+      const readable = fallbackReadableStreamFromAsyncIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const reader = readable.getReader();
+
+      await assert.rejects(
+        () => reader.read(),
+        (error) =>
+          error instanceof TypeError &&
+          "code" in error &&
+          error.code === "ERR_INVALID_STATE",
+      );
+    });
+  });
+
+  describe("function readableStreamFromIterable()", () => {
+    it("converts an Iterable to a ReadableStream", async () => {
+      const input = [
+        Buffer.from("one,"),
+        Buffer.from("two,"),
+        Buffer.from("three"),
+      ];
+
+      const readable = readableStreamFromIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const output = await text(readable);
+
+      assert.strictEqual(output, "one,two,three");
+    });
+
+    it("propagates cancel", async () => {
+      const returnFn = mock.fn(
+        (reason: unknown) => ({ done: true, value: undefined }) as const,
+      );
+
+      const input: IterableIterator<Uint8Array> = {
+        [Symbol.iterator]() {
+          return this;
+        },
+
+        next: () => ({ done: true, value: undefined }),
+        return: returnFn,
+      };
+
+      const readable = readableStreamFromIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const reader = readable.getReader();
+
+      const reason = Symbol();
+      await reader.cancel(reason);
+
+      assert.strictEqual(returnFn.mock.callCount(), 1);
+      assert.strictEqual(returnFn.mock.calls[0]?.arguments[0], reason);
+    });
+
+    it("accepts iterators with no return() method", async () => {
+      const input: IterableIterator<Uint8Array> = {
+        [Symbol.iterator]() {
+          return this;
+        },
+
+        next: () => ({ done: true, value: undefined }),
+      };
+
+      const readable = readableStreamFromIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const reader = readable.getReader();
+
+      const reason = Symbol();
+      await reader.cancel(reason);
+    });
+
+    it("throws TypeError if the iterable returns something other than an object", async () => {
+      const input: IterableIterator<Uint8Array> = {
+        [Symbol.iterator]() {
+          return this;
+        },
+
+        next: () => 2 as any,
+      };
+
+      const readable = readableStreamFromIterable(input);
+      assertInstanceOf(readable, ReadableStream);
+
+      const reader = readable.getReader();
+
+      await assert.rejects(
+        () => reader.read(),
+        (error) =>
+          error instanceof TypeError &&
+          "code" in error &&
+          error.code === "ERR_INVALID_STATE",
+      );
+    });
+
+    describe("function readableStreamFromDeferred()", () => {
+      it("returns the correct data", async () => {
+        const source = Promise.resolve(
+          new ReadableStream<Uint8Array>({
+            start: (controller) => {
+              controller.enqueue(Buffer.from("hello "));
+              controller.enqueue(Buffer.from("world"));
+              controller.close();
+            },
+          }),
+        );
+
+        const result = readableStreamFromDeferred(source);
+        assertInstanceOf(result, ReadableStream);
+
+        const data = await text(result);
+        assert.strictEqual(data, "hello world");
+      });
+
+      it("propagates cancel", async () => {
+        const cancel = mock.fn((reason: unknown) => {});
+
+        const source = Promise.resolve(
+          new ReadableStream<Uint8Array>({
+            start: (controller) => {
+              controller.enqueue(Buffer.from("hello "));
+              controller.enqueue(Buffer.from("world"));
+              controller.close();
+            },
+            cancel,
+          }),
+        );
+
+        const result = readableStreamFromDeferred(source);
+        assertInstanceOf(result, ReadableStream);
+
+        const reader = result.getReader();
+
+        const reason = Symbol();
+        await reader.cancel(reason);
+
+        assert.strictEqual(cancel.mock.callCount(), 1);
+        assert.strictEqual(cancel.mock.calls[0]?.arguments[0], reason);
+      });
     });
   });
 });

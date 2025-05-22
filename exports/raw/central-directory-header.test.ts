@@ -1,6 +1,6 @@
 import assert from "node:assert";
-import { describe, it } from "node:test";
-import { assertBufferEqual } from "../../test-util/assert.ts";
+import { describe, it, mock } from "node:test";
+import { assertBufferEqual, assertInstanceOf } from "../../test-util/assert.ts";
 import {
   bigUint,
   cp437,
@@ -13,7 +13,8 @@ import {
   utf8,
   utf8length,
 } from "../../test-util/data.ts";
-import { randomAccessReaderFromBuffer } from "../../util/streams.ts";
+import { Zip32CentralDirectoryWithThreeEntries } from "../../test-util/fixtures.ts";
+import { normalizeByteSource } from "../../util/streams.ts";
 import {
   MultiDiskError,
   ZipFormatError,
@@ -22,8 +23,8 @@ import {
 import {
   CentralDirectoryBufferReader,
   CentralDirectoryHeader,
-  CentralDirectoryRandomAccessReader,
-  CentralDirectoryReadableStream,
+  CentralDirectoryStream,
+  CentralDirectoryStreamReader,
 } from "./central-directory-header.ts";
 import {
   CompressionMethod,
@@ -713,9 +714,7 @@ describe("exports/raw/central-directory-header", () => {
   describe("class CentralDirectoryRandomAccessReader", () => {
     describe("constructor", () => {
       it("sets the instance properties", () => {
-        const data = randomAccessReaderFromBuffer(new Uint8Array(1024));
-
-        const reader = new CentralDirectoryRandomAccessReader(
+        const reader = new CentralDirectoryStreamReader(
           {
             comment: "comment here",
             count: 10,
@@ -727,7 +726,7 @@ describe("exports/raw/central-directory-header", () => {
               versionNeeded: ZipVersion.Utf8Encoding,
             },
           },
-          { reader: data, bufferSize: 100 },
+          new Uint8Array(1024),
         );
 
         assert.strictEqual(reader.comment, "comment here");
@@ -741,26 +740,76 @@ describe("exports/raw/central-directory-header", () => {
     });
   });
 
-  describe("class CentralDirectoryReadableStream", () => {
+  describe("class CentralDirectoryStream", () => {
     describe("iteration", () => {
-      it("throws ZipFormatError if size is too small for number of entries", async () => {
-        const data = randomAccessReaderFromBuffer(new Uint8Array(10));
+      it("returns 0 entries without reading the source if the entry count is 0", async () => {
+        const data = normalizeByteSource(new Uint8Array());
+        const getReader = mock.method(data, "getReader");
 
-        const readable = new CentralDirectoryReadableStream(
-          {
-            comment: "",
-            count: 10,
-            offset: 0,
-            size: 10,
-          },
-          { reader: data, bufferSize: 100 },
-        );
+        const readable = new CentralDirectoryStream(data, {
+          entryCount: 0,
+        });
+
+        const reader = readable.getReader();
+        const next = await reader.read();
+
+        assert.strictEqual(next.done, true);
+        assert.strictEqual(getReader.mock.callCount(), 0);
+      });
+
+      it("throws ZipFormatError if size is too small for number of entries", async () => {
+        const data = normalizeByteSource(new Uint8Array(10));
+
+        const readable = new CentralDirectoryStream(data, {
+          entryCount: 1,
+        });
 
         const reader = readable.getReader();
         await assert.rejects(
           () => reader.read(),
           (error) => error instanceof ZipFormatError,
         );
+      });
+
+      it("can read successfully with small data chunks", async () => {
+        const source = Zip32CentralDirectoryWithThreeEntries;
+        const smallChunks: Uint8Array[] = [];
+
+        // read the first header completely in two chunks, to cover all branches
+        const chunkSizes = [30, 31];
+
+        for (let offset = 0, i = 0; offset < source.byteLength; ++i) {
+          const chunkSize = chunkSizes[i] ?? 10;
+          smallChunks.push(source.subarray(offset, offset + chunkSize));
+          offset += chunkSize;
+        }
+
+        const directory = new CentralDirectoryStream(smallChunks, {
+          entryCount: 3,
+        });
+
+        const reader = directory.getReader();
+
+        const next = await reader.read();
+        assert(!next.done);
+        assertInstanceOf(next.value.attributes, UnixFileAttributes);
+        assert.strictEqual(next.value.attributes.value, 0o10_0644);
+        assert.strictEqual(next.value.comment, "comment 1");
+        assert.strictEqual(next.value.compressedSize, 26);
+        assert.strictEqual(next.value.compressionMethod, 0);
+        assert.strictEqual(next.value.crc32, 776234292);
+        assert.strictEqual(next.value.extraField.fields.length, 0);
+        assert.strictEqual(next.value.flags.value, 0);
+        assert.strictEqual(
+          next.value.lastModified.getTime(),
+          new Date("2023-04-05T11:22:34Z").getTime(),
+        );
+        assert.strictEqual(next.value.localHeaderOffset, 0);
+        assert.strictEqual(next.value.path, "path 1");
+        assert.strictEqual(next.value.platformMadeBy, 3);
+        assert.strictEqual(next.value.uncompressedSize, 26);
+        assert.strictEqual(next.value.versionMadeBy, 20);
+        assert.strictEqual(next.value.versionNeeded, 20);
       });
     });
   });

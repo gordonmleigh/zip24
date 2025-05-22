@@ -61,7 +61,7 @@
     "clean": "rm -rf lib/",
     "check": "tsc",
     "compile": "tsc -p tsconfig.build.json",
-    "coverage": "c8 node --test-reporter=dot --test '**/*.test.ts'",
+    "coverage": "c8 node --test '**/*.test.ts'",
     "lint": "eslint",
     "release": "release-it -VV",
     "test": "c8 --100 node --test-reporter=spec --test '**/*.test.*'",

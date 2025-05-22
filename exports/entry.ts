@@ -4,10 +4,10 @@ import { computeCrc32 } from "../util/crc32.ts";
 import {
   CountBytesStream,
   Crc32Stream,
+  normalizeByteSourceProvider,
   normalizeDataSource,
-  RandomAccessReaderStream,
+  type ByteSourceProvider,
   type DataSource,
-  type RandomAccessReader,
 } from "../util/streams.ts";
 import { ZipFormatError } from "./errors.ts";
 import {
@@ -26,7 +26,6 @@ import {
   type FileAttributes,
 } from "./raw/file-attributes.ts";
 import { GeneralPurposeFlags } from "./raw/flags.ts";
-import { LocalFileHeader } from "./raw/local-file-header.ts";
 
 /**
  * Represents an entry in a zip file.
@@ -106,58 +105,17 @@ export class ZipEntryReader
   extends ZipEntryBase
   implements AsyncIterable<Uint8Array>
 {
-  /**
-   * Create a {@link ZipEntryReader} for buffered content.
-   */
-  public static fromBuffer(
-    header: CentralDirectoryHeader,
-    dataBuffer: Uint8Array,
-  ): ZipEntryReader {
-    assert(
-      dataBuffer.byteLength === header.compressedSize,
-      `supplied data length must match compressedSize in header`,
-    );
-    return new this(header, () => {
-      return new ReadableStream({
-        start: (controller) => {
-          controller.enqueue(dataBuffer);
-          controller.close();
-        },
-      });
-    });
-  }
-
-  /**
-   * Create a {@link ZipEntryReader} for a {@link RandomAccessReader}.
-   */
-  public static fromRandomAccessReader(
-    header: CentralDirectoryHeader,
-    reader: RandomAccessReader,
-    bufferSize = 0x20000,
-  ): ZipEntryReader {
-    return new this(header, () => {
-      return new RandomAccessReaderStream({
-        bufferSize,
-        headerLength: LocalFileHeader.FixedSize,
-        header: (chunk) => ({
-          length: header.compressedSize,
-          startPosition:
-            header.localHeaderOffset + LocalFileHeader.readTotalSize(chunk),
-        }),
-        reader,
-        startPosition: header.localHeaderOffset,
-      });
-    });
-  }
-
   readonly #data: () => ReadableStream<Uint8Array>;
 
-  public constructor(
-    header: CentralDirectoryHeader,
-    data: () => ReadableStream<Uint8Array>,
-  ) {
+  public constructor(header: CentralDirectoryHeader, data: ByteSourceProvider) {
     super(header);
-    this.#data = data;
+    if (data instanceof Uint8Array) {
+      assert(
+        data.byteLength === header.compressedSize,
+        `supplied data length must match compressed size in header`,
+      );
+    }
+    this.#data = normalizeByteSourceProvider(data);
   }
 
   public [Symbol.asyncIterator](): AsyncIterator<Uint8Array, void, void> {
@@ -168,7 +126,14 @@ export class ZipEntryReader
    * Returns a stream for the uncompressed data.
    */
   public open(): ReadableStream<Uint8Array> {
-    let source = this.#data();
+    let source = this.#data().pipeThrough(
+      new CountBytesStream((count) => {
+        if (count !== this.compressedSize) {
+          throw new ZipFormatError(`entry compressed size mismatch`);
+        }
+      }),
+    );
+
     if (this.compressionMethod === CompressionMethod.Deflate) {
       source = source.pipeThrough(new DecompressionStream("deflate-raw"));
     } else if (this.compressionMethod !== CompressionMethod.Stored) {
@@ -180,7 +145,7 @@ export class ZipEntryReader
       .pipeThrough(
         new CountBytesStream((count) => {
           if (count !== this.uncompressedSize) {
-            throw new ZipFormatError(`entry size mismatch`);
+            throw new ZipFormatError(`entry uncompressed size mismatch`);
           }
         }),
       )
