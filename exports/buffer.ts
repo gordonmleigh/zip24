@@ -1,6 +1,9 @@
 import { BufferView, type BufferLike } from "../util/binary.ts";
 import { ZipEntryReader } from "./entry.ts";
-import { CentralDirectoryBufferReader } from "./raw/central-directory-header.ts";
+import {
+  CentralDirectoryBufferReader,
+  type CentralDirectoryReader,
+} from "./raw/central-directory-header.ts";
 import { LocalFileHeader } from "./raw/local-file-header.ts";
 import {
   Eocdr,
@@ -22,14 +25,22 @@ export class ZipBufferReader
    * The zip file comment, if set.
    */
   public get comment(): string {
-    return this.#directory.comment;
+    return this.directory.comment;
+  }
+
+  /**
+   * Get the zip's central directory.
+   * first.
+   */
+  public get directory(): CentralDirectoryReader {
+    return this.#directory;
   }
 
   /**
    * The number of file entries in the zip.
    */
   public get entryCount(): number {
-    return this.#directory.count;
+    return this.directory.entryCount;
   }
 
   public constructor(buffer: BufferLike) {
@@ -44,7 +55,7 @@ export class ZipBufferReader
     this.#directory = new CentralDirectoryBufferReader(
       trailer,
       buffer,
-      trailer.offset,
+      trailer.directoryStart,
     );
   }
 
@@ -53,7 +64,7 @@ export class ZipBufferReader
    */
   public *filesSync(): IterableIterator<ZipEntryReader, void, void> {
     for (const entry of this.#directory) {
-      const localHeaderSize = LocalFileHeader.readTotalSize(
+      const localHeaderSize = LocalFileHeader.readHeaderLength(
         this.#buffer,
         entry.localHeaderOffset,
       );

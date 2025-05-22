@@ -72,9 +72,9 @@ export class CentralDirectoryHeader
   // |        | extra field (variable size)     |      |
   // |        | file comment (variable size)    |      |
 
-  public static readonly FixedSize = 46;
+  public static readonly MinLength = 46;
   // fixed size + max file name + max extra + max comment
-  public static readonly MaxSize = this.FixedSize + 3 * 0xffff;
+  public static readonly MaxLength = this.MinLength + 3 * 0xffff;
   public static readonly Signature = 0x02014b50;
 
   public static deserialize(
@@ -147,17 +147,18 @@ export class CentralDirectoryHeader
     });
   }
 
-  public static readTotalSize(
+  public static readHeaderLength(
     buffer: BufferLike,
     byteOffset?: number,
     byteLength?: number,
   ): number {
     return (
-      this.FixedSize + this.readVariableSize(buffer, byteOffset, byteLength)
+      this.MinLength +
+      this.readVariableFieldLength(buffer, byteOffset, byteLength)
     );
   }
 
-  public static readVariableSize(
+  public static readVariableFieldLength(
     buffer: BufferLike,
     byteOffset?: number,
     byteLength?: number,
@@ -193,9 +194,9 @@ export class CentralDirectoryHeader
   public versionNeeded: number;
   public zip64: boolean;
 
-  public get totalSize(): number {
+  public get headerLength(): number {
     return (
-      CentralDirectoryHeader.FixedSize +
+      CentralDirectoryHeader.MinLength +
       this.rawPath.byteLength +
       this.extraField.byteLength +
       this.rawComment.byteLength
@@ -256,7 +257,7 @@ export class CentralDirectoryHeader
     }
 
     const view = makeBuffer(
-      CentralDirectoryHeader.FixedSize +
+      CentralDirectoryHeader.MinLength +
         this.rawPath.byteLength +
         extraField.byteLength +
         this.rawComment.byteLength,
@@ -313,17 +314,17 @@ export class CentralDirectoryBufferReader
   readonly #buffer: BufferView;
   readonly #trailer: ZipTrailerFields;
 
-  public get size(): number {
-    return this.#trailer.size;
-  }
   public get comment(): string {
     return this.#trailer.comment;
   }
-  public get count(): number {
-    return this.#trailer.count;
+  public get directoryLength(): number {
+    return this.#trailer.directoryLength;
   }
-  public get offset(): number {
-    return this.#trailer.offset;
+  public get directoryStart(): number {
+    return this.#trailer.directoryStart;
+  }
+  public get entryCount(): number {
+    return this.#trailer.entryCount;
   }
   public get zip64(): Zip64VersionFields | undefined {
     return this.#trailer.zip64;
@@ -334,7 +335,11 @@ export class CentralDirectoryBufferReader
     buffer: BufferLike,
     bufferOffset?: number,
   ) {
-    this.#buffer = new BufferView(buffer, bufferOffset, trailer.size);
+    this.#buffer = new BufferView(
+      buffer,
+      bufferOffset,
+      trailer.directoryLength,
+    );
     this.#trailer = trailer;
   }
 
@@ -354,9 +359,9 @@ export class CentralDirectoryBufferReader
   public *entries(): IterableIterator<CentralDirectoryHeader, void, void> {
     let offset = 0;
 
-    for (let index = 0; index < this.#trailer.count; ++index) {
+    for (let index = 0; index < this.#trailer.entryCount; ++index) {
       const header = CentralDirectoryHeader.deserialize(this.#buffer, offset);
-      offset += header.totalSize;
+      offset += header.headerLength;
       yield header;
     }
   }
@@ -366,17 +371,17 @@ export class CentralDirectoryStreamReader implements CentralDirectoryReader {
   readonly #source: () => ReadableStream<Uint8Array>;
   readonly #trailer: ZipTrailerFields;
 
-  public get size(): number {
-    return this.#trailer.size;
-  }
   public get comment(): string {
     return this.#trailer.comment;
   }
-  public get count(): number {
-    return this.#trailer.count;
+  public get directoryLength(): number {
+    return this.#trailer.directoryLength;
   }
-  public get offset(): number {
-    return this.#trailer.offset;
+  public get directoryStart(): number {
+    return this.#trailer.directoryStart;
+  }
+  public get entryCount(): number {
+    return this.#trailer.entryCount;
   }
   public get zip64(): Zip64VersionFields | undefined {
     return this.#trailer.zip64;
@@ -393,7 +398,7 @@ export class CentralDirectoryStreamReader implements CentralDirectoryReader {
     void
   > {
     const reader = new CentralDirectoryStream(this.#source(), {
-      entryCount: this.#trailer.count,
+      entryCount: this.#trailer.entryCount,
     });
 
     return reader[Symbol.asyncIterator]();
@@ -502,7 +507,7 @@ export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeade
       // we should only have an offset if we're processing the chunk, not buffer
       assert(byteOffset === 0);
 
-      const requiredBytes = CentralDirectoryHeader.FixedSize - this.#bufferSize;
+      const requiredBytes = CentralDirectoryHeader.MinLength - this.#bufferSize;
       assert(requiredBytes > 0);
 
       if (requiredBytes > newChunk.byteLength) {
@@ -515,12 +520,12 @@ export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeade
       this.#bufferChunk(newChunk.subarray(0, requiredBytes));
       const newChunkRemaining = newChunk.byteLength - requiredBytes;
 
-      const variableLength = CentralDirectoryHeader.readVariableSize(
+      const variableLength = CentralDirectoryHeader.readVariableFieldLength(
         this.#buffer,
         0,
         this.#bufferSize,
       );
-      const headerLength = CentralDirectoryHeader.FixedSize + variableLength;
+      const headerLength = CentralDirectoryHeader.MinLength + variableLength;
 
       if (variableLength > newChunkRemaining) {
         // we don't have enough for the whole header, but we know how much we
@@ -542,7 +547,7 @@ export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeade
     }
 
     const availableBytes = newChunk.byteLength - byteOffset;
-    if (availableBytes < CentralDirectoryHeader.FixedSize) {
+    if (availableBytes < CentralDirectoryHeader.MinLength) {
       // there's nothing in the buffer and the new chunk is too short
       this.#bufferChunk(newChunk.subarray(byteOffset));
       return 0;
@@ -551,7 +556,7 @@ export class CentralDirectoryStream extends ReadableStream<CentralDirectoryHeade
     // there's nothing in the buffer and the new chunk is at least long enough
     // to read the total length
 
-    const headerLength = CentralDirectoryHeader.readTotalSize(
+    const headerLength = CentralDirectoryHeader.readHeaderLength(
       newChunk,
       byteOffset,
     );

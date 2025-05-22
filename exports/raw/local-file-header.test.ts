@@ -192,7 +192,7 @@ describe("core/local-file-header", () => {
 
         assert.throws(
           () => {
-            LocalFileHeader.readTotalSize(buffer);
+            LocalFileHeader.readHeaderLength(buffer);
           },
           (error) => error instanceof ZipSignatureError,
         );
@@ -216,7 +216,7 @@ describe("core/local-file-header", () => {
           cp437`hello world ♥`, // file name
         );
 
-        const result = LocalFileHeader.readTotalSize(buffer, 32);
+        const result = LocalFileHeader.readHeaderLength(buffer, 32);
         assert.strictEqual(result, 30 + 13 + 123);
       });
     });

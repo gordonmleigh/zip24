@@ -125,7 +125,7 @@ describe("exports/raw/central-directory-header", () => {
         assert.strictEqual(entry.path, "ôöò/path");
         assert.strictEqual(entry.comment, "☺☻♥♦♣♠");
 
-        assert.strictEqual(entry.totalSize, 46 + 8 + 6);
+        assert.strictEqual(entry.headerLength, 46 + 8 + 6);
       });
 
       it("throws if the platform is unknown", () => {
@@ -357,7 +357,7 @@ describe("exports/raw/central-directory-header", () => {
         );
 
         const entry = CentralDirectoryHeader.deserialize(buffer);
-        assert.strictEqual(entry.totalSize, 46 + 5 + 53 + 5);
+        assert.strictEqual(entry.headerLength, 46 + 5 + 53 + 5);
 
         const commentField = entry.extraField.getField(
           ExtraFieldTag.UnicodeCommentField,
@@ -413,7 +413,7 @@ describe("exports/raw/central-directory-header", () => {
 
         assert.throws(
           () => {
-            CentralDirectoryHeader.readTotalSize(buffer);
+            CentralDirectoryHeader.readHeaderLength(buffer);
           },
           (error) => error instanceof ZipSignatureError,
         );
@@ -443,7 +443,7 @@ describe("exports/raw/central-directory-header", () => {
           /* 54 +11 */ "010203040506", // the comment
         );
 
-        const result = CentralDirectoryHeader.readTotalSize(buffer);
+        const result = CentralDirectoryHeader.readHeaderLength(buffer);
         assert.strictEqual(result, 46 + 8 + 5 + 6);
       });
     });
@@ -688,9 +688,9 @@ describe("exports/raw/central-directory-header", () => {
         const reader = new CentralDirectoryBufferReader(
           {
             comment: "comment here",
-            count: 10,
-            offset: 123,
-            size: 456,
+            entryCount: 10,
+            directoryStart: 123,
+            directoryLength: 456,
             zip64: {
               platformMadeBy: ZipPlatform.UNIX,
               versionMadeBy: ZipVersion.Zip64,
@@ -701,9 +701,9 @@ describe("exports/raw/central-directory-header", () => {
         );
 
         assert.strictEqual(reader.comment, "comment here");
-        assert.strictEqual(reader.count, 10);
-        assert.strictEqual(reader.offset, 123);
-        assert.strictEqual(reader.size, 456);
+        assert.strictEqual(reader.entryCount, 10);
+        assert.strictEqual(reader.directoryStart, 123);
+        assert.strictEqual(reader.directoryLength, 456);
         assert.strictEqual(reader.zip64?.platformMadeBy, ZipPlatform.UNIX);
         assert.strictEqual(reader.zip64.versionMadeBy, ZipVersion.Zip64);
         assert.strictEqual(reader.zip64.versionNeeded, ZipVersion.Utf8Encoding);
@@ -717,9 +717,9 @@ describe("exports/raw/central-directory-header", () => {
         const reader = new CentralDirectoryStreamReader(
           {
             comment: "comment here",
-            count: 10,
-            offset: 123,
-            size: 456,
+            entryCount: 10,
+            directoryStart: 123,
+            directoryLength: 456,
             zip64: {
               platformMadeBy: ZipPlatform.UNIX,
               versionMadeBy: ZipVersion.Zip64,
@@ -730,9 +730,9 @@ describe("exports/raw/central-directory-header", () => {
         );
 
         assert.strictEqual(reader.comment, "comment here");
-        assert.strictEqual(reader.count, 10);
-        assert.strictEqual(reader.offset, 123);
-        assert.strictEqual(reader.size, 456);
+        assert.strictEqual(reader.entryCount, 10);
+        assert.strictEqual(reader.directoryStart, 123);
+        assert.strictEqual(reader.directoryLength, 456);
         assert.strictEqual(reader.zip64?.platformMadeBy, ZipPlatform.UNIX);
         assert.strictEqual(reader.zip64.versionMadeBy, ZipVersion.Zip64);
         assert.strictEqual(reader.zip64.versionNeeded, ZipVersion.Utf8Encoding);

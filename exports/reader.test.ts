@@ -286,7 +286,7 @@ describe("exports/reader", () => {
           // file header read
           assert.partialDeepStrictEqual(read.mock.calls[1]?.arguments[0], {
             position: 0,
-            length: LocalFileHeader.FixedSize,
+            length: LocalFileHeader.MinLength,
           });
 
           // data read 1
@@ -346,7 +346,7 @@ describe("exports/reader", () => {
           // file header read
           assert.partialDeepStrictEqual(read.mock.calls[1]?.arguments[0], {
             position: 0,
-            length: LocalFileHeader.FixedSize,
+            length: LocalFileHeader.MinLength,
           });
         });
 
@@ -515,14 +515,14 @@ describe("exports/reader", () => {
 
         for await (const entry of directory) {
           ++entryCount;
-          totalSize += entry.totalSize;
+          totalSize += entry.headerLength;
         }
 
         // make sure the test conditions are actually valid
-        assert(directory.size > ZipReader.MinBufferSize);
+        assert(directory.directoryLength > ZipReader.MinBufferSize);
 
         assert.strictEqual(entryCount, fileCount);
-        assert.strictEqual(totalSize, directory.size);
+        assert.strictEqual(totalSize, directory.directoryLength);
         assertInstanceOf(directory, CentralDirectoryStreamReader);
 
         // we read one extra for the initial trailer read
