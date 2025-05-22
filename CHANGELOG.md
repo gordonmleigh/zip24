@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.2](https://github.com/gordonmleigh/zip24/compare/v0.1.7...v1.0.2) (2025-05-22)
+
+
+### Build
+
+* bump version number ([44922dd](https://github.com/gordonmleigh/zip24/commit/44922dd856835da91c182c270856b03632f558d7))
+
+### Chore
+
+* fix package exports (#2) ([63312d4](https://github.com/gordonmleigh/zip24/commit/63312d47e6f4cccd04fc0f400faad2ab385e38a1)), closes [#2](https://github.com/gordonmleigh/zip24/issues/2)
+
+### Refactor
+
+* streaming improvements (#3) ([58d4aff](https://github.com/gordonmleigh/zip24/commit/58d4aff51f8b76d43fa4ea852d3f0a0bc77fa347)), closes [#3](https://github.com/gordonmleigh/zip24/issues/3)
+* use standard web streams (#1) ([7a6b741](https://github.com/gordonmleigh/zip24/commit/7a6b741f35436dddee94b896133769d8c69a4451)), closes [#1](https://github.com/gordonmleigh/zip24/issues/1)
+
 ## [0.1.7](https://github.com/gordonmleigh/zip24/compare/v0.1.6...v0.1.7) (2025-03-25)
 
 ### Fix
