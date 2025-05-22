@@ -168,9 +168,9 @@ export class ZipWriter
 
     if (useZip64) {
       const eocdr64 = new Zip64Eocdr({
-        count: this.#centralDirectory.length,
-        offset: directoryOffset,
-        size: directorySize,
+        entryCount: this.#centralDirectory.length,
+        directoryStart: directoryOffset,
+        directoryLength: directorySize,
         platformMadeBy: ZipPlatform.UNIX,
         versionMadeBy: versionNeeded,
         versionNeeded,
@@ -183,9 +183,9 @@ export class ZipWriter
     const eocdr = new Eocdr(
       {
         comment: this.#comment,
-        count: this.#centralDirectory.length,
-        offset: directoryOffset,
-        size: directorySize,
+        entryCount: this.#centralDirectory.length,
+        directoryStart: directoryOffset,
+        directoryLength: directorySize,
       },
       useZip64,
     );

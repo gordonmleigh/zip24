@@ -28,8 +28,8 @@ export class DataDescriptor implements DataDescriptorFields, Serializable {
   // | 16     | uncompressed size      | 8    |
   // | 24     | (end)                  |      |
 
-  public static readonly FixedSize32 = 16;
-  public static readonly FixedSize64 = 24;
+  public static readonly RecordLength32 = 16;
+  public static readonly RecordLength64 = 24;
   public static readonly Signature = 0x08074b50;
 
   public compressedSize = 0;
@@ -52,7 +52,9 @@ export class DataDescriptor implements DataDescriptorFields, Serializable {
     byteLength?: number,
   ): Uint8Array {
     const view = makeBuffer(
-      this.is64bit ? DataDescriptor.FixedSize64 : DataDescriptor.FixedSize32,
+      this.is64bit
+        ? DataDescriptor.RecordLength64
+        : DataDescriptor.RecordLength32,
       buffer,
       byteOffset,
       byteLength,

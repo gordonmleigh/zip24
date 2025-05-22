@@ -42,7 +42,7 @@ export class LocalFileHeader implements Serializable {
   // | 30     | file name                 | ...  |
   // | ...    | extra field               | ...  |
 
-  public static readonly FixedSize = 30;
+  public static readonly MinLength = 30;
   public static readonly Signature = 0x04034b50;
 
   public static deserialize(
@@ -90,7 +90,7 @@ export class LocalFileHeader implements Serializable {
     });
   }
 
-  public static readTotalSize(
+  public static readHeaderLength(
     buffer: BufferLike,
     byteOffset?: number,
     byteLength?: number,
@@ -105,7 +105,7 @@ export class LocalFileHeader implements Serializable {
     const pathLength = view.readUint16LE(26);
     const extraFieldLength = view.readUint16LE(28);
 
-    return LocalFileHeader.FixedSize + pathLength + extraFieldLength;
+    return LocalFileHeader.MinLength + pathLength + extraFieldLength;
   }
 
   public compressedSize: number;
@@ -161,7 +161,7 @@ export class LocalFileHeader implements Serializable {
     }
 
     const view = makeBuffer(
-      LocalFileHeader.FixedSize +
+      LocalFileHeader.MinLength +
         this.rawPath.byteLength +
         extraField.byteLength,
       buffer,

@@ -11,7 +11,7 @@ import { ExtraFieldTag } from "./constants.ts";
 
 export type ExtraField = Serializable & {
   tag: number;
-  dataSize: number;
+  dataLength: number;
 };
 
 export type ExtraFieldType<T extends ExtraField> = Deserializer<T>;
@@ -66,7 +66,7 @@ export class UnicodeExtraField implements ExtraField {
   public crc32: number;
   public tag: UnicodeExtraFieldTag;
 
-  public get dataSize(): number {
+  public get dataLength(): number {
     // string plus crc32 and version
     return this.rawValueInternal.byteLength + 5;
   }
@@ -92,7 +92,12 @@ export class UnicodeExtraField implements ExtraField {
   ): Uint8Array {
     const encodedValue = new TextEncoder().encode(this.value);
 
-    const view = makeBuffer(this.dataSize + 4, buffer, byteOffset, byteLength);
+    const view = makeBuffer(
+      this.dataLength + 4,
+      buffer,
+      byteOffset,
+      byteLength,
+    );
 
     view.writeUint16LE(this.tag, 0);
     view.writeUint16LE(view.byteLength - 4, 2);
@@ -119,7 +124,7 @@ export class UnknownExtraField implements ExtraField {
   public tag: number;
   public data: Uint8Array;
 
-  public get dataSize(): number {
+  public get dataLength(): number {
     return this.data.byteLength;
   }
 
@@ -133,7 +138,12 @@ export class UnknownExtraField implements ExtraField {
     byteOffset?: number,
     byteLength?: number,
   ): Uint8Array {
-    const view = makeBuffer(this.dataSize + 4, buffer, byteOffset, byteLength);
+    const view = makeBuffer(
+      this.dataLength + 4,
+      buffer,
+      byteOffset,
+      byteLength,
+    );
     view.writeUint16LE(this.tag, 0);
     view.writeUint16LE(view.byteLength - 4, 2);
     view.setBytes(4, this.data);
@@ -196,7 +206,7 @@ export class Zip64ExtraField implements ExtraField {
 
   public readonly tag = ExtraFieldTag.Zip64ExtendedInfo;
 
-  public get dataSize(): number {
+  public get dataLength(): number {
     return this.values.length * 8;
   }
 
@@ -341,7 +351,10 @@ export class ExtraFieldCollection
   public fields: ExtraField[];
 
   public get byteLength(): number {
-    return this.fields.reduce((total, field) => total + field.dataSize + 4, 0);
+    return this.fields.reduce(
+      (total, field) => total + field.dataLength + 4,
+      0,
+    );
   }
 
   public constructor(fields: Iterable<ExtraField> = []) {

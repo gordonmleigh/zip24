@@ -9,10 +9,10 @@ import {
 import { ZipPlatform, ZipVersion } from "./constants.ts";
 
 export type EocdrFields = {
-  count: number;
-  offset: number;
   comment: string;
-  size: number;
+  directoryLength: number;
+  directoryStart: number;
+  entryCount: number;
 };
 
 export class Eocdr implements EocdrFields, Serializable {
@@ -28,9 +28,9 @@ export class Eocdr implements EocdrFields, Serializable {
   // | 20     | .ZIP file comment length      | 2    |
   // | 22     | (end)                         |      |
 
-  public static readonly FixedSize = 22;
+  public static readonly MinLength = 22;
   // fixed size + max extra field + max comment
-  public static readonly MaxSize = this.FixedSize + 2 * 0xffff;
+  public static readonly MaxLength = this.MinLength + 2 * 0xffff;
   public static readonly Signature = 0x06054b50;
 
   public static deserialize(
@@ -64,9 +64,9 @@ export class Eocdr implements EocdrFields, Serializable {
 
     return new this({
       comment,
-      count,
-      offset,
-      size,
+      directoryLength: size,
+      directoryStart: offset,
+      entryCount: count,
     });
   }
 
@@ -74,8 +74,8 @@ export class Eocdr implements EocdrFields, Serializable {
     const view = new BufferView(buffer);
 
     // max comment length is 0xffff
-    const maxLength = Math.min(view.byteLength, this.FixedSize + 0xffff);
-    const lastOffset = view.byteLength - this.FixedSize;
+    const maxLength = Math.min(view.byteLength, this.MinLength + 0xffff);
+    const lastOffset = view.byteLength - this.MinLength;
     const firstOffset = view.byteLength - maxLength;
 
     // look backwards from end of buffer for EOCDR signature
@@ -88,17 +88,17 @@ export class Eocdr implements EocdrFields, Serializable {
   }
 
   public comment = "";
-  public count = 0;
-  public offset = 0;
-  public size = 0;
+  public directoryLength = 0;
+  public directoryStart = 0;
+  public entryCount = 0;
   public zip64 = false;
 
   public constructor(fields?: EocdrFields, zip64 = false) {
     if (fields) {
       this.comment = fields.comment;
-      this.count = fields.count;
-      this.offset = fields.offset;
-      this.size = fields.size;
+      this.directoryLength = fields.directoryLength;
+      this.directoryStart = fields.directoryStart;
+      this.entryCount = fields.entryCount;
     }
     this.zip64 = zip64;
   }
@@ -120,10 +120,10 @@ export class Eocdr implements EocdrFields, Serializable {
     view.writeUint32LE(Eocdr.Signature, 0); // signature
     view.writeUint16LE(this.zip64 ? 0xffff : 0, 4); // number of this disk
     view.writeUint16LE(this.zip64 ? 0xffff : 0, 6); // central directory start disk
-    view.writeUint16LE(this.zip64 ? 0xffff : this.count, 8); // total entries this disk
-    view.writeUint16LE(this.zip64 ? 0xffff : this.count, 10); // total entries all disks
-    view.writeUint32LE(this.zip64 ? 0xffff_ffff : this.size, 12); // size of the central directory
-    view.writeUint32LE(this.zip64 ? 0xffff_ffff : this.offset, 16); // central directory offset
+    view.writeUint16LE(this.zip64 ? 0xffff : this.entryCount, 8); // total entries this disk
+    view.writeUint16LE(this.zip64 ? 0xffff : this.entryCount, 10); // total entries all disks
+    view.writeUint32LE(this.zip64 ? 0xffff_ffff : this.directoryLength, 12); // size of the central directory
+    view.writeUint32LE(this.zip64 ? 0xffff_ffff : this.directoryStart, 16); // central directory offset
     view.writeUint16LE(rawComment.byteLength, 20); // .ZIP file comment length
     view.setBytes(22, rawComment); // .ZIP file comment
 
@@ -142,7 +142,7 @@ export class Zip64Eocdl implements Serializable {
   // | 16     | total number of disks        | 4    |
   // | 20     | (end)                        |      |
 
-  public static readonly FixedSize = 20;
+  public static readonly RecordLength = 20;
   public static readonly Signature = 0x07064b50;
 
   public static deserialize(
@@ -172,7 +172,7 @@ export class Zip64Eocdl implements Serializable {
     buffer: BufferLike,
     eocdrOffset: number,
   ): Zip64Eocdl | undefined {
-    const offset = eocdrOffset - this.FixedSize;
+    const offset = eocdrOffset - this.RecordLength;
     if (offset < 0) {
       return;
     }
@@ -206,10 +206,10 @@ export class Zip64Eocdl implements Serializable {
 }
 
 export type Zip64EocdrFields = {
-  count: number;
-  offset: number;
+  directoryLength: number;
+  directoryStart: number;
+  entryCount: number;
   platformMadeBy: number;
-  size: number;
   versionMadeBy: number;
   versionNeeded: number;
 };
@@ -232,7 +232,7 @@ export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
   // | 56     | extensible data sector        | ...  |
   // | ...    | (56 + record size - 12)       |      |
 
-  public static readonly FixedSize = 56;
+  public static readonly MinLength = 56;
   public static readonly Signature = 0x06064b50;
 
   public static deserialize(
@@ -255,28 +255,28 @@ export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
     const offset = view.readUint64LE(48);
 
     return new this({
-      offset,
-      size,
-      count,
+      directoryStart: offset,
+      directoryLength: size,
+      entryCount: count,
       platformMadeBy,
       versionMadeBy,
       versionNeeded,
     });
   }
 
-  public count = 0;
-  public offset = 0;
+  public directoryLength = 0;
+  public directoryStart = 0;
+  public entryCount = 0;
   public platformMadeBy: number = ZipPlatform.DOS;
-  public size = 0;
   public versionMadeBy: number = ZipVersion.Zip64;
   public versionNeeded: number = ZipVersion.Zip64;
 
   public constructor(fields?: Zip64EocdrFields) {
     if (fields) {
-      this.count = fields.count;
-      this.offset = fields.offset;
+      this.directoryLength = fields.directoryLength;
+      this.directoryStart = fields.directoryStart;
+      this.entryCount = fields.entryCount;
       this.platformMadeBy = fields.platformMadeBy;
-      this.size = fields.size;
       this.versionMadeBy = fields.versionMadeBy;
       this.versionNeeded = fields.versionNeeded;
     }
@@ -296,10 +296,10 @@ export class Zip64Eocdr implements Zip64EocdrFields, Serializable {
     view.writeUint16LE(this.versionNeeded, 14); // version needed
     view.writeUint32LE(0, 16); // number of this disk
     view.writeUint32LE(0, 20); // central directory start disk
-    view.writeUint64LE(this.count, 24); // total entries this disk
-    view.writeUint64LE(this.count, 32); // total entries all disks
-    view.writeUint64LE(this.size, 40); // size of the central directory
-    view.writeUint64LE(this.offset, 48); // central directory offset
+    view.writeUint64LE(this.entryCount, 24); // total entries this disk
+    view.writeUint64LE(this.entryCount, 32); // total entries all disks
+    view.writeUint64LE(this.directoryLength, 40); // size of the central directory
+    view.writeUint64LE(this.directoryStart, 48); // central directory offset
 
     return view.getOriginalBytes();
   }
@@ -312,25 +312,25 @@ export type Zip64VersionFields = {
 };
 
 export type ZipTrailerFields = {
-  count: number;
-  offset: number;
   comment: string;
-  size: number;
+  directoryLength: number;
+  directoryStart: number;
+  entryCount: number;
   zip64?: Zip64VersionFields | undefined;
 };
 
 export class ZipTrailer implements ZipTrailerFields {
   public comment: string;
-  public count: number;
-  public offset: number;
-  public size: number;
+  public directoryLength: number;
+  public directoryStart: number;
+  public entryCount: number;
   public zip64: Zip64VersionFields | undefined;
 
   public constructor(eocdr: EocdrFields, eocdr64?: Zip64EocdrFields) {
     this.comment = eocdr.comment;
-    this.count = eocdr64?.count ?? eocdr.count;
-    this.offset = eocdr64?.offset ?? eocdr.offset;
-    this.size = eocdr64?.size ?? eocdr.size;
+    this.entryCount = eocdr64?.entryCount ?? eocdr.entryCount;
+    this.directoryStart = eocdr64?.directoryStart ?? eocdr.directoryStart;
+    this.directoryLength = eocdr64?.directoryLength ?? eocdr.directoryLength;
     this.zip64 = eocdr64;
   }
 }

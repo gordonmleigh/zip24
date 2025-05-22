@@ -54,7 +54,7 @@ export class ZipReader
 {
   public static readonly DefaultBufferSize = 1024 * 1024;
   // we need to be able to read a whole directory header at a time
-  public static readonly MinBufferSize = CentralDirectoryHeader.MaxSize;
+  public static readonly MinBufferSize = CentralDirectoryHeader.MaxLength;
 
   readonly #bufferSize: number;
   readonly #fileSize: number;
@@ -87,7 +87,7 @@ export class ZipReader
    * Get the total number of entries in the zip.
    */
   public get entryCount(): number {
-    return this.directory.count;
+    return this.directory.entryCount;
   }
 
   public constructor(
@@ -102,7 +102,7 @@ export class ZipReader
 
     assert(
       this.#bufferSize >= ZipReader.MinBufferSize,
-      `buffer size must be at least ${Eocdr.MaxSize + Zip64Eocdl.FixedSize} bytes`,
+      `buffer size must be at least ${Eocdr.MaxLength + Zip64Eocdl.RecordLength} bytes`,
     );
   }
 
@@ -172,15 +172,15 @@ export class ZipReader
     let pendingLocalHeaderLength: Promise<number> | undefined;
 
     const readLocalHeaderLength = async (): Promise<number> => {
-      const buffer = new Uint8Array(LocalFileHeader.FixedSize);
+      const buffer = new Uint8Array(LocalFileHeader.MinLength);
 
       await read(this.#reader, {
         buffer,
-        minLength: LocalFileHeader.FixedSize,
+        minLength: LocalFileHeader.MinLength,
         position: entry.localHeaderOffset,
       });
 
-      localHeaderLength = LocalFileHeader.readTotalSize(buffer);
+      localHeaderLength = LocalFileHeader.readHeaderLength(buffer);
       return localHeaderLength;
     };
 
@@ -206,8 +206,8 @@ export class ZipReader
 
   protected openDirectoryStream(trailer: ZipTrailer): ByteSource {
     return this.openStream({
-      length: trailer.size,
-      startPosition: trailer.offset,
+      length: trailer.directoryLength,
+      startPosition: trailer.directoryStart,
     });
   }
 
@@ -243,12 +243,12 @@ export class ZipReader
     if (!eocdl) {
       const trailer = new ZipTrailer(eocdr);
 
-      if (eocdr.offset >= position) {
+      if (eocdr.directoryStart >= position) {
         // we already read all of the central directory into the buffer
         return new CentralDirectoryBufferReader(
           trailer,
           buffer,
-          eocdr.offset - position,
+          eocdr.directoryStart - position,
         );
       }
 
@@ -265,7 +265,7 @@ export class ZipReader
       // whole central directory in one chunk, so we'll read from a position
       // that puts the ECODR at the _end_ of the buffer.
 
-      const endPosition = eocdl.eocdrOffset + Zip64Eocdr.FixedSize;
+      const endPosition = eocdl.eocdrOffset + Zip64Eocdr.MinLength;
       bufferSize = Math.min(this.#bufferSize, endPosition);
       position = endPosition - bufferSize;
 
@@ -278,7 +278,7 @@ export class ZipReader
       // read the EOCDR from the end of the buffer
       zip64eocdr = Zip64Eocdr.deserialize(
         buffer,
-        bufferSize - Zip64Eocdr.FixedSize,
+        bufferSize - Zip64Eocdr.MinLength,
       );
     } else {
       zip64eocdr = Zip64Eocdr.deserialize(buffer, eocdl.eocdrOffset - position);
@@ -286,9 +286,9 @@ export class ZipReader
 
     const trailer = new ZipTrailer(eocdr, zip64eocdr);
 
-    if (zip64eocdr.offset >= position) {
-      const bufferOffset = zip64eocdr.offset - position;
-      if (bufferOffset + zip64eocdr.size < bufferSize) {
+    if (zip64eocdr.directoryStart >= position) {
+      const bufferOffset = zip64eocdr.directoryStart - position;
+      if (bufferOffset + zip64eocdr.directoryLength < bufferSize) {
         // we have the whole EOCDR in the buffer
         return new CentralDirectoryBufferReader(trailer, buffer, bufferOffset);
       }

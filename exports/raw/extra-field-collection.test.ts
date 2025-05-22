@@ -39,7 +39,7 @@ describe("core/extra-field-collection", () => {
 
         assert.strictEqual(field.tag, 0x6375);
         assert.strictEqual(field.value, "ABC");
-        assert.strictEqual(field.dataSize, 8);
+        assert.strictEqual(field.dataLength, 8);
         assert.strictEqual(field.crc32, 0x0d4a1185);
       });
 
@@ -58,7 +58,7 @@ describe("core/extra-field-collection", () => {
 
         assert.strictEqual(field.tag, 0x7075);
         assert.strictEqual(field.value, "path 1️⃣");
-        assert.strictEqual(field.dataSize, 12 + 5);
+        assert.strictEqual(field.dataLength, 12 + 5);
         assert.strictEqual(field.crc32, 0x0d4a1185);
       });
 
@@ -206,7 +206,7 @@ describe("core/extra-field-collection", () => {
         const field = UnknownExtraField.deserialize(buffer, 3);
 
         assert.strictEqual(field.tag, 0xcdef);
-        assert.strictEqual(field.dataSize, 10);
+        assert.strictEqual(field.dataLength, 10);
 
         assertBufferEqual(field.data, data("0102030405060708090a"));
       });
@@ -473,7 +473,7 @@ describe("core/extra-field-collection", () => {
         const field0 = fields.fields[0];
         assertInstanceOf(field0, UnicodeExtraField);
         assert.strictEqual(field0.tag, ExtraFieldTag.UnicodeCommentField);
-        assert.strictEqual(field0.dataSize, 8);
+        assert.strictEqual(field0.dataLength, 8);
         assert.strictEqual(field0.crc32, 0x3610a686);
         assert.strictEqual(field0.value, "ABC");
 
@@ -485,14 +485,14 @@ describe("core/extra-field-collection", () => {
         const field2 = fields.fields[2];
         assertInstanceOf(field2, UnicodeExtraField);
         assert.strictEqual(field2.tag, ExtraFieldTag.UnicodePathField);
-        assert.strictEqual(field2.dataSize, 9);
+        assert.strictEqual(field2.dataLength, 9);
         assert.strictEqual(field2.crc32, 0x3a771143);
         assert.strictEqual(field2.value, "🥺");
 
         const field3 = fields.fields[3];
         assertInstanceOf(field3, Zip64ExtraField);
         assert.strictEqual(field3.tag, ExtraFieldTag.Zip64ExtendedInfo);
-        assert.strictEqual(field3.dataSize, 24);
+        assert.strictEqual(field3.dataLength, 24);
         assert.deepStrictEqual(
           field3.values,
           [0x060504030201, 0x010203040506, 0x010203010203],

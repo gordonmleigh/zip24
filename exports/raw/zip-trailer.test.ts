@@ -37,9 +37,9 @@ describe("core/zip-trailer", () => {
         const record = Eocdr.deserialize(buffer);
 
         assert.strictEqual(record.comment, "hello world");
-        assert.strictEqual(record.count, 0x1234);
-        assert.strictEqual(record.offset, 0x21436587);
-        assert.strictEqual(record.size, 0x78563412);
+        assert.strictEqual(record.entryCount, 0x1234);
+        assert.strictEqual(record.directoryStart, 0x21436587);
+        assert.strictEqual(record.directoryLength, 0x78563412);
       });
 
       it("throws if the signature is invalid", () => {
@@ -99,9 +99,9 @@ describe("core/zip-trailer", () => {
         const record = Eocdr.deserialize(buffer);
 
         assert.strictEqual(record.comment, "hello world");
-        assert.strictEqual(record.count, 0xffff);
-        assert.strictEqual(record.offset, 0xffff_ffff);
-        assert.strictEqual(record.size, 0xffff_ffff);
+        assert.strictEqual(record.entryCount, 0xffff);
+        assert.strictEqual(record.directoryStart, 0xffff_ffff);
+        assert.strictEqual(record.directoryLength, 0xffff_ffff);
       });
     });
 
@@ -151,9 +151,9 @@ describe("core/zip-trailer", () => {
       it("writes all the values", () => {
         const record = new Eocdr({
           comment: "hello world",
-          count: 0x1234,
-          offset: 0x21436587,
-          size: 0x78563412,
+          entryCount: 0x1234,
+          directoryStart: 0x21436587,
+          directoryLength: 0x78563412,
         });
 
         const expected = data(
@@ -177,9 +177,9 @@ describe("core/zip-trailer", () => {
         const record = new Eocdr(
           {
             comment: "hello world",
-            count: 0x1234,
-            offset: 0x21436587,
-            size: 0x78563412,
+            entryCount: 0x1234,
+            directoryStart: 0x21436587,
+            directoryLength: 0x78563412,
           },
           true,
         );
@@ -355,9 +355,9 @@ describe("core/zip-trailer", () => {
         assert.strictEqual(eocdr.versionMadeBy, ZipVersion.Utf8Encoding);
         assert.strictEqual(eocdr.platformMadeBy, ZipPlatform.DOS);
         assert.strictEqual(eocdr.versionNeeded, ZipVersion.Zip64);
-        assert.strictEqual(eocdr.count, 0x0123456789ab);
-        assert.strictEqual(eocdr.size, 0xabcdef010203);
-        assert.strictEqual(eocdr.offset, 0x010203abcdef);
+        assert.strictEqual(eocdr.entryCount, 0x0123456789ab);
+        assert.strictEqual(eocdr.directoryLength, 0xabcdef010203);
+        assert.strictEqual(eocdr.directoryStart, 0x010203abcdef);
       });
 
       it("throws if the signature is invalid", () => {
@@ -387,10 +387,10 @@ describe("core/zip-trailer", () => {
     describe("serialize()", () => {
       it("writes all the fields", () => {
         const eocdr = new Zip64Eocdr({
-          count: 0x112233445566,
-          offset: 0x665544332211,
+          entryCount: 0x112233445566,
+          directoryStart: 0x665544332211,
           platformMadeBy: ZipPlatform.UNIX,
-          size: 0x555544443333,
+          directoryLength: 0x555544443333,
           versionMadeBy: ZipVersion.Zip64,
           versionNeeded: ZipVersion.Utf8Encoding,
         });
@@ -421,14 +421,14 @@ describe("core/zip-trailer", () => {
       it("sets eocdr fields if provider", () => {
         const trailer = new ZipTrailer({
           comment: "the comment",
-          count: 42,
-          offset: 123,
-          size: 96,
+          entryCount: 42,
+          directoryStart: 123,
+          directoryLength: 96,
         });
         assert.strictEqual(trailer.comment, "the comment");
-        assert.strictEqual(trailer.count, 42);
-        assert.strictEqual(trailer.offset, 123);
-        assert.strictEqual(trailer.size, 96);
+        assert.strictEqual(trailer.entryCount, 42);
+        assert.strictEqual(trailer.directoryStart, 123);
+        assert.strictEqual(trailer.directoryLength, 96);
         assert.strictEqual(trailer.zip64, undefined);
       });
 
@@ -436,23 +436,23 @@ describe("core/zip-trailer", () => {
         const trailer = new ZipTrailer(
           {
             comment: "the comment",
-            count: 42,
-            offset: 123,
-            size: 96,
+            entryCount: 42,
+            directoryStart: 123,
+            directoryLength: 96,
           },
           {
-            count: 142,
-            offset: 1123,
-            size: 196,
+            entryCount: 142,
+            directoryStart: 1123,
+            directoryLength: 196,
             platformMadeBy: ZipPlatform.UNIX,
             versionMadeBy: ZipVersion.Utf8Encoding,
             versionNeeded: ZipVersion.Zip64,
           },
         );
         assert.strictEqual(trailer.comment, "the comment");
-        assert.strictEqual(trailer.count, 142);
-        assert.strictEqual(trailer.offset, 1123);
-        assert.strictEqual(trailer.size, 196);
+        assert.strictEqual(trailer.entryCount, 142);
+        assert.strictEqual(trailer.directoryStart, 1123);
+        assert.strictEqual(trailer.directoryLength, 196);
         assert(trailer.zip64);
         assert.strictEqual(trailer.zip64.platformMadeBy, ZipPlatform.UNIX);
         assert.strictEqual(
