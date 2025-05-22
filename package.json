@@ -1,6 +1,6 @@
 {
   "name": "zip24",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A zip package for the modern age",
   "type": "module",
   "author": "Gordon Leigh",
@@ -107,8 +107,7 @@
           "name": "eslint"
         },
         "header": "# Changelog",
-        "infile": "CHANGELOG.md",
-        "strictSemVer": true
+        "infile": "CHANGELOG.md"
       }
     }
   }
