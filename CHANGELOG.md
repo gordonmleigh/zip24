@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/gordonmleigh/zip24/compare/v1.0.2...v1.0.3) (2025-05-23)
+
+
+### Fix
+
+* export more types related to reader ([0fcc56b](https://github.com/gordonmleigh/zip24/commit/0fcc56b2fc6be3c120b5b21a218c5926c731065d))
+
 ## [1.0.2](https://github.com/gordonmleigh/zip24/compare/v0.1.7...v1.0.2) (2025-05-22)
 
 
