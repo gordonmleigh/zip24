@@ -4,7 +4,13 @@ import {
   type ZipReaderOptions,
 } from "../reader.ts";
 
-export type { ZipReaderOptions } from "../reader.ts";
+export type {
+  OpenStreamOptions,
+  RandomAccessReader,
+  RandomAccessReadOptions,
+  ZipReaderOptions,
+  ZipReaderOptionsWithFileSize,
+} from "../reader.ts";
 
 /**
  * An object which can read a zip file from a {@link RandomAccessReader}.

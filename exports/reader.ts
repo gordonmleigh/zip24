@@ -23,6 +23,11 @@ import {
   ZipTrailer,
 } from "./raw/zip-trailer.ts";
 
+export type {
+  RandomAccessReader,
+  RandomAccessReadOptions,
+} from "../util/streams.ts";
+
 /**
  * Options for {@link ZipReaderOptions.openStream}.
  */
@@ -44,6 +49,16 @@ export type ZipReaderOptions = {
    * data will be read in chunks via the {@link RandomAccessReader}.
    */
   openStream?: ((options: OpenStreamOptions) => ByteSource) | undefined;
+};
+
+/**
+ * Options for {@link ZipReader} instance.
+ */
+export type ZipReaderOptionsWithFileSize = ZipReaderOptions & {
+  /**
+   * The total size of the zip file, in bytes.
+   */
+  fileSize: number;
 };
 
 /**
@@ -92,13 +107,26 @@ export class ZipReader
 
   public constructor(
     reader: RandomAccessReader,
+    options: ZipReaderOptionsWithFileSize,
+  );
+  public constructor(
+    reader: RandomAccessReader,
     fileSize: number,
+    options?: ZipReaderOptions,
+  );
+  public constructor(
+    reader: RandomAccessReader,
+    fileSizeOrOptions: number | ZipReaderOptionsWithFileSize,
     options: ZipReaderOptions = {},
   ) {
     this.#bufferSize = options.bufferSize ?? ZipReader.DefaultBufferSize;
-    this.#fileSize = fileSize;
     this.#reader = reader;
     this.#openStream = options.openStream;
+
+    this.#fileSize =
+      typeof fileSizeOrOptions === "number"
+        ? fileSizeOrOptions
+        : fileSizeOrOptions.fileSize;
 
     assert(
       this.#bufferSize >= ZipReader.MinBufferSize,

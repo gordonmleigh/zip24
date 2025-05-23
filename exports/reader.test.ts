@@ -67,13 +67,10 @@ describe("exports/reader", () => {
           fileSize: 10,
         }),
       );
-      const reader = new ZipReader(
-        randomAccessReaderFromBuffer(data),
-        data.byteLength,
-        {
-          bufferSize: ZipReader.MinBufferSize,
-        },
-      );
+      const reader = new ZipReader(randomAccessReaderFromBuffer(data), {
+        bufferSize: ZipReader.MinBufferSize,
+        fileSize: data.byteLength,
+      });
 
       let fileIndex = 0;
       for await (const file of reader) {
