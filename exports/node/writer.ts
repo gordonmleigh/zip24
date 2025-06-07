@@ -15,11 +15,11 @@ export type ZipWriterOptions = {
 };
 
 /**
- * An object which can read a zip file from a {@link RandomAccessReader}.
+ * An object which can create a zip file..
  */
 export class ZipWriter extends ZipWriterBase {
   /**
-   * Read a zip file from the given path.
+   * Create a zip file at the given path.
    */
   public static open(
     path: string,
@@ -31,13 +31,13 @@ export class ZipWriter extends ZipWriterBase {
     });
   }
 
-  public constructor(options: ZipWriterOptions) {
+  public constructor(options?: ZipWriterOptions) {
     super({
       ...options,
       destination:
-        options.destination instanceof Writable
+        options?.destination instanceof Writable
           ? Writable.toWeb(options.destination)
-          : options.destination,
+          : options?.destination,
     });
   }
 }
