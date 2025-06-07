@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/gordonmleigh/zip24/compare/v1.0.3...v1.0.4) (2025-06-07)
+
+
+### Fix
+
+* node ZipWriter nits ([9ff095e](https://github.com/gordonmleigh/zip24/commit/9ff095e050ee664251b293b1083208dc63504539))
+
 ## [1.0.3](https://github.com/gordonmleigh/zip24/compare/v1.0.2...v1.0.3) (2025-05-23)
 
 
